@@ -1,0 +1,50 @@
+from datetime import datetime
+from aiogram import types, Dispatcher
+from aiogram.dispatcher import FSMContext
+
+from ..services import classify_food, recognize_dish, calculate_macros
+from ..utils import format_meal_message
+from ..keyboards import meal_actions_kb
+from ..states import EditMeal
+from ..storage import pending_meals
+
+async def handle_photo(message: types.Message, state: FSMContext):
+    await message.reply("Получил, анализирую…")
+    photo = message.photo[-1]
+    photo_file = await photo.download()
+    classification = await classify_food(photo_file.name)
+    if not classification['is_food'] or classification['confidence'] < 0.7:
+        await message.answer("Я не увидел еду на фото, попробуйте снова.")
+        return
+
+    dish = await recognize_dish(photo_file.name)
+    name = dish.get('name')
+    ingredients = dish.get('ingredients', [])
+    serving = dish.get('serving', 0)
+
+    if not name:
+        markup = types.InlineKeyboardMarkup().add(
+            types.InlineKeyboardButton("Уточнить вес/ингр.", callback_data="refine")
+        )
+        await state.update_data(photo_path=photo_file.name, ingredients=ingredients, serving=serving)
+        await message.answer("Не смог распознать блюдо. Уточните вес/ингредиенты.", reply_markup=markup)
+        await EditMeal.waiting_input.set()
+        return
+
+    macros = await calculate_macros(ingredients, serving)
+    meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
+    pending_meals[meal_id] = {
+        'name': name,
+        'ingredients': ingredients,
+        'serving': serving,
+        'macros': macros,
+    }
+
+    await message.answer(
+        format_meal_message(name, serving, macros),
+        reply_markup=meal_actions_kb(meal_id)
+    )
+
+
+def register(dp: Dispatcher):
+    dp.register_message_handler(handle_photo, content_types=types.ContentType.PHOTO)
