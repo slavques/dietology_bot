@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
-from aiogram import types, Dispatcher
-
+from aiogram import types, Dispatcher, F
+from aiogram.filters import Command
 from ..database import SessionLocal, Meal, User
 from ..utils import make_bar_chart
 from ..keyboards import stats_period_kb
@@ -45,5 +45,5 @@ async def cb_stats(query: types.CallbackQuery):
 
 
 def register(dp: Dispatcher):
-    dp.register_message_handler(cmd_stats, commands=['stats'])
-    dp.register_callback_query_handler(cb_stats, lambda c: c.data.startswith('stats:'))
+    dp.message.register(cmd_stats, Command('stats'))
+    dp.callback_query.register(cb_stats, F.data.startswith('stats:'))

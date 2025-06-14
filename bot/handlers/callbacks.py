@@ -1,7 +1,6 @@
 from datetime import datetime
-from aiogram import types, Dispatcher
-from aiogram.dispatcher import FSMContext
-
+from aiogram import types, Dispatcher, F
+from aiogram.fsm.context import FSMContext
 from ..database import SessionLocal, User, Meal
 from ..services import calculate_macros
 from ..utils import format_meal_message
@@ -13,7 +12,7 @@ async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
     await query.bot.send_message(query.from_user.id, "Введите название и вес, напр. 'Яблоко 150'")
-    await EditMeal.waiting_input.set()
+    await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
 async def process_edit(message: types.Message, state: FSMContext):
@@ -38,7 +37,7 @@ async def process_edit(message: types.Message, state: FSMContext):
         format_meal_message(name, serving, macros),
         reply_markup=meal_actions_kb(meal_id)
     )
-    await state.finish()
+    await state.clear()
 
 async def cb_delete(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
@@ -75,7 +74,7 @@ async def cb_save(query: types.CallbackQuery):
 
 
 def register(dp: Dispatcher):
-    dp.register_callback_query_handler(cb_edit, lambda c: c.data.startswith('edit:'))
-    dp.register_message_handler(process_edit, state=EditMeal.waiting_input)
-    dp.register_callback_query_handler(cb_delete, lambda c: c.data.startswith('delete:'))
-    dp.register_callback_query_handler(cb_save, lambda c: c.data.startswith('save:'))
+    dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
+    dp.message.register(process_edit, state=EditMeal.waiting_input)
+    dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
+    dp.callback_query.register(cb_save, F.data.startswith('save:'))

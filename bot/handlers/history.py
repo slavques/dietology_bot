@@ -1,5 +1,5 @@
-from aiogram import types, Dispatcher, Bot
-
+from aiogram import types, Dispatcher, Bot, F
+from aiogram.filters import Command
 from ..database import SessionLocal, Meal, User
 from ..utils import format_meal_message
 from ..keyboards import history_nav_kb
@@ -39,5 +39,5 @@ async def cb_history(query: types.CallbackQuery):
 
 
 def register(dp: Dispatcher):
-    dp.register_message_handler(cmd_history, commands=['history'])
-    dp.register_callback_query_handler(cb_history, lambda c: c.data.startswith('hist:'))
+    dp.message.register(cmd_history, Command('history'))
+    dp.callback_query.register(cb_history, F.data.startswith('hist:'))

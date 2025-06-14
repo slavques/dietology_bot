@@ -1,15 +1,12 @@
 import logging
+import asyncio
 from aiogram import Bot, Dispatcher
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.utils import executor
-
+from aiogram.fsm.storage.memory import MemoryStorage
 from .config import API_TOKEN
 from .handlers import start, photo, history, stats, callbacks
 
-logging.basicConfig(level=logging.INFO)
-
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot, storage=MemoryStorage())
+dp = Dispatcher(storage=MemoryStorage())
 
 # register handlers
 start.register(dp)
@@ -18,5 +15,10 @@ history.register(dp)
 stats.register(dp)
 callbacks.register(dp)
 
+async def main() -> None:
+    await dp.start_polling(bot)
+
+
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(main())

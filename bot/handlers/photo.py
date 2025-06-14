@@ -1,7 +1,6 @@
 from datetime import datetime
-from aiogram import types, Dispatcher
-from aiogram.dispatcher import FSMContext
-
+from aiogram import types, Dispatcher, F
+from aiogram.fsm.context import FSMContext
 from ..services import classify_food, recognize_dish, calculate_macros
 from ..utils import format_meal_message
 from ..keyboards import meal_actions_kb
@@ -28,7 +27,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         )
         await state.update_data(photo_path=photo_file.name, ingredients=ingredients, serving=serving)
         await message.answer("Не смог распознать блюдо. Уточните вес/ингредиенты.", reply_markup=markup)
-        await EditMeal.waiting_input.set()
+        await state.set_state(EditMeal.waiting_input)
         return
 
     macros = await calculate_macros(ingredients, serving)
@@ -47,4 +46,4 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
 
 def register(dp: Dispatcher):
-    dp.register_message_handler(handle_photo, content_types=types.ContentType.PHOTO)
+    dp.message.register(handle_photo, F.photo)
