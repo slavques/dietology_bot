@@ -19,4 +19,7 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
    python bot.py
    ```
 
+
 The database is stored in `bot.db` in the project root by default. You can change this by setting `DATABASE_URL`.
+
+If the OpenAI API is overloaded, the bot will respond that the recognition service is unavailable. Simply try again later.

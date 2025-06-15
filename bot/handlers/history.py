@@ -1,5 +1,6 @@
 from aiogram import types, Dispatcher, Bot, F
 from aiogram.filters import Command
+
 from ..database import SessionLocal, Meal, User
 from ..utils import format_meal_message
 from ..keyboards import history_nav_kb

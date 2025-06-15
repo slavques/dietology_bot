@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from aiogram import types, Dispatcher, F
 from aiogram.filters import Command
+
 from ..database import SessionLocal, Meal, User
 from ..utils import make_bar_chart
 from ..keyboards import stats_period_kb

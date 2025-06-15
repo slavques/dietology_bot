@@ -13,6 +13,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
 
 from bot.services import classify_food, recognize_dish, calculate_macros
+
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime, ForeignKey
 )
@@ -307,6 +308,7 @@ dp.message.register(cmd_history, Command('history'))
 dp.message.register(cmd_stats, Command('stats'))
 
 dp.message.register(process_edit, StateFilter(EditMeal.waiting_input))
+
 dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
 dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
 dp.callback_query.register(cb_save, F.data.startswith('save:'))

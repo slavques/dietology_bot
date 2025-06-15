@@ -2,6 +2,7 @@ from datetime import datetime
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
+
 from ..database import SessionLocal, User, Meal
 from ..services import calculate_macros
 from ..utils import format_meal_message
