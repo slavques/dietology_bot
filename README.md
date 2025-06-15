@@ -14,5 +14,4 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
    ```bash
    python -m bot.main
    ```
-
 The database is stored in `bot.db` in the project root by default. You can change this by setting `DATABASE_URL`.
