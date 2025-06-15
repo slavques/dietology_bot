@@ -1,7 +1,6 @@
 from datetime import datetime
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
-
 from ..services import classify_food, recognize_dish, calculate_macros
 from ..utils import format_meal_message
 from ..keyboards import meal_actions_kb

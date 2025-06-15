@@ -2,7 +2,6 @@ import logging
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-
 from .config import API_TOKEN
 from .handlers import start, photo, history, stats, callbacks
 
