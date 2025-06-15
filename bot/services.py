@@ -1,5 +1,6 @@
 import json
 import base64
+import re
 from typing import Dict, List
 
 import openai
@@ -50,6 +51,13 @@ async def classify_food(photo_path: str) -> Dict[str, float]:
     try:
         return json.loads(content)
     except Exception:
+
+        match = re.search(r"\{.*\}", content)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
         return {"is_food": False, "confidence": 0.0}
 
 
@@ -85,6 +93,12 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
     try:
         return json.loads(content)
     except Exception:
+        match = re.search(r"\{.*\}", content)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
         return {"name": None, "ingredients": [], "serving": 0}
 
 
@@ -103,4 +117,10 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
     try:
         return json.loads(content)
     except Exception:
+        match = re.search(r"\{.*\}", content)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
         return {"calories": 0, "protein": 0, "fat": 0, "carbs": 0}
