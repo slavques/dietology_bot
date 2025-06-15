@@ -12,6 +12,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
 
+from bot.services import classify_food, recognize_dish, calculate_macros
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime, ForeignKey
 )
@@ -53,25 +54,6 @@ Base.metadata.create_all(engine)
 
 class EditMeal(StatesGroup):
     waiting_input = State()
-
-
-async def classify_food(photo_path: str) -> Dict[str, float]:
-    """Stub: detect food vs non-food."""
-    return {"is_food": True, "confidence": 0.9}
-
-
-async def recognize_dish(photo_path: str) -> Dict[str, any]:
-    """Stub: recognize dish name and ingredients."""
-    return {
-        "name": "Sample dish",
-        "ingredients": ["ingredient1", "ingredient2"],
-        "serving": 150,
-    }
-
-
-async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, float]:
-    """Stub: calculate macros for given ingredients."""
-    return {"calories": 250, "protein": 20, "fat": 10, "carbs": 30}
 
 
 def format_meal_message(name: str, serving: float, macros: Dict[str, float]) -> str:

@@ -51,7 +51,6 @@ async def classify_food(photo_path: str) -> Dict[str, float]:
     try:
         return json.loads(content)
     except Exception:
-
         match = re.search(r"\{.*\}", content)
         if match:
             try:
@@ -123,4 +122,5 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
                 return json.loads(match.group(0))
             except Exception:
                 pass
+
         return {"calories": 0, "protein": 0, "fat": 0, "carbs": 0}
