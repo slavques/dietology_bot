@@ -21,13 +21,11 @@ async def handle_photo(message: types.Message, state: FSMContext):
     if classification.get('error'):
         await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
         return
-
     if not classification['is_food'] or classification['confidence'] < 0.7:
         await message.answer("Я не увидел еду на фото, попробуйте снова.")
         return
 
     dish = await recognize_dish(photo_path)
-
     if dish.get('error'):
         await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
         return
@@ -51,7 +49,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
     if macros.get('error'):
         await message.answer("Сервис расчета недоступен. Попробуйте позднее.")
         return
-
     meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
     pending_meals[meal_id] = {
         'name': name,

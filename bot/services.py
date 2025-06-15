@@ -1,18 +1,15 @@
 import json
 import base64
 import re
-
 import asyncio
 from typing import Dict, List
 
 import openai
 from openai import RateLimitError, BadRequestError
 
-
 from .config import OPENAI_API_KEY
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
-
 
 
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
@@ -56,15 +53,14 @@ async def classify_food(photo_path: str) -> Dict[str, float]:
             "content": [
                 {
                     "type": "image_url",
-                    "image_url": f"data:image/jpeg;base64,{b64}",
+
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
                 }
             ],
         },
     ])
-
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
-
     try:
         return json.loads(content)
     except Exception:
@@ -101,7 +97,8 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
             "content": [
                 {
                     "type": "image_url",
-                    "image_url": f"data:image/jpeg;base64,{b64}",
+
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
                 }
             ],
         },
@@ -133,7 +130,6 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
     content = await _chat([
         {"role": "system", "content": prompt}
     ])
-
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
