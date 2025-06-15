@@ -1,6 +1,5 @@
 from aiogram import types, Dispatcher
 from aiogram.filters import Command
-
 from ..database import SessionLocal, User
 
 async def cmd_start(message: types.Message):

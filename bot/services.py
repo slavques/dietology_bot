@@ -51,6 +51,7 @@ async def classify_food(photo_path: str) -> Dict[str, float]:
     try:
         return json.loads(content)
     except Exception:
+
         match = re.search(r"\{.*\}", content)
         if match:
             try:
