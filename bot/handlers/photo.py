@@ -1,8 +1,8 @@
 from datetime import datetime
 from aiogram import types, Dispatcher, F
-
 import tempfile
 from aiogram.fsm.context import FSMContext
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..services import classify_food, recognize_dish, calculate_macros
 from ..utils import format_meal_message
 from ..keyboards import meal_actions_kb
@@ -16,7 +16,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
     classification = await classify_food(photo_path)
-
     if not classification['is_food'] or classification['confidence'] < 0.7:
         await message.answer("Я не увидел еду на фото, попробуйте снова.")
         return
@@ -27,11 +26,13 @@ async def handle_photo(message: types.Message, state: FSMContext):
     serving = dish.get('serving', 0)
 
     if not name:
-        markup = types.InlineKeyboardMarkup().add(
-            types.InlineKeyboardButton("Уточнить вес/ингр.", callback_data="refine")
+        builder = InlineKeyboardBuilder()
+        builder.button(text="Уточнить вес/ингр.", callback_data="refine")
+        await state.update_data(photo_path=photo_path, ingredients=ingredients, serving=serving)
+        await message.answer(
+            "Не смог распознать блюдо. Уточните вес/ингредиенты.",
+            reply_markup=builder.as_markup(),
         )
-        await state.update_data(photo_path=photo_file.name, ingredients=ingredients, serving=serving)
-        await message.answer("Не смог распознать блюдо. Уточните вес/ингредиенты.", reply_markup=markup)
         await state.set_state(EditMeal.waiting_input)
         return
 

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 
 from aiogram import Bot, Dispatcher, types, F
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 import tempfile
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -91,32 +92,32 @@ def make_bar_chart(totals: Dict[str, float]) -> str:
 
 
 def meal_actions_kb(meal_id: str) -> types.InlineKeyboardMarkup:
-    markup = types.InlineKeyboardMarkup(row_width=3)
-    markup.add(
-        types.InlineKeyboardButton("Редактировать", callback_data=f"edit:{meal_id}"),
-        types.InlineKeyboardButton("Удалить", callback_data=f"delete:{meal_id}"),
-        types.InlineKeyboardButton("В историю", callback_data=f"save:{meal_id}"),
-    )
-    return markup
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Редактировать", callback_data=f"edit:{meal_id}")
+    builder.button(text="Удалить", callback_data=f"delete:{meal_id}")
+    builder.button(text="В историю", callback_data=f"save:{meal_id}")
+    builder.adjust(3)
+    return builder.as_markup()
 
 
 def history_nav_kb(offset: int, total: int) -> types.InlineKeyboardMarkup:
-    markup = types.InlineKeyboardMarkup()
+    builder = InlineKeyboardBuilder()
     if offset > 0:
-        markup.insert(types.InlineKeyboardButton("\u2190", callback_data=f"hist:{offset-1}"))
+        builder.button(text="\u2190", callback_data=f"hist:{offset-1}")
     if offset < total - 1:
-        markup.insert(types.InlineKeyboardButton("\u2192", callback_data=f"hist:{offset+1}"))
-    return markup
+        builder.button(text="\u2192", callback_data=f"hist:{offset+1}")
+    if builder.buttons:
+        builder.adjust(len(builder.buttons))
+    return builder.as_markup()
 
 
 def stats_period_kb() -> types.InlineKeyboardMarkup:
-    markup = types.InlineKeyboardMarkup(row_width=3)
-    markup.add(
-        types.InlineKeyboardButton("День", callback_data="stats:day"),
-        types.InlineKeyboardButton("Неделя", callback_data="stats:week"),
-        types.InlineKeyboardButton("Месяц", callback_data="stats:month"),
-    )
-    return markup
+    builder = InlineKeyboardBuilder()
+    builder.button(text="День", callback_data="stats:day")
+    builder.button(text="Неделя", callback_data="stats:week")
+    builder.button(text="Месяц", callback_data="stats:month")
+    builder.adjust(3)
+    return builder.as_markup()
 
 
 pending_meals: Dict[str, Dict] = {}
@@ -148,11 +149,13 @@ async def handle_photo(message: types.Message, state: FSMContext):
     ingredients = dish.get('ingredients', [])
     serving = dish.get('serving', 0)
     if not name:
-        markup = types.InlineKeyboardMarkup().add(
-            types.InlineKeyboardButton("Уточнить вес/ингр.", callback_data="refine")
-        )
+        builder = InlineKeyboardBuilder()
+        builder.button(text="Уточнить вес/ингр.", callback_data="refine")
         await state.update_data(photo_path=photo_path, ingredients=ingredients, serving=serving)
-        await message.answer("Не смог распознать блюдо. Уточните вес/ингредиенты.", reply_markup=markup)
+        await message.answer(
+            "Не смог распознать блюдо. Уточните вес/ингредиенты.",
+            reply_markup=builder.as_markup(),
+        )
         await state.set_state(EditMeal.waiting_input)
         return
     macros = await calculate_macros(ingredients, serving)
@@ -327,6 +330,15 @@ dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
 dp.callback_query.register(cb_save, F.data.startswith('save:'))
 dp.callback_query.register(cb_history, F.data.startswith('hist:'))
 dp.callback_query.register(cb_stats, F.data.startswith('stats:'))
+
+async def handle_error(update: types.Update, exception: Exception) -> bool:
+    if isinstance(update, types.Message):
+        await update.answer("Произошла ошибка на сервере, попробуйте позже.")
+    elif isinstance(update, types.CallbackQuery):
+        await update.message.answer("Произошла ошибка на сервере, попробуйте позже.")
+    return True
+
+dp.errors.register(handle_error)
 
 
 async def main() -> None:
