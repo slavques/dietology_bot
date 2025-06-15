@@ -4,7 +4,9 @@ import re
 from typing import Dict, List
 
 import openai
+
 from openai import RateLimitError
+
 
 from .config import OPENAI_API_KEY
 
@@ -21,8 +23,10 @@ async def _chat(messages: List[Dict]) -> str:
             max_tokens=200,
         )
         return resp.choices[0].message.content
+
     except RateLimitError:
         return "__RATE_LIMIT__"
+
     except Exception:
         return ""
 
@@ -51,8 +55,10 @@ async def classify_food(photo_path: str) -> Dict[str, float]:
             ],
         },
     ])
+
     if content == "__RATE_LIMIT__":
         return {"error": "rate_limit"}
+
     try:
         return json.loads(content)
     except Exception:
@@ -94,8 +100,10 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
             ],
         },
     ])
+
     if content == "__RATE_LIMIT__":
         return {"error": "rate_limit"}
+
     try:
         return json.loads(content)
     except Exception:
@@ -120,8 +128,10 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
     content = await _chat([
         {"role": "system", "content": prompt}
     ])
+
     if content == "__RATE_LIMIT__":
         return {"error": "rate_limit"}
+
     try:
         return json.loads(content)
     except Exception:
@@ -131,4 +141,5 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
                 return json.loads(match.group(0))
             except Exception:
                 pass
+
         return {"calories": 0, "protein": 0, "fat": 0, "carbs": 0}

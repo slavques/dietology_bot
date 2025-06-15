@@ -17,17 +17,21 @@ async def handle_photo(message: types.Message, state: FSMContext):
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
     classification = await classify_food(photo_path)
+
     if classification.get('error') == 'rate_limit':
         await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
         return
+
     if not classification['is_food'] or classification['confidence'] < 0.7:
         await message.answer("Я не увидел еду на фото, попробуйте снова.")
         return
 
     dish = await recognize_dish(photo_path)
+
     if dish.get('error') == 'rate_limit':
         await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
         return
+
     name = dish.get('name')
     ingredients = dish.get('ingredients', [])
     serving = dish.get('serving', 0)
@@ -44,9 +48,11 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
 
     macros = await calculate_macros(ingredients, serving)
+
     if macros.get('error') == 'rate_limit':
         await message.answer("Сервис расчета недоступен. Попробуйте позднее.")
         return
+
     meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
     pending_meals[meal_id] = {
         'name': name,
