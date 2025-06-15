@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
+import tempfile
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
@@ -135,12 +136,14 @@ async def cmd_start(message: types.Message):
 async def handle_photo(message: types.Message, state: FSMContext):
     await message.reply("Получил, анализирую…")
     photo = message.photo[-1]
-    photo_file = await photo.download()
-    classification = await classify_food(photo_file.name)
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        await message.bot.download(photo.file_id, destination=tmp.name)
+        photo_path = tmp.name
+    classification = await classify_food(photo_path)
     if not classification['is_food'] or classification['confidence'] < 0.7:
         await message.answer("Я не увидел еду на фото, попробуйте снова.")
         return
-    dish = await recognize_dish(photo_file.name)
+    dish = await recognize_dish(photo_path)
     name = dish.get('name')
     ingredients = dish.get('ingredients', [])
     serving = dish.get('serving', 0)
@@ -148,7 +151,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         markup = types.InlineKeyboardMarkup().add(
             types.InlineKeyboardButton("Уточнить вес/ингр.", callback_data="refine")
         )
-        await state.update_data(photo_path=photo_file.name, ingredients=ingredients, serving=serving)
+        await state.update_data(photo_path=photo_path, ingredients=ingredients, serving=serving)
         await message.answer("Не смог распознать блюдо. Уточните вес/ингредиенты.", reply_markup=markup)
         await state.set_state(EditMeal.waiting_input)
         return
@@ -317,8 +320,8 @@ dp.message.register(cmd_start, Command('start'))
 dp.message.register(handle_photo, F.photo)
 dp.message.register(cmd_history, Command('history'))
 dp.message.register(cmd_stats, Command('stats'))
-dp.message.register(process_edit, state=EditMeal.waiting_input)
 
+dp.message.register(process_edit, StateFilter(EditMeal.waiting_input))
 dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
 dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
 dp.callback_query.register(cb_save, F.data.startswith('save:'))

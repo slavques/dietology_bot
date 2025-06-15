@@ -1,5 +1,7 @@
 from datetime import datetime
 from aiogram import types, Dispatcher, F
+
+import tempfile
 from aiogram.fsm.context import FSMContext
 from ..services import classify_food, recognize_dish, calculate_macros
 from ..utils import format_meal_message
@@ -10,13 +12,16 @@ from ..storage import pending_meals
 async def handle_photo(message: types.Message, state: FSMContext):
     await message.reply("Получил, анализирую…")
     photo = message.photo[-1]
-    photo_file = await photo.download()
-    classification = await classify_food(photo_file.name)
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        await message.bot.download(photo.file_id, destination=tmp.name)
+        photo_path = tmp.name
+    classification = await classify_food(photo_path)
+
     if not classification['is_food'] or classification['confidence'] < 0.7:
         await message.answer("Я не увидел еду на фото, попробуйте снова.")
         return
 
-    dish = await recognize_dish(photo_file.name)
+    dish = await recognize_dish(photo_path)
     name = dish.get('name')
     ingredients = dish.get('ingredients', [])
     serving = dish.get('serving', 0)
