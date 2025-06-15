@@ -1,6 +1,7 @@
 from datetime import datetime
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
+from aiogram.filters import StateFilter
 from ..database import SessionLocal, User, Meal
 from ..services import calculate_macros
 from ..utils import format_meal_message
@@ -75,6 +76,6 @@ async def cb_save(query: types.CallbackQuery):
 
 def register(dp: Dispatcher):
     dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
-    dp.message.register(process_edit, state=EditMeal.waiting_input)
+    dp.message.register(process_edit, StateFilter(EditMeal.waiting_input))
     dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
     dp.callback_query.register(cb_save, F.data.startswith('save:'))
