@@ -18,7 +18,6 @@ stats.register(dp)
 callbacks.register(dp)
 
 dp.errors.register(handle_error)
-
 async def main() -> None:
     await dp.start_polling(bot)
 
