@@ -1,11 +1,12 @@
 import json
 import base64
 import re
+
+import asyncio
 from typing import Dict, List
 
 import openai
-
-from openai import RateLimitError
+from openai import RateLimitError, BadRequestError
 
 
 from .config import OPENAI_API_KEY
@@ -13,22 +14,27 @@ from .config import OPENAI_API_KEY
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 
-async def _chat(messages: List[Dict]) -> str:
+
+async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
     if not client.api_key:
         return ""
-    try:
-        resp = await client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            max_tokens=200,
-        )
-        return resp.choices[0].message.content
-
-    except RateLimitError:
-        return "__RATE_LIMIT__"
-
-    except Exception:
-        return ""
+    for attempt in range(retries):
+        try:
+            resp = await client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                max_tokens=200,
+            )
+            return resp.choices[0].message.content
+        except RateLimitError:
+            if attempt < retries - 1:
+                await asyncio.sleep(backoff * (2 ** attempt))
+                continue
+            return "__RATE_LIMIT__"
+        except BadRequestError:
+            return "__BAD_REQUEST__"
+        except Exception:
+            return "__ERROR__"
 
 
 async def classify_food(photo_path: str) -> Dict[str, float]:
@@ -56,8 +62,8 @@ async def classify_food(photo_path: str) -> Dict[str, float]:
         },
     ])
 
-    if content == "__RATE_LIMIT__":
-        return {"error": "rate_limit"}
+    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
+        return {"error": content.strip("_").lower()}
 
     try:
         return json.loads(content)
@@ -101,9 +107,8 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
         },
     ])
 
-    if content == "__RATE_LIMIT__":
-        return {"error": "rate_limit"}
-
+    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
+        return {"error": content.strip("_").lower()}
     try:
         return json.loads(content)
     except Exception:
@@ -129,9 +134,8 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
         {"role": "system", "content": prompt}
     ])
 
-    if content == "__RATE_LIMIT__":
-        return {"error": "rate_limit"}
-
+    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
+        return {"error": content.strip("_").lower()}
     try:
         return json.loads(content)
     except Exception:
