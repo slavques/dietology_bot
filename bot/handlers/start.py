@@ -2,6 +2,7 @@ from aiogram import types, Dispatcher
 from aiogram.filters import Command
 
 from ..database import SessionLocal, User
+
 from ..keyboards import main_menu_kb
 
 async def cmd_start(message: types.Message):
@@ -12,6 +13,7 @@ async def cmd_start(message: types.Message):
         session.add(user)
         session.commit()
     session.close()
+
     text = (
         "Я — твой AI-диетолог 🧠\n\n"
         "Загрузи фото еды, и за секунды получишь:\n"

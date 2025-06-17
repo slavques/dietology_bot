@@ -4,6 +4,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
+
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 def meal_actions_kb(meal_id: str) -> InlineKeyboardMarkup:

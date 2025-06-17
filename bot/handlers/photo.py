@@ -10,6 +10,7 @@ from ..keyboards import meal_actions_kb
 from ..states import EditMeal
 from ..storage import pending_meals
 
+
 async def request_photo(message: types.Message):
     await message.answer("Отправьте фото блюда.")
 
@@ -20,6 +21,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
     classification = await classify_food(photo_path)
+
     if classification.get('error'):
         await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
         return
@@ -47,6 +49,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
 
     macros = await calculate_macros(ingredients, serving)
+
     if macros.get('error'):
         await message.answer("Сервис расчета недоступен. Попробуйте позднее.")
         return
@@ -65,5 +68,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
 
 def register(dp: Dispatcher):
+
     dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
+
     dp.message.register(handle_photo, F.photo)
