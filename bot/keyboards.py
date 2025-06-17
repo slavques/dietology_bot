@@ -36,6 +36,7 @@ def stats_period_kb() -> InlineKeyboardMarkup:
 
 
 def main_menu_kb() -> ReplyKeyboardMarkup:
+
     """Main menu with four actions arranged vertically."""
     return ReplyKeyboardMarkup(
         keyboard=[
