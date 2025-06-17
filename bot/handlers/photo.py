@@ -17,7 +17,7 @@ async def request_photo(message: types.Message):
     )
 
 async def handle_photo(message: types.Message, state: FSMContext):
-    await message.reply("Готово! \ud83d\udd0d\nАнализирую фото…")
+    await message.reply("Готово! 🔍\nАнализирую фото…")
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
@@ -28,8 +28,8 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
     if not classification['is_food'] or classification['confidence'] < 0.7:
         await message.answer(
-            "\ud83e\udd14 \u0415\u0434\u0443 \u043d\u0430 \u044d\u0442\u043e\u043c \u0444\u043e\u0442\u043e \u043d\u0430\u0439\u0442\u0438 \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c.\n"
-            "\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0434\u0440\u0443\u0433\u043e\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 \u2014 \u043f\u043e\u0441\u0442\u0430\u0440\u0430\u044e\u0441\u044c \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c."
+            "🤔 Еду на этом фото найти не удалось.\n"
+            "Попробуй отправить другое изображение — постараюсь распознать."
         )
         return
 
@@ -48,7 +48,8 @@ async def handle_photo(message: types.Message, state: FSMContext):
         builder.adjust(2)
         await state.update_data(photo_path=photo_path, ingredients=ingredients, serving=serving)
         await message.answer(
-            "\ud83e\udd14 \u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0442\u043e\u0447\u043d\u043e \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c \u0431\u043b\u044e\u0434\u043e \u043d\u0430 \u0444\u043e\u0442\u043e.\n\u041c\u043e\u0436\u0435\u0448\u044c \u0432\u0432\u0435\u0441\u0442\u0438 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438 \u0432\u0435\u0441 \u0432\u0440\u0443\u0447\u043d\u0443\u044e?",
+            "🤔 Не удалось точно распознать блюдо на фото.\n"
+            "Можешь ввести название и вес вручную?",
             reply_markup=builder.as_markup(),
         )
         await state.set_state(EditMeal.waiting_input)

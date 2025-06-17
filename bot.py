@@ -89,7 +89,6 @@ def meal_actions_kb(meal_id: str) -> types.InlineKeyboardMarkup:
     builder.button(text="✏️ Уточнить", callback_data=f"edit:{meal_id}")
     builder.button(text="🗑 Удалить", callback_data=f"delete:{meal_id}")
     builder.button(text="💾 Сохранить", callback_data=f"save:{meal_id}")
-
     builder.adjust(3)
     return builder.as_markup()
 
@@ -115,7 +114,6 @@ def stats_period_kb() -> types.InlineKeyboardMarkup:
 
 
 def main_menu_kb() -> ReplyKeyboardMarkup:
-
     """Main menu buttons arranged vertically."""
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -146,7 +144,6 @@ async def cmd_start(message: types.Message):
         session.add(user)
         session.commit()
     session.close()
-
     await message.answer(WELCOME_TEXT, reply_markup=main_menu_kb())
 
 
@@ -163,7 +160,6 @@ async def request_photo(message: types.Message):
 
 async def handle_photo(message: types.Message, state: FSMContext):
     await message.reply("Готово! \ud83d\udd0d\nАнализирую фото…")
-
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
@@ -187,7 +183,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
         await state.update_data(photo_path=photo_path, ingredients=ingredients, serving=serving)
         await message.answer(
             "\ud83e\udd14 \u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0442\u043e\u0447\u043d\u043e \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c \u0431\u043b\u044e\u0434\u043e \u043d\u0430 \u0444\u043e\u0442\u043e.\n\u041c\u043e\u0436\u0435\u0448\u044c \u0432\u0432\u0435\u0441\u0442\u0438 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438 \u0432\u0435\u0441 \u0432\u0440\u0443\u0447\u043d\u0443\u044e?",
-
             reply_markup=builder.as_markup(),
         )
         await state.set_state(EditMeal.waiting_input)
