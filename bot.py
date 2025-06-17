@@ -133,7 +133,6 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
     )
 
-
 pending_meals: Dict[str, Dict] = {}
 
 
@@ -220,7 +219,6 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
     await state.clear()
     await query.message.delete()
     await query.answer("Удалено")
-
 
 async def process_edit(message: types.Message, state: FSMContext):
     data = await state.get_data()
