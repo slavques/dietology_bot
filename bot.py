@@ -6,9 +6,7 @@ from typing import Dict, List
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-
 import tempfile
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -334,9 +332,7 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 dp.message.register(cmd_start, Command('start'))
-
 dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
-
 dp.message.register(handle_photo, F.photo)
 dp.message.register(cmd_history, Command('history'))
 dp.message.register(cmd_stats, Command('stats'))

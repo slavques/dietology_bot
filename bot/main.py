@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from .config import API_TOKEN
-from .handlers import start, photo, history, stats, callbacks
+from .handlers import start, photo, history, stats, callbacks, faq
 from .error_handler import handle_error
 
 bot = Bot(token=API_TOKEN)
@@ -16,6 +16,7 @@ photo.register(dp)
 history.register(dp)
 stats.register(dp)
 callbacks.register(dp)
+faq.register(dp)
 
 dp.errors.register(handle_error)
 

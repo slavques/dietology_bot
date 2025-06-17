@@ -6,13 +6,15 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..services import classify_food, recognize_dish, calculate_macros
 from ..utils import format_meal_message
-from ..keyboards import meal_actions_kb
+from ..keyboards import meal_actions_kb, back_menu_kb
 from ..states import EditMeal
 from ..storage import pending_meals
 
-
 async def request_photo(message: types.Message):
-    await message.answer("Отправьте фото блюда.")
+    await message.answer(
+        "\U0001F525\u041E\u0442\u043B\u0438\u0447\u043D\u043E! \u041E\u0442\u043F\u0440\u0430\u0432\u044C \u0444\u043E\u0442\u043E \u0435\u0434\u044B \u2014 \u044F \u0432\u0441\u0451 \u043F\u043E\u0441\u0447\u0438\u0442\u0430\u044E \u0441\u0430\u043C.",
+        reply_markup=back_menu_kb(),
+    )
 
 async def handle_photo(message: types.Message, state: FSMContext):
     await message.reply("Получил, анализирую…")
@@ -21,7 +23,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
     classification = await classify_food(photo_path)
-
     if classification.get('error'):
         await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
         return
@@ -49,7 +50,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
 
     macros = await calculate_macros(ingredients, serving)
-
     if macros.get('error'):
         await message.answer("Сервис расчета недоступен. Попробуйте позднее.")
         return
@@ -68,7 +68,5 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
 
 def register(dp: Dispatcher):
-
     dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
-
     dp.message.register(handle_photo, F.photo)

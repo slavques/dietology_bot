@@ -101,7 +101,6 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
             ],
         },
     ])
-
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
@@ -139,5 +138,4 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
                 return json.loads(match.group(0))
             except Exception:
                 pass
-
         return {"calories": 0, "protein": 0, "fat": 0, "carbs": 0}

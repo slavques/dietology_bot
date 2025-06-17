@@ -3,7 +3,7 @@ from aiogram.filters import Command
 
 from ..database import SessionLocal, Meal, User
 from ..utils import format_meal_message
-from ..keyboards import history_nav_kb
+from ..keyboards import history_nav_kb, back_menu_kb
 
 async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int):
     session = SessionLocal()
@@ -30,6 +30,7 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int):
     )
 
 async def cmd_history(message: types.Message):
+    await message.answer("Последние приёмы:", reply_markup=back_menu_kb())
     await send_history(message.bot, message.from_user.id, message.chat.id, 0)
 
 async def cb_history(query: types.CallbackQuery):
@@ -41,4 +42,5 @@ async def cb_history(query: types.CallbackQuery):
 
 def register(dp: Dispatcher):
     dp.message.register(cmd_history, Command('history'))
+    dp.message.register(cmd_history, F.text == "\U0001F4CA \u041C\u043E\u0438 \u043F\u0440\u0438\u0451\u043C\u044B")
     dp.callback_query.register(cb_history, F.data.startswith('hist:'))
