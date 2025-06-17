@@ -34,73 +34,42 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
             return "__ERROR__"
 
 
-async def classify_food(photo_path: str) -> Dict[str, float]:
-    """Detect food vs non-food using GPT-4o. Returns JSON."""
-    if not client.api_key:
-        return {"is_food": True, "confidence": 0.9}
-    with open(photo_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
-    content = await _chat([
-        {
-            "role": "system",
-            "content": (
-                "Определи, изображена ли еда на фото. "
-                "Ответ только JSON вида {\"is_food\": bool, \"confidence\": 0-1}."
-            ),
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-                }
-            ],
-        },
-    ])
-    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
-        return {"error": content.strip("_").lower()}
-    try:
-        return json.loads(content)
-    except Exception:
-        match = re.search(r"\{.*\}", content)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                pass
-        return {"is_food": False, "confidence": 0.0}
-
-
-async def recognize_dish(photo_path: str) -> Dict[str, any]:
-    """Recognize dish name and ingredients via GPT-4o."""
+async def analyze_photo(photo_path: str) -> Dict[str, any]:
+    """Analyze photo in a single GPT request and return dish info and macros."""
     if not client.api_key:
         return {
-            "name": "Sample dish",
-            "ingredients": ["ingredient1", "ingredient2"],
-            "serving": 150,
+            "is_food": True,
+            "confidence": 1.0,
+            "name": "Пример блюда",
+            "serving": 200,
+            "calories": 250,
+            "protein": 15,
+            "fat": 10,
+            "carbs": 30,
         }
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    content = await _chat([
-        {
-            "role": "system",
-            "content": (
-                "Определи блюдо на фото и перечисли основные ингредиенты "
-                "и примерный вес порции в граммах. "
-                "Ответ только JSON вида {name, ingredients, serving}."
-            ),
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-                }
-            ],
-        },
-    ])
+    prompt = (
+        "Определи, есть ли еда на фото. Если еды нет, верни JSON "
+        "{\"is_food\": false}. Если еда есть, назови блюдо по-русски, "
+        "оцени уверенность распознавания в диапазоне 0-1, приблизительный "
+        "вес порции и расчитай калории, белки, жиры и углеводы. "
+        "Ответ только JSON вида {is_food, confidence, name, serving, calories, protein, fat, carbs}."
+    )
+    content = await _chat(
+        [
+            {"role": "system", "content": prompt},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+                    }
+                ],
+            },
+        ]
+    )
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
@@ -112,11 +81,11 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
                 return json.loads(match.group(0))
             except Exception:
                 pass
-        return {"name": None, "ingredients": [], "serving": 0}
+        return {"error": "parse"}
 
 
 async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, float]:
-    """Calculate approximate macros via GPT-4o."""
+    """Calculate approximate macros for a dish using GPT-4o."""
     if not client.api_key:
         return {"calories": 250, "protein": 20, "fat": 10, "carbs": 30}
     prompt = (
@@ -124,9 +93,7 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
         f"из ингредиентов {', '.join(ingredients)} весом {serving} г. "
         "Ответ только JSON вида {calories, protein, fat, carbs}."
     )
-    content = await _chat([
-        {"role": "system", "content": prompt}
-    ])
+    content = await _chat([{"role": "system", "content": prompt}])
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:

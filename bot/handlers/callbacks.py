@@ -15,7 +15,9 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
     """Prompt user to enter name and weight manually."""
     await query.bot.send_message(
         query.from_user.id,
-        "Введите название и вес, напр. 'Борщ 250'",
+        "✏️ Хорошо!\n"
+        "Напиши название блюда и его вес (в граммах).\n\n"
+        "Например: Паста с соусом, 250 г",
     )
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -25,12 +27,21 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
     """Cancel current operation."""
     await state.clear()
     await query.message.delete()
-    await query.answer("Удалено")
+    await query.answer()
+    await query.bot.send_message(
+        query.from_user.id,
+        "🗑 Запись удалена.\nЕсли хочешь отправить другое блюдо — просто пришли фото",
+    )
 
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
-    await query.bot.send_message(query.from_user.id, "Введите название и вес, напр. 'Яблоко 150'")
+    await query.bot.send_message(
+        query.from_user.id,
+        "✏️ Хорошо!\n"
+        "Напиши название блюда и его вес (в граммах).\n\n"
+        "Например: Паста с соусом, 250 г",
+    )
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
@@ -62,7 +73,11 @@ async def cb_delete(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     pending_meals.pop(meal_id, None)
     await query.message.delete()
-    await query.answer("Удалено")
+    await query.answer()
+    await query.bot.send_message(
+        query.from_user.id,
+        "🗑 Запись удалена.\nЕсли хочешь отправить другое блюдо — просто пришли фото",
+    )
 
 async def cb_save(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
@@ -89,7 +104,12 @@ async def cb_save(query: types.CallbackQuery):
     session.add(new_meal)
     session.commit()
     session.close()
-    await query.answer("Сохранено в историю!")
+    await query.answer()
+    await query.bot.send_message(
+        query.from_user.id,
+        "✅ Готово! Блюдо добавлено в историю.\n"
+        "📂 Хочешь посмотреть приёмы за сегодня — нажми ниже \n\"🧾 Отчёт за день\"",
+    )
 
 
 def register(dp: Dispatcher):

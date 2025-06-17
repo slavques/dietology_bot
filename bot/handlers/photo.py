@@ -4,7 +4,7 @@ import tempfile
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ..services import classify_food, recognize_dish, calculate_macros
+from ..services import analyze_photo
 from ..utils import format_meal_message
 from ..keyboards import meal_actions_kb, back_menu_kb
 from ..states import EditMeal
@@ -17,29 +17,37 @@ async def request_photo(message: types.Message):
     )
 
 async def handle_photo(message: types.Message, state: FSMContext):
+    if message.media_group_id:
+        await message.answer(
+            "🤖 Хм… похоже, ты отправил сразу несколько изображений или файл в неподдерживаемом формате.\n\n"
+            "Пришли, пожалуйста, одно фото блюда — и я всё рассчитаю!"
+        )
+        return
     await message.reply("Готово! 🔍\nАнализирую фото…")
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
-    classification = await classify_food(photo_path)
-    if classification.get('error'):
+    result = await analyze_photo(photo_path)
+    if result.get('error'):
         await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
         return
-    if not classification['is_food'] or classification['confidence'] < 0.7:
+    if not result.get('is_food') or result.get('confidence', 0) < 0.7:
         await message.answer(
             "🤔 Еду на этом фото найти не удалось.\n"
             "Попробуй отправить другое изображение — постараюсь распознать."
         )
         return
 
-    dish = await recognize_dish(photo_path)
-    if dish.get('error'):
-        await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
-        return
-    name = dish.get('name')
-    ingredients = dish.get('ingredients', [])
-    serving = dish.get('serving', 0)
+    name = result.get('name')
+    ingredients = result.get('ingredients', [])
+    serving = result.get('serving', 0)
+    macros = {
+        'calories': result.get('calories', 0),
+        'protein': result.get('protein', 0),
+        'fat': result.get('fat', 0),
+        'carbs': result.get('carbs', 0),
+    }
 
     if not name:
         builder = InlineKeyboardBuilder()
@@ -53,11 +61,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
             reply_markup=builder.as_markup(),
         )
         await state.set_state(EditMeal.waiting_input)
-        return
-
-    macros = await calculate_macros(ingredients, serving)
-    if macros.get('error'):
-        await message.answer("Сервис расчета недоступен. Попробуйте позднее.")
         return
     meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
     pending_meals[meal_id] = {
@@ -73,6 +76,14 @@ async def handle_photo(message: types.Message, state: FSMContext):
     )
 
 
+async def handle_document(message: types.Message):
+    await message.answer(
+        "🤖 Хм… похоже, ты отправил сразу несколько изображений или файл в неподдерживаемом формате.\n\n"
+        "Пришли, пожалуйста, одно фото блюда — и я всё рассчитаю!"
+    )
+
+
 def register(dp: Dispatcher):
     dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
     dp.message.register(handle_photo, F.photo)
+    dp.message.register(handle_document, F.document)

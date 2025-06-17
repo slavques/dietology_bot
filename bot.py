@@ -13,7 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
 
-from bot.services import classify_food, recognize_dish, calculate_macros
+from bot.services import analyze_photo, calculate_macros
 
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime, ForeignKey
@@ -159,22 +159,36 @@ async def request_photo(message: types.Message):
 
 
 async def handle_photo(message: types.Message, state: FSMContext):
+    if message.media_group_id:
+        await message.answer(
+            "🤖 Хм… похоже, ты отправил сразу несколько изображений или файл в неподдерживаемом формате.\n\n"
+            "Пришли, пожалуйста, одно фото блюда — и я всё рассчитаю!"
+        )
+        return
+
     await message.reply("Готово! \ud83d\udd0d\nАнализирую фото…")
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
-    classification = await classify_food(photo_path)
-    if not classification['is_food'] or classification['confidence'] < 0.7:
+
+    result = await analyze_photo(photo_path)
+    if not result.get('is_food') or result.get('confidence', 0) < 0.7:
         await message.answer(
             "\ud83e\udd14 \u0415\u0434\u0443 \u043d\u0430 \u044d\u0442\u043e\u043c \u0444\u043e\u0442\u043e \u043d\u0430\u0439\u0442\u0438 \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c.\n"
             "\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0434\u0440\u0443\u0433\u043e\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 \u2014 \u043f\u043e\u0441\u0442\u0430\u0440\u0430\u044e\u0441\u044c \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c."
         )
         return
-    dish = await recognize_dish(photo_path)
-    name = dish.get('name')
-    ingredients = dish.get('ingredients', [])
-    serving = dish.get('serving', 0)
+
+    name = result.get('name')
+    ingredients = result.get('ingredients', [])
+    serving = result.get('serving', 0)
+    macros = {
+        'calories': result.get('calories', 0),
+        'protein': result.get('protein', 0),
+        'fat': result.get('fat', 0),
+        'carbs': result.get('carbs', 0),
+    }
     if not name:
         builder = InlineKeyboardBuilder()
         builder.button(text="✏️ Уточнить", callback_data="refine")
@@ -187,7 +201,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
         )
         await state.set_state(EditMeal.waiting_input)
         return
-    macros = await calculate_macros(ingredients, serving)
     meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
     pending_meals[meal_id] = {
         'name': name,
@@ -201,16 +214,33 @@ async def handle_photo(message: types.Message, state: FSMContext):
     )
 
 
+async def handle_document(message: types.Message):
+    await message.answer(
+        "🤖 Хм… похоже, ты отправил сразу несколько изображений или файл в неподдерживаемом формате.\n\n"
+        "Пришли, пожалуйста, одно фото блюда — и я всё рассчитаю!"
+    )
+
+
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
-    await query.bot.send_message(query.from_user.id, "Введите название и вес, напр. 'Яблоко 150'")
+    await query.bot.send_message(
+        query.from_user.id,
+        "✏️ Хорошо!\n"
+        "Напиши название блюда и его вес (в граммах).\n\n"
+        "Например: Паста с соусом, 250 г",
+    )
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
 
 async def cb_refine(query: types.CallbackQuery, state: FSMContext):
-    await query.bot.send_message(query.from_user.id, "Введите название и вес, напр. 'Борщ 250'")
+    await query.bot.send_message(
+        query.from_user.id,
+        "✏️ Хорошо!\n"
+        "Напиши название блюда и его вес (в граммах).\n\n"
+        "Например: Паста с соусом, 250 г",
+    )
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
@@ -218,7 +248,12 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
 async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
     await state.clear()
     await query.message.delete()
-    await query.answer("Удалено")
+    await query.answer()
+    await query.bot.send_message(
+        query.from_user.id,
+        "🗑 Запись удалена.\nЕсли хочешь отправить другое блюдо — просто пришли фото",
+    )
+
 
 async def process_edit(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -249,7 +284,11 @@ async def cb_delete(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     pending_meals.pop(meal_id, None)
     await query.message.delete()
-    await query.answer("Удалено")
+    await query.answer()
+    await query.bot.send_message(
+        query.from_user.id,
+        "🗑 Запись удалена.\nЕсли хочешь отправить другое блюдо — просто пришли фото",
+    )
 
 
 async def cb_save(query: types.CallbackQuery):
@@ -277,7 +316,12 @@ async def cb_save(query: types.CallbackQuery):
     session.add(new_meal)
     session.commit()
     session.close()
-    await query.answer("Сохранено в историю!")
+    await query.answer()
+    await query.bot.send_message(
+        query.from_user.id,
+        "✅ Готово! Блюдо добавлено в историю.\n"
+        "📂 Хочешь посмотреть приёмы за сегодня — нажми ниже \n\"🧾 Отчёт за день\"",
+    )
 
 
 async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int):
@@ -362,6 +406,7 @@ dp = Dispatcher(storage=MemoryStorage())
 dp.message.register(cmd_start, Command('start'))
 dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
 dp.message.register(handle_photo, F.photo)
+dp.message.register(handle_document, F.document)
 dp.message.register(back_to_menu, F.text == "\U0001F951 \u0413\u043B\u0430\u0432\u043D\u043E\u0435 \u043C\u0435\u043D\u044E")
 dp.message.register(cmd_history, Command('history'))
 dp.message.register(cmd_stats, Command('stats'))
