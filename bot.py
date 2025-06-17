@@ -6,6 +6,9 @@ from typing import Dict, List
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+
 import tempfile
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -103,6 +106,22 @@ def stats_period_kb() -> types.InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def main_menu_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="\U0001F4F8 Новое фото"),
+                KeyboardButton(text="\U0001F9FE \u041E\u0442\u0447\u0451\u0442 \u0437\u0430 \u0434\u0435\u043D\u044C"),
+            ],
+            [
+                KeyboardButton(text="\U0001F4CA \u041C\u043E\u0438 \u043F\u0440\u0438\u0451\u043C\u044B"),
+                KeyboardButton(text="\u2753 \u0427\u0430\u0412\u041E"),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
 pending_meals: Dict[str, Dict] = {}
 
 
@@ -114,7 +133,19 @@ async def cmd_start(message: types.Message):
         session.add(user)
         session.commit()
     session.close()
-    await message.answer("Привет! Отправь фото блюда, и я рассчитаю КБЖУ.")
+    text = (
+        "Я — твой AI-диетолог 🧠\n\n"
+        "Загрузи фото еды, и за секунды получишь:\n"
+        "— Калории\n"
+        "— Белки, жиры, углеводы\n"
+        "— Быстрый отчёт в историю\n\n"
+        "🔍 Готов? Отправь фото."
+    )
+    await message.answer(text, reply_markup=main_menu_kb())
+
+
+async def request_photo(message: types.Message):
+    await message.answer("Отправьте фото блюда.")
 
 
 async def handle_photo(message: types.Message, state: FSMContext):
@@ -303,6 +334,9 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 dp.message.register(cmd_start, Command('start'))
+
+dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
+
 dp.message.register(handle_photo, F.photo)
 dp.message.register(cmd_history, Command('history'))
 dp.message.register(cmd_stats, Command('stats'))

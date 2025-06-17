@@ -10,6 +10,10 @@ from ..keyboards import meal_actions_kb
 from ..states import EditMeal
 from ..storage import pending_meals
 
+
+async def request_photo(message: types.Message):
+    await message.answer("Отправьте фото блюда.")
+
 async def handle_photo(message: types.Message, state: FSMContext):
     await message.reply("Получил, анализирую…")
     photo = message.photo[-1]
@@ -64,4 +68,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
 
 def register(dp: Dispatcher):
+
+    dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
+
     dp.message.register(handle_photo, F.photo)

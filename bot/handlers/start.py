@@ -3,6 +3,8 @@ from aiogram.filters import Command
 
 from ..database import SessionLocal, User
 
+from ..keyboards import main_menu_kb
+
 async def cmd_start(message: types.Message):
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=message.from_user.id).first()
@@ -11,7 +13,16 @@ async def cmd_start(message: types.Message):
         session.add(user)
         session.commit()
     session.close()
-    await message.reply("Привет! Отправь фото блюда, и я рассчитаю КБЖУ.")
+
+    text = (
+        "Я — твой AI-диетолог 🧠\n\n"
+        "Загрузи фото еды, и за секунды получишь:\n"
+        "— Калории\n"
+        "— Белки, жиры, углеводы\n"
+        "— Быстрый отчёт в историю\n\n"
+        "🔍 Готов? Отправь фото."
+    )
+    await message.answer(text, reply_markup=main_menu_kb())
 
 
 def register(dp: Dispatcher):

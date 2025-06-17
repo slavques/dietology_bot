@@ -53,7 +53,6 @@ async def classify_food(photo_path: str) -> Dict[str, float]:
             "content": [
                 {
                     "type": "image_url",
-
                     "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
                 }
             ],
@@ -97,7 +96,6 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
             "content": [
                 {
                     "type": "image_url",
-
                     "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
                 }
             ],
