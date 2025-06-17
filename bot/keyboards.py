@@ -7,10 +7,11 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 def meal_actions_kb(meal_id: str) -> InlineKeyboardMarkup:
+    """Inline keyboard for meal actions with updated button text."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="Редактировать", callback_data=f"edit:{meal_id}")
-    builder.button(text="Удалить", callback_data=f"delete:{meal_id}")
-    builder.button(text="В историю", callback_data=f"save:{meal_id}")
+    builder.button(text="✏️ Уточнить", callback_data=f"edit:{meal_id}")
+    builder.button(text="🗑 Удалить", callback_data=f"delete:{meal_id}")
+    builder.button(text="💾 Сохранить", callback_data=f"save:{meal_id}")
     builder.adjust(3)
     return builder.as_markup()
 
@@ -36,7 +37,6 @@ def stats_period_kb() -> InlineKeyboardMarkup:
 
 
 def main_menu_kb() -> ReplyKeyboardMarkup:
-
     """Main menu with four actions arranged vertically."""
     return ReplyKeyboardMarkup(
         keyboard=[

@@ -23,6 +23,15 @@ from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 API_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///bot.db")
 
+WELCOME_TEXT = (
+    "Я — твой AI-диетолог 🧠\n\n"
+    "Загрузи фото еды, и за секунды получишь:\n"
+    "— Калории\n"
+    "— Белки, жиры, углеводы\n"
+    "— Быстрый отчёт в историю\n\n"
+    "🔍 Готов? Отправь фото."
+)
+
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -77,9 +86,10 @@ def make_bar_chart(totals: Dict[str, float]) -> str:
 
 def meal_actions_kb(meal_id: str) -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Редактировать", callback_data=f"edit:{meal_id}")
-    builder.button(text="Удалить", callback_data=f"delete:{meal_id}")
-    builder.button(text="В историю", callback_data=f"save:{meal_id}")
+    builder.button(text="✏️ Уточнить", callback_data=f"edit:{meal_id}")
+    builder.button(text="🗑 Удалить", callback_data=f"delete:{meal_id}")
+    builder.button(text="💾 Сохранить", callback_data=f"save:{meal_id}")
+
     builder.adjust(3)
     return builder.as_markup()
 
@@ -105,20 +115,25 @@ def stats_period_kb() -> types.InlineKeyboardMarkup:
 
 
 def main_menu_kb() -> ReplyKeyboardMarkup:
+
+    """Main menu buttons arranged vertically."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [
-                KeyboardButton(text="\U0001F4F8 Новое фото"),
-                KeyboardButton(text="\U0001F9FE \u041E\u0442\u0447\u0451\u0442 \u0437\u0430 \u0434\u0435\u043D\u044C"),
-            ],
-            [
-                KeyboardButton(text="\U0001F4CA \u041C\u043E\u0438 \u043F\u0440\u0438\u0451\u043C\u044B"),
-                KeyboardButton(text="\u2753 \u0427\u0430\u0412\u041E"),
-            ],
+            [KeyboardButton(text="\U0001F4F8 Новое фото")],
+            [KeyboardButton(text="\U0001F9FE \u041E\u0442\u0447\u0451\u0442 \u0437\u0430 \u0434\u0435\u043D\u044C")],
+            [KeyboardButton(text="\U0001F4CA \u041C\u043E\u0438 \u043F\u0440\u0438\u0451\u043C\u044B")],
+            [KeyboardButton(text="\u2753 \u0427\u0430\u0412\u041E")],
         ],
         resize_keyboard=True,
     )
 
+
+def back_menu_kb() -> ReplyKeyboardMarkup:
+    """Single button keyboard to return to main menu."""
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="\U0001F951 \u0413\u043B\u0430\u0432\u043D\u043E\u0435 \u043C\u0435\u043D\u044E")]],
+        resize_keyboard=True,
+    )
 
 pending_meals: Dict[str, Dict] = {}
 
@@ -131,30 +146,34 @@ async def cmd_start(message: types.Message):
         session.add(user)
         session.commit()
     session.close()
-    text = (
-        "Я — твой AI-диетолог 🧠\n\n"
-        "Загрузи фото еды, и за секунды получишь:\n"
-        "— Калории\n"
-        "— Белки, жиры, углеводы\n"
-        "— Быстрый отчёт в историю\n\n"
-        "🔍 Готов? Отправь фото."
-    )
-    await message.answer(text, reply_markup=main_menu_kb())
+
+    await message.answer(WELCOME_TEXT, reply_markup=main_menu_kb())
+
+
+async def back_to_menu(message: types.Message):
+    await message.answer(WELCOME_TEXT, reply_markup=main_menu_kb())
 
 
 async def request_photo(message: types.Message):
-    await message.answer("Отправьте фото блюда.")
+    await message.answer(
+        "\U0001F525\u041E\u0442\u043B\u0438\u0447\u043D\u043E! \u041E\u0442\u043F\u0440\u0430\u0432\u044C \u0444\u043E\u0442\u043E \u0435\u0434\u044B \u2014 \u044F \u0432\u0441\u0451 \u043F\u043E\u0441\u0447\u0438\u0442\u0430\u044E \u0441\u0430\u043C.",
+        reply_markup=back_menu_kb(),
+    )
 
 
 async def handle_photo(message: types.Message, state: FSMContext):
-    await message.reply("Получил, анализирую…")
+    await message.reply("Готово! \ud83d\udd0d\nАнализирую фото…")
+
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
     classification = await classify_food(photo_path)
     if not classification['is_food'] or classification['confidence'] < 0.7:
-        await message.answer("Я не увидел еду на фото, попробуйте снова.")
+        await message.answer(
+            "\ud83e\udd14 \u0415\u0434\u0443 \u043d\u0430 \u044d\u0442\u043e\u043c \u0444\u043e\u0442\u043e \u043d\u0430\u0439\u0442\u0438 \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c.\n"
+            "\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0434\u0440\u0443\u0433\u043e\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 \u2014 \u043f\u043e\u0441\u0442\u0430\u0440\u0430\u044e\u0441\u044c \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c."
+        )
         return
     dish = await recognize_dish(photo_path)
     name = dish.get('name')
@@ -162,10 +181,13 @@ async def handle_photo(message: types.Message, state: FSMContext):
     serving = dish.get('serving', 0)
     if not name:
         builder = InlineKeyboardBuilder()
-        builder.button(text="Уточнить вес/ингр.", callback_data="refine")
+        builder.button(text="✏️ Уточнить", callback_data="refine")
+        builder.button(text="🗑 Удалить", callback_data="cancel")
+        builder.adjust(2)
         await state.update_data(photo_path=photo_path, ingredients=ingredients, serving=serving)
         await message.answer(
-            "Не смог распознать блюдо. Уточните вес/ингредиенты.",
+            "\ud83e\udd14 \u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0442\u043e\u0447\u043d\u043e \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c \u0431\u043b\u044e\u0434\u043e \u043d\u0430 \u0444\u043e\u0442\u043e.\n\u041c\u043e\u0436\u0435\u0448\u044c \u0432\u0432\u0435\u0441\u0442\u0438 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438 \u0432\u0435\u0441 \u0432\u0440\u0443\u0447\u043d\u0443\u044e?",
+
             reply_markup=builder.as_markup(),
         )
         await state.set_state(EditMeal.waiting_input)
@@ -191,6 +213,17 @@ async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
+
+async def cb_refine(query: types.CallbackQuery, state: FSMContext):
+    await query.bot.send_message(query.from_user.id, "Введите название и вес, напр. 'Борщ 250'")
+    await state.set_state(EditMeal.waiting_input)
+    await query.answer()
+
+
+async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await query.message.delete()
+    await query.answer("Удалено")
 
 async def process_edit(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -334,12 +367,15 @@ dp = Dispatcher(storage=MemoryStorage())
 dp.message.register(cmd_start, Command('start'))
 dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
 dp.message.register(handle_photo, F.photo)
+dp.message.register(back_to_menu, F.text == "\U0001F951 \u0413\u043B\u0430\u0432\u043D\u043E\u0435 \u043C\u0435\u043D\u044E")
 dp.message.register(cmd_history, Command('history'))
 dp.message.register(cmd_stats, Command('stats'))
 
 dp.message.register(process_edit, StateFilter(EditMeal.waiting_input))
 
 dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
+dp.callback_query.register(cb_refine, F.data == 'refine')
+dp.callback_query.register(cb_cancel, F.data == 'cancel')
 dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
 dp.callback_query.register(cb_save, F.data.startswith('save:'))
 dp.callback_query.register(cb_history, F.data.startswith('hist:'))

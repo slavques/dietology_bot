@@ -10,6 +10,23 @@ from ..keyboards import meal_actions_kb
 from ..states import EditMeal
 from ..storage import pending_meals
 
+
+async def cb_refine(query: types.CallbackQuery, state: FSMContext):
+    """Prompt user to enter name and weight manually."""
+    await query.bot.send_message(
+        query.from_user.id,
+        "Введите название и вес, напр. 'Борщ 250'",
+    )
+    await state.set_state(EditMeal.waiting_input)
+    await query.answer()
+
+
+async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
+    """Cancel current operation."""
+    await state.clear()
+    await query.message.delete()
+    await query.answer("Удалено")
+
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
@@ -77,6 +94,8 @@ async def cb_save(query: types.CallbackQuery):
 
 def register(dp: Dispatcher):
     dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
+    dp.callback_query.register(cb_refine, F.data == 'refine')
+    dp.callback_query.register(cb_cancel, F.data == 'cancel')
     dp.message.register(process_edit, StateFilter(EditMeal.waiting_input))
     dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
     dp.callback_query.register(cb_save, F.data.startswith('save:'))

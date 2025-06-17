@@ -1,10 +1,14 @@
 from typing import Dict
 
 def format_meal_message(name: str, serving: float, macros: Dict[str, float]) -> str:
+    """Format meal info using the new template."""
     return (
-        f"\U0001F37D {name}\n"
-        f"\u2696 {serving} г\n"
-        f"\U0001F522 {macros['calories']} ккал / {macros['protein']} г / {macros['fat']} г / {macros['carbs']} г"
+        f"🍽 {name}\n"
+        f"⚖ Вес: {serving} г\n"
+        f"🔥 Калории: {macros['calories']} ккал\n"
+        f"Белки: {macros['protein']} г\n"
+        f"Жиры: {macros['fat']} г\n"
+        f"Углеводы: {macros['carbs']} г"
     )
 
 def make_bar_chart(totals: Dict[str, float]) -> str:
