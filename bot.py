@@ -13,7 +13,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
 
-from bot.services import analyze_photo, calculate_macros
+from bot.services import (
+    classify_food,
+    recognize_dish,
+    analyze_photo_with_hint,
+    calculate_macros,
+)
 
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime, ForeignKey
@@ -171,35 +176,39 @@ async def handle_photo(message: types.Message, state: FSMContext):
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
-    result = await analyze_photo(photo_path)
-    if not result.get('is_food') or result.get('confidence', 0) < 0.7:
+    cls = await classify_food(photo_path)
+    if cls.get('error') or not cls.get('is_food') or cls.get('confidence', 0) < 0.7:
         await message.answer(
             "\ud83e\udd14 \u0415\u0434\u0443 \u043d\u0430 \u044d\u0442\u043e\u043c \u0444\u043e\u0442\u043e \u043d\u0430\u0439\u0442\u0438 \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c.\n"
             "\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0434\u0440\u0443\u0433\u043e\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 \u2014 \u043f\u043e\u0441\u0442\u0430\u0440\u0430\u044e\u0441\u044c \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c."
         )
         return
-
-    name = result.get('name')
-    ingredients = result.get('ingredients', [])
-    serving = result.get('serving', 0)
-    macros = {
-        'calories': result.get('calories', 0),
-        'protein': result.get('protein', 0),
-        'fat': result.get('fat', 0),
-        'carbs': result.get('carbs', 0),
-    }
+    recog = await recognize_dish(photo_path)
+    if recog.get('error'):
+        await message.answer("\u041E\u0448\u0438\u0431\u043A\u0430 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u044F \u0431\u043B\u044E\u0434\u0430. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u043E\u0437\u0436\u0435.")
+        return
+    name = recog.get('name')
+    ingredients = recog.get('ingredients', [])
+    serving = recog.get('serving', 0)
+    macros = None
+    if name:
+        macros = await calculate_macros(ingredients, serving)
+    else:
+        macros = None
     if not name:
         builder = InlineKeyboardBuilder()
         builder.button(text="✏️ Уточнить", callback_data="refine")
         builder.button(text="🗑 Удалить", callback_data="cancel")
         builder.adjust(2)
-        await state.update_data(photo_path=photo_path, ingredients=ingredients, serving=serving)
+        await state.update_data(photo_path=photo_path)
         await message.answer(
             "\ud83e\udd14 \u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0442\u043e\u0447\u043d\u043e \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0442\u044c \u0431\u043b\u044e\u0434\u043e \u043d\u0430 \u0444\u043e\u0442\u043e.\n\u041c\u043e\u0436\u0435\u0448\u044c \u0432\u0432\u0435\u0441\u0442\u0438 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438 \u0432\u0435\u0441 \u0432\u0440\u0443\u0447\u043d\u0443\u044e?",
             reply_markup=builder.as_markup(),
         )
         await state.set_state(EditMeal.waiting_input)
         return
+    if macros is None or macros.get('error'):
+        macros = {"calories": 0, "protein": 0, "fat": 0, "carbs": 0}
     meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
     pending_meals[meal_id] = {
         'name': name,
@@ -257,6 +266,7 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
 async def process_edit(message: types.Message, state: FSMContext):
     data = await state.get_data()
     meal_id = data.get('meal_id', f"{message.from_user.id}_{datetime.utcnow().timestamp()}")
+    photo_path = data.get('photo_path')
     parts = message.text.split()
     if len(parts) >= 2 and parts[-1].replace('.', '', 1).isdigit():
         serving = float(parts[-1])
@@ -264,8 +274,20 @@ async def process_edit(message: types.Message, state: FSMContext):
     else:
         name = message.text
         serving = 100.0
-    ingredients = [name]
-    macros = await calculate_macros(ingredients, serving)
+    if photo_path:
+        result = await analyze_photo_with_hint(photo_path, message.text)
+        name = result.get('name', name)
+        serving = result.get('serving', serving)
+        macros = {
+            'calories': result.get('calories', 0),
+            'protein': result.get('protein', 0),
+            'fat': result.get('fat', 0),
+            'carbs': result.get('carbs', 0),
+        }
+        ingredients = [name]
+    else:
+        ingredients = [name]
+        macros = await calculate_macros(ingredients, serving)
     pending_meals[meal_id] = {
         'name': name,
         'ingredients': ingredients,

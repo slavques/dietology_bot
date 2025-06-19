@@ -34,6 +34,73 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
             return "__ERROR__"
 
 
+async def classify_food(photo_path: str) -> Dict[str, any]:
+    """Determine if the photo contains food and return confidence."""
+    if not client.api_key:
+        return {"is_food": True, "confidence": 1.0}
+    with open(photo_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    prompt = (
+        "Определи, есть ли еда на изображении. Ответ только JSON вида "
+        "{is_food, confidence}."
+    )
+    content = await _chat([
+        {"role": "system", "content": prompt},
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            ],
+        },
+    ])
+    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
+        return {"error": content.strip("_").lower()}
+    try:
+        return json.loads(content)
+    except Exception:
+        match = re.search(r"\{.*\}", content, re.S)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
+        return {"error": "parse"}
+
+
+async def recognize_dish(photo_path: str) -> Dict[str, any]:
+    """Recognize dish name, ingredients and serving from a photo."""
+    if not client.api_key:
+        return {"name": "Пример блюда", "ingredients": ["ингредиент"], "serving": 200}
+    with open(photo_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    prompt = (
+        "Определи название блюда на русском и основные ингредиенты. "
+        "Примерный вес порции в граммах. "
+        "Ответ только JSON вида {name, ingredients, serving}."
+    )
+    content = await _chat([
+        {"role": "system", "content": prompt},
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            ],
+        },
+    ])
+    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
+        return {"error": content.strip("_").lower()}
+    try:
+        return json.loads(content)
+    except Exception:
+        match = re.search(r"\{.*\}", content, re.S)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
+        return {"error": "parse"}
+
+
 async def analyze_photo(photo_path: str) -> Dict[str, any]:
     """Analyze photo in a single GPT request and return dish info and macros."""
     if not client.api_key:
@@ -75,7 +142,7 @@ async def analyze_photo(photo_path: str) -> Dict[str, any]:
     try:
         return json.loads(content)
     except Exception:
-        match = re.search(r"\{.*\}", content)
+        match = re.search(r"\{.*\}", content, re.S)
         if match:
             try:
                 return json.loads(match.group(0))
@@ -123,7 +190,7 @@ async def analyze_photo_with_hint(photo_path: str, hint: str) -> Dict[str, any]:
     try:
         return json.loads(content)
     except Exception:
-        match = re.search(r"\{.*\}", content)
+        match = re.search(r"\{.*\}", content, re.S)
         if match:
             try:
                 return json.loads(match.group(0))
@@ -147,7 +214,7 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
     try:
         return json.loads(content)
     except Exception:
-        match = re.search(r"\{.*\}", content)
+        match = re.search(r"\{.*\}", content, re.S)
         if match:
             try:
                 return json.loads(match.group(0))
