@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
@@ -57,11 +58,17 @@ async def process_edit(message: types.Message, state: FSMContext):
         await state.clear()
         return
     meal = pending_meals[meal_id]
+    # Ensure user provided weight or ingredient details before contacting GPT
+    if not re.search(r"\d", message.text):
+        await message.answer(
+            "Не удалось понять уточнение. Пожалуйста, укажи блюдо и вес, например: Паста, 250 г"
+        )
+        return
+
     result = await analyze_photo_with_hint(meal['photo_path'], message.text)
     if result.get('error') or not result.get('name'):
         await message.answer(
-            "Не удалось понять уточнение. Пожалуйста, укажи блюдо и вес, наприме"
-            "р: Паста, 250 г"
+            "Сервис распознавания недоступен. Попробуйте позднее."
         )
         return
     meal.update({

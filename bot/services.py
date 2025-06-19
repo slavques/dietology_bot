@@ -9,7 +9,7 @@ from openai import RateLimitError, BadRequestError
 
 from .config import OPENAI_API_KEY
 
-client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
@@ -154,3 +154,5 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
             except Exception:
                 pass
         return {"calories": 0, "protein": 0, "fat": 0, "carbs": 0}
+
+

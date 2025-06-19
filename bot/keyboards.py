@@ -33,12 +33,15 @@ def save_options_kb(meal_id: str) -> InlineKeyboardMarkup:
 
 def history_nav_kb(offset: int, total: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    count = 0
     if offset > 0:
         builder.button(text="\u2190", callback_data=f"hist:{offset-1}")
+        count += 1
     if offset < total - 1:
         builder.button(text="\u2192", callback_data=f"hist:{offset+1}")
-    if builder.buttons:
-        builder.adjust(len(builder.buttons))
+        count += 1
+    if count:
+        builder.adjust(count)
     return builder.as_markup()
 
 
