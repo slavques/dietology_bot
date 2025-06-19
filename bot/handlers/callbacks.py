@@ -58,7 +58,6 @@ async def process_edit(message: types.Message, state: FSMContext):
         return
     meal = pending_meals[meal_id]
 
-
     result = await analyze_photo_with_hint(meal['photo_path'], message.text)
     if result.get('error') or not result.get('name'):
         await message.answer(
@@ -162,7 +161,6 @@ async def cb_save_back(query: types.CallbackQuery):
             reply_markup=meal_actions_kb(meal_id, meal.get('clarifications', 0))
         )
     await query.answer()
-
 
 def register(dp: Dispatcher):
     dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
