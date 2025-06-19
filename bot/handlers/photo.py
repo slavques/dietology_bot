@@ -4,7 +4,7 @@ import tempfile
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ..services import analyze_photo
+from ..services import analyze_photo, analyze_photo_with_hint
 from ..utils import format_meal_message
 from ..keyboards import meal_actions_kb, back_menu_kb
 from ..states import EditMeal
@@ -49,12 +49,22 @@ async def handle_photo(message: types.Message, state: FSMContext):
         'carbs': result.get('carbs', 0),
     }
 
+    meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
+    pending_meals[meal_id] = {
+        'name': name,
+        'ingredients': ingredients,
+        'serving': serving,
+        'macros': macros,
+        'photo_path': photo_path,
+        'clarifications': 0,
+    }
+
     if not name:
         builder = InlineKeyboardBuilder()
         builder.button(text="✏️ Уточнить", callback_data="refine")
         builder.button(text="🗑 Удалить", callback_data="cancel")
         builder.adjust(2)
-        await state.update_data(photo_path=photo_path, ingredients=ingredients, serving=serving)
+        await state.update_data(meal_id=meal_id)
         await message.answer(
             "🤔 Не удалось точно распознать блюдо на фото.\n"
             "Можешь ввести название и вес вручную?",
@@ -62,17 +72,10 @@ async def handle_photo(message: types.Message, state: FSMContext):
         )
         await state.set_state(EditMeal.waiting_input)
         return
-    meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
-    pending_meals[meal_id] = {
-        'name': name,
-        'ingredients': ingredients,
-        'serving': serving,
-        'macros': macros,
-    }
 
     await message.answer(
         format_meal_message(name, serving, macros),
-        reply_markup=meal_actions_kb(meal_id)
+        reply_markup=meal_actions_kb(meal_id, clarifications=0)
     )
 
 

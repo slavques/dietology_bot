@@ -6,13 +6,28 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-def meal_actions_kb(meal_id: str) -> InlineKeyboardMarkup:
-    """Inline keyboard for meal actions with updated button text."""
+
+def meal_actions_kb(meal_id: str, clarifications: int = 0) -> InlineKeyboardMarkup:
+    """Inline keyboard for meal actions. Hide refine after two clarifications."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="✏️ Уточнить", callback_data=f"edit:{meal_id}")
+    if clarifications < 2:
+        builder.button(text="✏️ Уточнить", callback_data=f"edit:{meal_id}")
     builder.button(text="🗑 Удалить", callback_data=f"delete:{meal_id}")
     builder.button(text="💾 Сохранить", callback_data=f"save:{meal_id}")
-    builder.adjust(3)
+    if clarifications < 2:
+        builder.adjust(3)
+    else:
+        builder.adjust(2)
+    return builder.as_markup()
+
+
+def save_options_kb(meal_id: str) -> InlineKeyboardMarkup:
+    """Keyboard with portion save options."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Вся порция", callback_data=f"full:{meal_id}")
+    builder.button(text="1/2 Порции", callback_data=f"half:{meal_id}")
+    builder.button(text="Назад", callback_data=f"back:{meal_id}")
+    builder.adjust(1)
     return builder.as_markup()
 
 
