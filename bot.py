@@ -133,7 +133,6 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
     )
 
-
 pending_meals: Dict[str, Dict] = {}
 
 
