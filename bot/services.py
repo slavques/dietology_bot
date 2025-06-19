@@ -154,5 +154,3 @@ async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, 
             except Exception:
                 pass
         return {"calories": 0, "protein": 0, "fat": 0, "carbs": 0}
-
-

@@ -133,7 +133,6 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
     )
 
-
 pending_meals: Dict[str, Dict] = {}
 
 
@@ -172,6 +171,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
+
     result = await analyze_photo(photo_path)
     if not result.get('is_food') or result.get('confidence', 0) < 0.7:
         await message.answer(
