@@ -2,6 +2,7 @@ import json
 import base64
 import re
 import asyncio
+import logging
 from typing import Dict, List
 
 import openai
@@ -15,6 +16,12 @@ client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
     if not client.api_key:
         return ""
+    # Log the prompt being sent to OpenAI for easier debugging
+    try:
+        system_msg = next(m["content"] for m in messages if m.get("role") == "system")
+        logging.info("OpenAI prompt: %s", system_msg)
+    except Exception:
+        pass
     for attempt in range(retries):
         try:
             resp = await client.chat.completions.create(
