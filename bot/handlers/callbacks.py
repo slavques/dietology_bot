@@ -80,9 +80,9 @@ async def process_edit(message: types.Message, state: FSMContext):
     meal['clarifications'] += 1
     await message.delete()
     await message.bot.edit_message_text(
-        format_meal_message(meal['name'], meal['serving'], meal['macros']),
-        meal['chat_id'],
-        meal['message_id'],
+        text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
+        chat_id=meal['chat_id'],
+        message_id=meal['message_id'],
         reply_markup=meal_actions_kb(meal_id, meal['clarifications'])
     )
     await state.clear()

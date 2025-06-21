@@ -66,9 +66,9 @@ async def report_day(message: types.Message):
     session.close()
     if not meals:
         await message.answer(
-            "\ud83d\udcdd \u041e\u0442\u0447\u0451\u0442 \u0437\u0430 \u0434\u0435\u043d\u044c\n\n"
-            "\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u043d\u0438 \u043e\u0434\u043d\u043e\u0433\u043e \u043f\u0440\u0438\u0451\u043c\u0430 \u043f\u0438\u0449\u0438.\n\n"
-            "\ud83d\udcf8 \u041e\u0442\u043f\u0440\u0430\u0432\u044c \u0444\u043e\u0442\u043e \u0435\u0434\u044b \u2014 \u0438 \u044f \u0434\u043e\u0431\u0430\u0432\u043b\u044e \u043f\u0435\u0440\u0432\u0443\u044e \u0437\u0430\u043f\u0438\u0441\u044c!",
+            "🧾 Отчёт за день\n\n"
+            "Пока нет ни одного приёма пищи.\n\n"
+            "📸 Отправь фото еды — и я добавлю первую запись!",
             reply_markup=back_menu_kb(),
         )
         return
@@ -81,19 +81,19 @@ async def report_day(message: types.Message):
         totals["carbs"] += m.carbs
 
     lines = [
-        "\ud83d\udcdd \u041e\u0442\u0447\u0451\u0442 \u0437\u0430 \u0434\u0435\u043d\u044c",
+        "🧾 Отчёт за день",
         "",
-        "\ud83d\udcca \u0418\u0442\u043e\u0433\u043e:",
-        f"\u2022 \ud83d\udd25 \u041a\u0430\u043b\u043e\u0440\u0438\u0438: {int(totals['calories'])} \u043a\u043a\u0430\u043b",
-        f"\u2022 \u0411\u0435\u043b\u043a\u0438: {int(totals['protein'])} \u0433  ",
-        f"\u2022 \u0416\u0438\u0440\u044b: {int(totals['fat'])} \u0433  ",
-        f"\u2022 \u0423\u0433\u043b\u0435\u0432\u043E\u0434\u044B: {int(totals['carbs'])} \u0433  ",
+        "📊 Итого:",
+        f"• 🔥 Калории: {int(totals['calories'])} ккал",
+        f"• Белки: {int(totals['protein'])} г  ",
+        f"• Жиры: {int(totals['fat'])} г  ",
+        f"• Углеводы: {int(totals['carbs'])} г  ",
         "",
-        "\ud83d\udcc2 \u041f\u0440\u0438\u0451\u043c\u044b \u043f\u0438\u0449\u0438:",
+        "📂 Приёмы пищи:",
     ]
     for meal in meals:
         lines.append(
-            f"\u2022 {meal.name}\n(\u0411\u0435\u043b\u043a\u0438: {int(meal.protein)} \u0433 / \u0416\u0438\u0440\u044b: {int(meal.fat)} \u0433  / \u0423\u0433\u043B\u0435\u0432\u043E\u0434\u044B: {int(meal.carbs)} \u0433)"
+            f"• {meal.name}\n(Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
         )
     await message.answer("\n".join(lines), reply_markup=back_menu_kb())
 
