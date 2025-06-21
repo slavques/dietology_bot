@@ -8,7 +8,10 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
    ```bash
    pip install -r requirements.txt
    ```
-2. Set environment variables `BOT_TOKEN` (Telegram token) and optionally `OPENAI_API_KEY` for OpenAI integration. These values are read in `bot/config.py`. To change the admin login command, set `ADMIN_COMMAND` (default `admin1467`).
+2. Create a `.env` file with `BOT_TOKEN` (Telegram token) and optionally
+   `OPENAI_API_KEY` for OpenAI integration. These values are loaded in
+   `bot/config.py`. You can also set `ADMIN_COMMAND` (default `admin1467`) and
+   `DATABASE_URL` here.
 
 3. Run the bot (package version):
    ```bash
