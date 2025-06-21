@@ -6,6 +6,21 @@ from datetime import datetime, timedelta
 from ..database import SessionLocal, Meal, User
 from ..keyboards import back_menu_kb
 
+MONTHS_RU = {
+    1: "января",
+    2: "февраля",
+    3: "марта",
+    4: "апреля",
+    5: "мая",
+    6: "июня",
+    7: "июля",
+    8: "августа",
+    9: "сентября",
+    10: "октября",
+    11: "ноября",
+    12: "декабря",
+}
+
 async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int):
     """Send totals for two days starting from offset."""
     session = SessionLocal()
@@ -15,7 +30,7 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int):
         session.close()
         return
 
-    text_lines = ["📊 Мои приёмы", ""]
+    text_lines = []
     any_data = False
     for i in range(2):
         day = datetime.utcnow().date() - timedelta(days=offset + i)
@@ -35,8 +50,9 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int):
             totals["protein"] += m.protein
             totals["fat"] += m.fat
             totals["carbs"] += m.carbs
+        month = MONTHS_RU.get(day.month, day.strftime('%B'))
         text_lines.append(
-            f"📊 Итого за {day.day} {day.strftime('%B')}:"
+            f"📊 Итого за {day.day} {month}:"
         )
         text_lines.extend(
             [
@@ -49,8 +65,7 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int):
         )
     session.close()
     if not any_data:
-        await bot.send_message(chat_id, "История пуста.")
-        return
+        text_lines.append("История пуста.")
     builder = InlineKeyboardBuilder()
     count = 1
     builder.button(text="⬅️ Записи ранее", callback_data=f"hist:{offset+1}")

@@ -81,15 +81,19 @@ async def process_edit(message: types.Message, state: FSMContext):
             )
             await state.clear()
         return
+    serving = parse_serving(result.get('serving', meal['serving']))
+    macros = {
+        'calories': to_float(result.get('calories', meal['macros']['calories'])),
+        'protein': to_float(result.get('protein', meal['macros']['protein'])),
+        'fat': to_float(result.get('fat', meal['macros']['fat'])),
+        'carbs': to_float(result.get('carbs', meal['macros']['carbs'])),
+    }
     meal.update({
         'name': result.get('name', meal['name']),
-        'serving': parse_serving(result.get('serving', meal['serving'])),
-        'macros': {
-            'calories': to_float(result.get('calories', meal['macros']['calories'])),
-            'protein': to_float(result.get('protein', meal['macros']['protein'])),
-            'fat': to_float(result.get('fat', meal['macros']['fat'])),
-            'carbs': to_float(result.get('carbs', meal['macros']['carbs'])),
-        },
+        'serving': serving,
+        'orig_serving': serving,
+        'macros': macros,
+        'orig_macros': macros.copy(),
     })
     meal['clarifications'] += 1
     await message.delete()
@@ -132,8 +136,11 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         user = User(telegram_id=query.from_user.id)
         session.add(user)
         session.commit()
-    serving = parse_serving(meal['serving']) * fraction
-    macros = {k: to_float(v) * fraction for k, v in meal['macros'].items()}
+    serving = parse_serving(meal.get('orig_serving', meal['serving'])) * fraction
+    macros = {
+        k: to_float(v) * fraction
+        for k, v in meal.get('orig_macros', meal['macros']).items()
+    }
     prefixes = {1.0: "", 0.5: "1/2 ", 0.25: "1/4 ", 0.75: "3/4 "}
     name = prefixes.get(fraction, "") + meal['name']
     new_meal = Meal(
@@ -165,7 +172,17 @@ async def cb_save_full(query: types.CallbackQuery):
         await query.answer("Сессия устарела", show_alert=True)
         return
     meal['portion'] = 1.0
-    await query.message.edit_reply_markup(reply_markup=confirm_save_kb(meal_id))
+    serving = int(round(meal.get('orig_serving', meal['serving']) * 1.0))
+    macros = {
+        k: round(v * 1.0)
+        for k, v in meal.get('orig_macros', meal['macros']).items()
+    }
+    meal['serving'] = serving
+    meal['macros'] = macros
+    await query.message.edit_text(
+        format_meal_message(meal['name'], serving, macros),
+        reply_markup=confirm_save_kb(meal_id),
+    )
     await query.answer()
 
 
@@ -176,7 +193,17 @@ async def cb_save_half(query: types.CallbackQuery):
         await query.answer("Сессия устарела", show_alert=True)
         return
     meal['portion'] = 0.5
-    await query.message.edit_reply_markup(reply_markup=confirm_save_kb(meal_id))
+    serving = int(round(meal.get('orig_serving', meal['serving']) * 0.5))
+    macros = {
+        k: round(v * 0.5)
+        for k, v in meal.get('orig_macros', meal['macros']).items()
+    }
+    meal['serving'] = serving
+    meal['macros'] = macros
+    await query.message.edit_text(
+        format_meal_message(meal['name'], serving, macros),
+        reply_markup=confirm_save_kb(meal_id),
+    )
     await query.answer()
 
 
@@ -187,7 +214,17 @@ async def cb_save_quarter(query: types.CallbackQuery):
         await query.answer("Сессия устарела", show_alert=True)
         return
     meal['portion'] = 0.25
-    await query.message.edit_reply_markup(reply_markup=confirm_save_kb(meal_id))
+    serving = int(round(meal.get('orig_serving', meal['serving']) * 0.25))
+    macros = {
+        k: round(v * 0.25)
+        for k, v in meal.get('orig_macros', meal['macros']).items()
+    }
+    meal['serving'] = serving
+    meal['macros'] = macros
+    await query.message.edit_text(
+        format_meal_message(meal['name'], serving, macros),
+        reply_markup=confirm_save_kb(meal_id),
+    )
     await query.answer()
 
 
@@ -198,7 +235,17 @@ async def cb_save_threeq(query: types.CallbackQuery):
         await query.answer("Сессия устарела", show_alert=True)
         return
     meal['portion'] = 0.75
-    await query.message.edit_reply_markup(reply_markup=confirm_save_kb(meal_id))
+    serving = int(round(meal.get('orig_serving', meal['serving']) * 0.75))
+    macros = {
+        k: round(v * 0.75)
+        for k, v in meal.get('orig_macros', meal['macros']).items()
+    }
+    meal['serving'] = serving
+    meal['macros'] = macros
+    await query.message.edit_text(
+        format_meal_message(meal['name'], serving, macros),
+        reply_markup=confirm_save_kb(meal_id),
+    )
     await query.answer()
 
 
@@ -208,10 +255,16 @@ async def cb_save_back(query: types.CallbackQuery):
     if meal:
         if 'portion' in meal:
             meal.pop('portion', None)
-            await query.message.edit_reply_markup(reply_markup=save_options_kb(meal_id))
+            meal['serving'] = meal.get('orig_serving', meal['serving'])
+            meal['macros'] = meal.get('orig_macros', meal['macros'])
+            await query.message.edit_text(
+                format_meal_message(meal['name'], meal['serving'], meal['macros']),
+                reply_markup=save_options_kb(meal_id),
+            )
         else:
-            await query.message.edit_reply_markup(
-                reply_markup=meal_actions_kb(meal_id, meal.get('clarifications', 0))
+            await query.message.edit_text(
+                format_meal_message(meal['name'], meal['serving'], meal['macros']),
+                reply_markup=meal_actions_kb(meal_id, meal.get('clarifications', 0)),
             )
     await query.answer()
 

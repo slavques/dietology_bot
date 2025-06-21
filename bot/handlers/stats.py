@@ -93,7 +93,7 @@ async def report_day(message: types.Message):
     ]
     for meal in meals:
         lines.append(
-            f"• {meal.name}\n(Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
+            f"• {meal.name}\n(🔥 {int(meal.calories)} ккал / Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
         )
     await message.answer("\n".join(lines), reply_markup=back_menu_kb())
 
