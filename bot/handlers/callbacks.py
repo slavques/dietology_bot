@@ -165,7 +165,6 @@ async def cb_save_back(query: types.CallbackQuery):
         )
     await query.answer()
 
-
 def register(dp: Dispatcher):
     dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
     dp.callback_query.register(cb_refine, F.data == 'refine')
