@@ -9,6 +9,7 @@ import openai
 from openai import RateLimitError, BadRequestError
 
 from .config import OPENAI_API_KEY
+from .utils import parse_serving, to_float
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
@@ -65,7 +66,20 @@ async def classify_food(photo_path: str) -> Dict[str, any]:
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
-        return json.loads(content)
+        data = json.loads(content)
+        if 'serving' in data:
+            data['serving'] = parse_serving(data['serving'])
+        if 'calories' in data:
+            data['calories'] = to_float(data['calories'])
+        if 'protein' in data:
+            data['protein'] = to_float(data['protein'])
+        if 'fat' in data:
+            data['fat'] = to_float(data['fat'])
+        if 'carbs' in data:
+            data['carbs'] = to_float(data['carbs'])
+        if 'name' in data and isinstance(data['name'], str):
+            data['name'] = data['name'].strip().capitalize()
+        return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
         if match:
@@ -99,7 +113,20 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
-        return json.loads(content)
+        data = json.loads(content)
+        if 'serving' in data:
+            data['serving'] = parse_serving(data['serving'])
+        if 'calories' in data:
+            data['calories'] = to_float(data['calories'])
+        if 'protein' in data:
+            data['protein'] = to_float(data['protein'])
+        if 'fat' in data:
+            data['fat'] = to_float(data['fat'])
+        if 'carbs' in data:
+            data['carbs'] = to_float(data['carbs'])
+        if 'name' in data and isinstance(data['name'], str):
+            data['name'] = data['name'].strip().capitalize()
+        return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
         if match:
@@ -128,9 +155,9 @@ async def analyze_photo(photo_path: str) -> Dict[str, any]:
     prompt = (
         "Ты диетолог/нутрициолог. "
         "Определи, есть ли еда на фото. Если еды нет, верни JSON "
-        "{\"is_food\": false}. Если еда есть, назови блюдо по-русски, "
-        "оцени уверенность распознавания (0-1), примерный вес порции и "
-        "расчитай калории, белки, жиры и углеводы. "
+        "{\"is_food\": false}. Если еда есть, назови блюдо по-русски с большой буквы, "
+        "оцени уверенность распознавания (0-1), укажи примерный вес полной порции "
+        "в граммах целым числом и расчитай калории, белки, жиры и углеводы. "
         "Ответ только JSON вида {is_food, confidence, name, serving, calories, protein, fat, carbs}."
     )
     content = await _chat(
@@ -150,7 +177,11 @@ async def analyze_photo(photo_path: str) -> Dict[str, any]:
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
-        return json.loads(content)
+        data = json.loads(content)
+        for k in ('calories', 'protein', 'fat', 'carbs'):
+            if k in data:
+                data[k] = to_float(data[k])
+        return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
         if match:
@@ -179,8 +210,9 @@ async def analyze_photo_with_hint(photo_path: str, hint: str) -> Dict[str, any]:
     prompt = (
         "Ты диетолог/нутрициолог. Пользователь уточняет блюдо на фото: "
         f"{hint}. Сравни текст с изображением и, если уточнение относится к "
-        "блюду, обнови название, вес и подсчитай калории, белки, жиры и углеводы."
-        " Если уточнение не относится к еде, ответь JSON {success: false}. "
+        "блюду, обнови название, вес и подсчитай калории, белки, жиры и углеводы. "
+        "Название верни на русском с большой буквы, вес укажи целым числом в граммах "
+        "за всю порцию. Если уточнение не относится к еде, ответь JSON {success: false}. "
         "В остальных случаях ответь только JSON вида "
         "{success: true, name, serving, calories, protein, fat, carbs}."
     )

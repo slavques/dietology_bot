@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..services import analyze_photo, analyze_photo_with_hint
-from ..utils import format_meal_message
+from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import meal_actions_kb, back_menu_kb
 from ..states import EditMeal
 from ..storage import pending_meals
@@ -41,12 +41,12 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
     name = result.get('name')
     ingredients = result.get('ingredients', [])
-    serving = result.get('serving', 0)
+    serving = parse_serving(result.get('serving', 0))
     macros = {
-        'calories': result.get('calories', 0),
-        'protein': result.get('protein', 0),
-        'fat': result.get('fat', 0),
-        'carbs': result.get('carbs', 0),
+        'calories': to_float(result.get('calories', 0)),
+        'protein': to_float(result.get('protein', 0)),
+        'fat': to_float(result.get('fat', 0)),
+        'carbs': to_float(result.get('carbs', 0)),
     }
 
     meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"

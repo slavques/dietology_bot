@@ -33,6 +33,15 @@ def save_options_kb(meal_id: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def confirm_save_kb(meal_id: str) -> InlineKeyboardMarkup:
+    """Keyboard asking to confirm addition."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Добавить", callback_data=f"add:{meal_id}")
+    builder.button(text="Назад", callback_data=f"back:{meal_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def history_nav_kb(offset: int, total: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     count = 0

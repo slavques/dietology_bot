@@ -5,8 +5,8 @@ from aiogram.filters import StateFilter
 
 from ..database import SessionLocal, User, Meal
 from ..services import analyze_photo_with_hint
-from ..utils import format_meal_message
-from ..keyboards import meal_actions_kb, save_options_kb
+from ..utils import format_meal_message, parse_serving, to_float
+from ..keyboards import meal_actions_kb, save_options_kb, confirm_save_kb
 from ..states import EditMeal
 from ..storage import pending_meals
 
@@ -66,18 +66,29 @@ async def process_edit(message: types.Message, state: FSMContext):
 
     result = await analyze_photo_with_hint(meal['photo_path'], message.text)
     if result.get('error') or not result.get('success'):
-        await message.answer(
-            "Не удалось обработать уточнение. Попробуй ещё раз."
-        )
+        if meal['clarifications'] == 0:
+            await message.answer("Уточнение некорретктно. У тебя ещё одна попытка.")
+        else:
+            await message.answer(
+                "Снова не удалось обработать уточнение. Возможно, ты пишешь что-то не то. Удали расчет, если он тебя не устраивает. "
+            )
+        meal['clarifications'] += 1
+        if meal['clarifications'] >= 2:
+            await message.bot.edit_message_reply_markup(
+                chat_id=meal['chat_id'],
+                message_id=meal['message_id'],
+                reply_markup=meal_actions_kb(meal_id, meal['clarifications'])
+            )
+            await state.clear()
         return
     meal.update({
         'name': result.get('name', meal['name']),
-        'serving': result.get('serving', meal['serving']),
+        'serving': parse_serving(result.get('serving', meal['serving'])),
         'macros': {
-            'calories': result.get('calories', meal['macros']['calories']),
-            'protein': result.get('protein', meal['macros']['protein']),
-            'fat': result.get('fat', meal['macros']['fat']),
-            'carbs': result.get('carbs', meal['macros']['carbs']),
+            'calories': to_float(result.get('calories', meal['macros']['calories'])),
+            'protein': to_float(result.get('protein', meal['macros']['protein'])),
+            'fat': to_float(result.get('fat', meal['macros']['fat'])),
+            'carbs': to_float(result.get('carbs', meal['macros']['carbs'])),
         },
     })
     meal['clarifications'] += 1
@@ -105,6 +116,7 @@ async def cb_save(query: types.CallbackQuery):
     if meal_id not in pending_meals:
         await query.answer("Сессия устарела", show_alert=True)
         return
+    pending_meals[meal_id].pop('portion', None)
     await query.message.edit_reply_markup(reply_markup=save_options_kb(meal_id))
     await query.answer()
 
@@ -120,8 +132,8 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         user = User(telegram_id=query.from_user.id)
         session.add(user)
         session.commit()
-    serving = meal['serving'] * fraction
-    macros = {k: v * fraction for k, v in meal['macros'].items()}
+    serving = parse_serving(meal['serving']) * fraction
+    macros = {k: to_float(v) * fraction for k, v in meal['macros'].items()}
     prefixes = {1.0: "", 0.5: "1/2 ", 0.25: "1/4 ", 0.75: "3/4 "}
     name = prefixes.get(fraction, "") + meal['name']
     new_meal = Meal(
@@ -148,32 +160,71 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
 
 async def cb_save_full(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
-    await _final_save(query, meal_id, fraction=1.0)
+    meal = pending_meals.get(meal_id)
+    if not meal:
+        await query.answer("Сессия устарела", show_alert=True)
+        return
+    meal['portion'] = 1.0
+    await query.message.edit_reply_markup(reply_markup=confirm_save_kb(meal_id))
+    await query.answer()
 
 
 async def cb_save_half(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
-    await _final_save(query, meal_id, fraction=0.5)
+    meal = pending_meals.get(meal_id)
+    if not meal:
+        await query.answer("Сессия устарела", show_alert=True)
+        return
+    meal['portion'] = 0.5
+    await query.message.edit_reply_markup(reply_markup=confirm_save_kb(meal_id))
+    await query.answer()
 
 
 async def cb_save_quarter(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
-    await _final_save(query, meal_id, fraction=0.25)
+    meal = pending_meals.get(meal_id)
+    if not meal:
+        await query.answer("Сессия устарела", show_alert=True)
+        return
+    meal['portion'] = 0.25
+    await query.message.edit_reply_markup(reply_markup=confirm_save_kb(meal_id))
+    await query.answer()
 
 
 async def cb_save_threeq(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
-    await _final_save(query, meal_id, fraction=0.75)
+    meal = pending_meals.get(meal_id)
+    if not meal:
+        await query.answer("Сессия устарела", show_alert=True)
+        return
+    meal['portion'] = 0.75
+    await query.message.edit_reply_markup(reply_markup=confirm_save_kb(meal_id))
+    await query.answer()
 
 
 async def cb_save_back(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     meal = pending_meals.get(meal_id)
     if meal:
-        await query.message.edit_reply_markup(
-            reply_markup=meal_actions_kb(meal_id, meal.get('clarifications', 0))
-        )
+        if 'portion' in meal:
+            meal.pop('portion', None)
+            await query.message.edit_reply_markup(reply_markup=save_options_kb(meal_id))
+        else:
+            await query.message.edit_reply_markup(
+                reply_markup=meal_actions_kb(meal_id, meal.get('clarifications', 0))
+            )
     await query.answer()
+
+
+async def cb_add(query: types.CallbackQuery):
+    meal_id = query.data.split(':', 1)[1]
+    meal = pending_meals.get(meal_id)
+    if not meal:
+        await query.answer("Сессия устарела", show_alert=True)
+        return
+    fraction = meal.pop('portion', 1.0)
+    await _final_save(query, meal_id, fraction)
+
 
 def register(dp: Dispatcher):
     dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
@@ -187,3 +238,4 @@ def register(dp: Dispatcher):
     dp.callback_query.register(cb_save_quarter, F.data.startswith('quarter:'))
     dp.callback_query.register(cb_save_threeq, F.data.startswith('threeq:'))
     dp.callback_query.register(cb_save_back, F.data.startswith('back:'))
+    dp.callback_query.register(cb_add, F.data.startswith('add:'))
