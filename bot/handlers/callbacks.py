@@ -12,12 +12,12 @@ from ..storage import pending_meals
 
 
 async def cb_refine(query: types.CallbackQuery, state: FSMContext):
-    """Prompt user to enter name and weight manually."""
-    await query.bot.send_message(
-        query.from_user.id,
+    """Prompt user to enter name and weight manually within the same message."""
+    await query.message.edit_text(
         "✏️ Хорошо!\n"
         "Напиши название блюда и его вес (в граммах).\n\n"
         "Например: Паста с соусом, 250 г",
+        reply_markup=None,
     )
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -40,11 +40,11 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
-    await query.bot.send_message(
-        query.from_user.id,
+    await query.message.edit_text(
         "✏️ Хорошо!\n"
         "Напиши название блюда и его вес (в граммах).\n\n"
         "Например: Паста с соусом, 250 г",
+        reply_markup=None,
     )
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -57,29 +57,32 @@ async def process_edit(message: types.Message, state: FSMContext):
         await state.clear()
         return
     meal = pending_meals[meal_id]
+    if not message.text or len(message.text) > 100:
+        await message.answer("Уточнение должно быть текстом до 100 символов.")
+        return
 
     result = await analyze_photo_with_hint(meal['photo_path'], message.text)
-    if result.get('error') or not result.get('name'):
+    if result.get('error') or not result.get('success'):
         await message.answer(
-            "Не удалось обработать уточнение. "
-            "Напишите, пожалуйста, название блюда и при необходимости вес или ингредиенты.\n"
-            "Примеры: \"Паста с соусом, 250 г\" или \"Помидор 100 г, огурец 50 г\""
+            "Не удалось обработать уточнение. Попробуй ещё раз."
         )
         return
     meal.update({
-        'name': result['name'],
-        'ingredients': result.get('ingredients', []),
-        'serving': result.get('serving', 0),
+        'name': result.get('name', meal['name']),
+        'serving': result.get('serving', meal['serving']),
         'macros': {
-            'calories': result.get('calories', 0),
-            'protein': result.get('protein', 0),
-            'fat': result.get('fat', 0),
-            'carbs': result.get('carbs', 0),
+            'calories': result.get('calories', meal['macros']['calories']),
+            'protein': result.get('protein', meal['macros']['protein']),
+            'fat': result.get('fat', meal['macros']['fat']),
+            'carbs': result.get('carbs', meal['macros']['carbs']),
         },
     })
     meal['clarifications'] += 1
-    await message.answer(
+    await message.delete()
+    await message.bot.edit_message_text(
         format_meal_message(meal['name'], meal['serving'], meal['macros']),
+        meal['chat_id'],
+        meal['message_id'],
         reply_markup=meal_actions_kb(meal_id, meal['clarifications'])
     )
     await state.clear()
@@ -166,7 +169,7 @@ def register(dp: Dispatcher):
     dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
     dp.callback_query.register(cb_refine, F.data == 'refine')
     dp.callback_query.register(cb_cancel, F.data == 'cancel')
-    dp.message.register(process_edit, StateFilter(EditMeal.waiting_input))
+    dp.message.register(process_edit, StateFilter(EditMeal.waiting_input), F.text)
     dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
     dp.callback_query.register(cb_save, F.data.startswith('save:'))
     dp.callback_query.register(cb_save_full, F.data.startswith('full:'))

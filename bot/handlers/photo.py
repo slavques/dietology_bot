@@ -57,6 +57,8 @@ async def handle_photo(message: types.Message, state: FSMContext):
         'macros': macros,
         'photo_path': photo_path,
         'clarifications': 0,
+        'chat_id': message.chat.id,
+        'message_id': None,
     }
 
     if not name:
@@ -65,18 +67,22 @@ async def handle_photo(message: types.Message, state: FSMContext):
         builder.button(text="🗑 Удалить", callback_data="cancel")
         builder.adjust(2)
         await state.update_data(meal_id=meal_id)
-        await message.answer(
+        msg = await message.answer(
             "🤔 Не удалось точно распознать блюдо на фото.\n"
             "Можешь ввести название и вес вручную?",
             reply_markup=builder.as_markup(),
         )
+        pending_meals[meal_id]["message_id"] = msg.message_id
+        pending_meals[meal_id]["chat_id"] = msg.chat.id
         await state.set_state(EditMeal.waiting_input)
         return
 
-    await message.answer(
+    msg = await message.answer(
         format_meal_message(name, serving, macros),
         reply_markup=meal_actions_kb(meal_id, clarifications=0)
     )
+    pending_meals[meal_id]["message_id"] = msg.message_id
+    pending_meals[meal_id]["chat_id"] = msg.chat.id
 
 
 async def handle_document(message: types.Message):

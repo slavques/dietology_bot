@@ -29,7 +29,9 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
                 messages=messages,
                 max_tokens=200,
             )
-            return resp.choices[0].message.content
+            content = resp.choices[0].message.content
+            logging.info("OpenAI response: %s", content)
+            return content
         except RateLimitError:
             if attempt < retries - 1:
                 await asyncio.sleep(backoff * (2 ** attempt))
@@ -124,10 +126,11 @@ async def analyze_photo(photo_path: str) -> Dict[str, any]:
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     prompt = (
+        "Ты диетолог/нутрициолог. "
         "Определи, есть ли еда на фото. Если еды нет, верни JSON "
         "{\"is_food\": false}. Если еда есть, назови блюдо по-русски, "
-        "оцени уверенность распознавания в диапазоне 0-1, приблизительный "
-        "вес порции и расчитай калории, белки, жиры и углеводы. "
+        "оцени уверенность распознавания (0-1), примерный вес порции и "
+        "расчитай калории, белки, жиры и углеводы. "
         "Ответ только JSON вида {is_food, confidence, name, serving, calories, protein, fat, carbs}."
     )
     content = await _chat(
@@ -163,6 +166,7 @@ async def analyze_photo_with_hint(photo_path: str, hint: str) -> Dict[str, any]:
     if not client.api_key:
         # simple stub when API key is missing
         return {
+            "success": True,
             "name": hint,
             "serving": 200,
             "calories": 250,
@@ -173,10 +177,12 @@ async def analyze_photo_with_hint(photo_path: str, hint: str) -> Dict[str, any]:
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     prompt = (
-        "Ты диетолог. На фото изображено блюдо. Пользователь уточнил: "
-        f"{hint}. Используя это уточнение, определи название блюда по-русски, "
-        "примерный вес порции и рассчитай калории, белки, жиры и углеводы. "
-        "Ответ только JSON вида {name, serving, calories, protein, fat, carbs}."
+        "Ты диетолог/нутрициолог. Пользователь уточняет блюдо на фото: "
+        f"{hint}. Сравни текст с изображением и, если уточнение относится к "
+        "блюду, обнови название, вес и подсчитай калории, белки, жиры и углеводы."
+        " Если уточнение не относится к еде, ответь JSON {success: false}. "
+        "В остальных случаях ответь только JSON вида "
+        "{success: true, name, serving, calories, protein, fat, carbs}."
     )
     content = await _chat(
         [
