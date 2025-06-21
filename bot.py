@@ -275,7 +275,7 @@ async def process_edit(message: types.Message, state: FSMContext):
         name = message.text
         serving = 100.0
     if photo_path:
-        result = await analyze_photo_with_hint(photo_path, message.text)
+        result = await analyze_photo_with_hint(photo_path, message.text, {})
         name = result.get('name', name)
         serving = result.get('serving', serving)
         macros = {

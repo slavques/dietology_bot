@@ -4,7 +4,7 @@ from aiogram.filters import Command
 
 from ..database import SessionLocal, Meal, User
 from ..utils import make_bar_chart
-from ..keyboards import stats_period_kb, back_menu_kb
+from ..keyboards import stats_period_kb, back_menu_kb, main_menu_kb
 
 async def cmd_stats(message: types.Message):
     await message.answer(
@@ -52,7 +52,7 @@ async def report_day(message: types.Message):
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=message.from_user.id).first()
     if not user:
-        await message.answer("Нет данных", reply_markup=back_menu_kb())
+        await message.answer("Нет данных", reply_markup=main_menu_kb())
         session.close()
         return
     start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -69,7 +69,7 @@ async def report_day(message: types.Message):
             "🧾 Отчёт за день\n\n"
             "Пока нет ни одного приёма пищи.\n\n"
             "📸 Отправь фото еды — и я добавлю первую запись!",
-            reply_markup=back_menu_kb(),
+            reply_markup=main_menu_kb(),
         )
         return
 
@@ -95,7 +95,7 @@ async def report_day(message: types.Message):
         lines.append(
             f"• {meal.name}\n(🔥 {int(meal.calories)} ккал / Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
         )
-    await message.answer("\n".join(lines), reply_markup=back_menu_kb())
+    await message.answer("\n".join(lines), reply_markup=main_menu_kb())
 
 
 def register(dp: Dispatcher):

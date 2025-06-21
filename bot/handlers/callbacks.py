@@ -6,19 +6,28 @@ from aiogram.filters import StateFilter
 from ..database import SessionLocal, User, Meal
 from ..services import analyze_photo_with_hint
 from ..utils import format_meal_message, parse_serving, to_float
-from ..keyboards import meal_actions_kb, save_options_kb, confirm_save_kb
+from ..keyboards import meal_actions_kb, save_options_kb, confirm_save_kb, main_menu_kb
 from ..states import EditMeal
 from ..storage import pending_meals
 
 
 async def cb_refine(query: types.CallbackQuery, state: FSMContext):
-    """Prompt user to enter name and weight manually within the same message."""
-    await query.message.edit_text(
+    """Prompt user to enter name and weight manually."""
+    data = await state.get_data()
+    meal_id = data.get("meal_id")
+    clar = 0
+    if meal_id and meal_id in pending_meals:
+        clar = pending_meals[meal_id].get("clarifications", 0)
+    text = (
         "✏️ Хорошо!\n"
-        "Напиши название блюда и его вес (в граммах).\n\n"
-        "Например: Паста с соусом, 250 г",
-        reply_markup=None,
+        "Напиши название блюда и его вес (в граммах).\n"
     )
+    if clar == 0:
+        text += "У тебя есть две попытки уточнить нюансы по блюду.\n\n"
+    else:
+        text += "Осталась еще одна попытка.\n\n"
+    text += "Например: Паста с соусом, 250 г"
+    await query.message.edit_text(text, reply_markup=None)
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
@@ -40,12 +49,17 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
-    await query.message.edit_text(
+    clar = pending_meals.get(meal_id, {}).get("clarifications", 0)
+    text = (
         "✏️ Хорошо!\n"
-        "Напиши название блюда и его вес (в граммах).\n\n"
-        "Например: Паста с соусом, 250 г",
-        reply_markup=None,
+        "Напиши название блюда и его вес (в граммах).\n"
     )
+    if clar == 0:
+        text += "У тебя есть две попытки уточнить нюансы по блюду.\n\n"
+    else:
+        text += "Осталась еще одна попытка.\n\n"
+    text += "Например: Паста с соусом, 250 г"
+    await query.message.edit_text(text, reply_markup=None)
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
@@ -64,13 +78,13 @@ async def process_edit(message: types.Message, state: FSMContext):
         )
         return
 
-    result = await analyze_photo_with_hint(meal['photo_path'], message.text)
+    result = await analyze_photo_with_hint(meal['photo_path'], message.text, meal)
     if result.get('error') or not result.get('success'):
         if meal['clarifications'] == 0:
-            await message.answer("Уточнение некорретктно. У тебя ещё одна попытка.")
+            await message.answer("Ваше уточнение некорректно. Осталась ещё одна попытка.")
         else:
             await message.answer(
-                "Снова не удалось обработать уточнение. Возможно, ты пишешь что-то не то. Удали расчет, если он тебя не устраивает. "
+                "Попытки закончились.\n\nТы можешь сохранить или удалить запись, если она некорректна."
             )
         meal['clarifications'] += 1
         if meal['clarifications'] >= 2:
@@ -162,6 +176,7 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         query.from_user.id,
         "✅ Готово! Блюдо добавлено в историю.\n"
         "📂 Хочешь посмотреть приёмы за сегодня — нажми ниже \n\"🧾 Отчёт за день\"",
+        reply_markup=main_menu_kb(),
     )
 
 

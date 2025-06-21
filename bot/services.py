@@ -3,7 +3,7 @@ import base64
 import re
 import asyncio
 import logging
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
 
 import openai
 from openai import RateLimitError, BadRequestError
@@ -45,7 +45,7 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
             return "__ERROR__"
 
 
-async def classify_food(photo_path: str) -> Dict[str, any]:
+async def classify_food(photo_path: str) -> Dict[str, Any]:
     """Determine if the photo contains food and return confidence."""
     if not client.api_key:
         return {"is_food": True, "confidence": 1.0}
@@ -91,7 +91,7 @@ async def classify_food(photo_path: str) -> Dict[str, any]:
         return {"error": "parse"}
 
 
-async def recognize_dish(photo_path: str) -> Dict[str, any]:
+async def recognize_dish(photo_path: str) -> Dict[str, Any]:
     """Recognize dish name, ingredients and serving from a photo."""
     if not client.api_key:
         return {"name": "Пример блюда", "ingredients": ["ингредиент"], "serving": 200}
@@ -138,7 +138,7 @@ async def recognize_dish(photo_path: str) -> Dict[str, any]:
         return {"error": "parse"}
 
 
-async def analyze_photo(photo_path: str) -> Dict[str, any]:
+async def analyze_photo(photo_path: str) -> Dict[str, Any]:
     """Analyze photo in a single GPT request and return dish info and macros."""
     if not client.api_key:
         return {
@@ -159,6 +159,7 @@ async def analyze_photo(photo_path: str) -> Dict[str, any]:
         "{\"is_food\": false}. Если еда есть, назови блюдо по-русски с большой буквы, "
         "оцени уверенность распознавания (0-1), укажи примерный вес полной порции "
         "в граммах целым числом и расчитай калории, белки, жиры и углеводы. "
+        "При необходимости используй поиск в интернете для более точной оценки. "
         "Старайся давать схожие результаты при повторном анализе одного и того же блюда. "
         "Ответ только JSON вида {is_food, confidence, name, serving, calories, protein, fat, carbs}."
     )
@@ -194,7 +195,7 @@ async def analyze_photo(photo_path: str) -> Dict[str, any]:
         return {"error": "parse"}
 
 
-async def analyze_photo_with_hint(photo_path: str, hint: str) -> Dict[str, any]:
+async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Re-analyze photo using user clarification text."""
     if not client.api_key:
         # simple stub when API key is missing
@@ -209,10 +210,13 @@ async def analyze_photo_with_hint(photo_path: str, hint: str) -> Dict[str, any]:
         }
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
+    prev_json = json.dumps(prev or {}, ensure_ascii=False)
     prompt = (
         "Ты диетолог/нутрициолог. Пользователь уточняет блюдо на фото: "
-        f"{hint}. Сравни текст с изображением и, если уточнение относится к "
-        "блюду, обнови название, вес и подсчитай калории, белки, жиры и углеводы. "
+        f"{hint}. Предыдущие данные анализа: {prev_json}. "
+        "Сравни текст с изображением и, если уточнение относится к блюду, "
+        "обнови название, вес и подсчитай калории, белки, жиры и углеводы. "
+        "При необходимости используй поиск в интернете для более точных расчётов. "
         "Название верни на русском с большой буквы, вес укажи целым числом в граммах "
         "за всю порцию. Старайся выдавать близкие значения при повторной проверке того же фото. "
         "Если уточнение не относится к еде, ответь JSON {success: false}. "
