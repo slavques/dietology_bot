@@ -25,4 +25,4 @@ async def cmd_faq(message: types.Message):
 
 
 def register(dp: Dispatcher):
-    dp.message.register(cmd_faq, F.text == "\u2753 \u0427\u0430\u0412\u041E")
+    dp.message.register(cmd_faq, F.text == "❓ ЧаВО")

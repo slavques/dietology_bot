@@ -100,5 +100,5 @@ async def report_day(message: types.Message):
 
 def register(dp: Dispatcher):
     dp.message.register(cmd_stats, Command('stats'))
-    dp.message.register(report_day, F.text == "\U0001F9FE \u041E\u0442\u0447\u0451\u0442 \u0437\u0430 \u0434\u0435\u043D\u044C")
+    dp.message.register(report_day, F.text == "🧾 Отчёт за день")
     dp.callback_query.register(cb_stats, F.data.startswith('stats:'))

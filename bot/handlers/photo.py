@@ -93,6 +93,6 @@ async def handle_document(message: types.Message):
 
 
 def register(dp: Dispatcher):
-    dp.message.register(request_photo, F.text == "\U0001F4F8 Новое фото")
+    dp.message.register(request_photo, F.text == "📸 Новое фото")
     dp.message.register(handle_photo, F.photo)
     dp.message.register(handle_document, F.document)

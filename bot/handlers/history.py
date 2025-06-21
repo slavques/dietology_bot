@@ -52,10 +52,12 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int):
         await bot.send_message(chat_id, "История пуста.")
         return
     builder = InlineKeyboardBuilder()
+    count = 1
     builder.button(text="⬅️ Записи ранее", callback_data=f"hist:{offset+1}")
     if offset > 0:
         builder.button(text="Записи позже ➡️", callback_data=f"hist:{offset-1}")
-    builder.adjust(len(builder.buttons))
+        count += 1
+    builder.adjust(count)
     await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=builder.as_markup())
 
 async def cmd_history(message: types.Message):
@@ -71,5 +73,5 @@ async def cb_history(query: types.CallbackQuery):
 
 def register(dp: Dispatcher):
     dp.message.register(cmd_history, Command('history'))
-    dp.message.register(cmd_history, F.text == "\U0001F4CA \u041C\u043E\u0438 \u043F\u0440\u0438\u0451\u043C\u044B")
+    dp.message.register(cmd_history, F.text == "📊 Мои приёмы")
     dp.callback_query.register(cb_history, F.data.startswith('hist:'))

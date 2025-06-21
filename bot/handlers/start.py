@@ -33,5 +33,5 @@ def register(dp: Dispatcher):
     dp.message.register(cmd_start, Command('start'))
     dp.message.register(
         back_to_menu,
-        lambda m: m.text == "\U0001F951 \u0413\u043B\u0430\u0432\u043D\u043E\u0435 \u043C\u0435\u043D\u044E",
+        lambda m: m.text == "🥑 Главное меню",
     )

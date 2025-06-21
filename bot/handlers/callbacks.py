@@ -57,8 +57,11 @@ async def process_edit(message: types.Message, state: FSMContext):
         await state.clear()
         return
     meal = pending_meals[meal_id]
-    if not message.text or len(message.text) > 100:
-        await message.answer("Уточнение должно быть текстом до 100 символов.")
+    MAX_LEN = 200
+    if not message.text or len(message.text) > MAX_LEN:
+        await message.answer(
+            f"Уточнение должно быть текстом до {MAX_LEN} символов."
+        )
         return
 
     result = await analyze_photo_with_hint(meal['photo_path'], message.text)
@@ -106,7 +109,7 @@ async def cb_save(query: types.CallbackQuery):
     await query.answer()
 
 
-async def _final_save(query: types.CallbackQuery, meal_id: str, half: bool = False):
+async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float = 1.0):
     meal = pending_meals.pop(meal_id, None)
     if not meal:
         await query.answer("Нечего сохранять", show_alert=True)
@@ -117,13 +120,10 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, half: bool = Fal
         user = User(telegram_id=query.from_user.id)
         session.add(user)
         session.commit()
-    serving = meal['serving'] / 2 if half else meal['serving']
-    macros = meal['macros']
-    if half:
-        macros = {k: v / 2 for k, v in macros.items()}
-    name = meal['name']
-    if half:
-        name = "1/2 " + name
+    serving = meal['serving'] * fraction
+    macros = {k: v * fraction for k, v in meal['macros'].items()}
+    prefixes = {1.0: "", 0.5: "1/2 ", 0.25: "1/4 ", 0.75: "3/4 "}
+    name = prefixes.get(fraction, "") + meal['name']
     new_meal = Meal(
         user_id=user.id,
         name=name,
@@ -148,12 +148,22 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, half: bool = Fal
 
 async def cb_save_full(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
-    await _final_save(query, meal_id, half=False)
+    await _final_save(query, meal_id, fraction=1.0)
 
 
 async def cb_save_half(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
-    await _final_save(query, meal_id, half=True)
+    await _final_save(query, meal_id, fraction=0.5)
+
+
+async def cb_save_quarter(query: types.CallbackQuery):
+    meal_id = query.data.split(':', 1)[1]
+    await _final_save(query, meal_id, fraction=0.25)
+
+
+async def cb_save_threeq(query: types.CallbackQuery):
+    meal_id = query.data.split(':', 1)[1]
+    await _final_save(query, meal_id, fraction=0.75)
 
 
 async def cb_save_back(query: types.CallbackQuery):
@@ -174,4 +184,6 @@ def register(dp: Dispatcher):
     dp.callback_query.register(cb_save, F.data.startswith('save:'))
     dp.callback_query.register(cb_save_full, F.data.startswith('full:'))
     dp.callback_query.register(cb_save_half, F.data.startswith('half:'))
+    dp.callback_query.register(cb_save_quarter, F.data.startswith('quarter:'))
+    dp.callback_query.register(cb_save_threeq, F.data.startswith('threeq:'))
     dp.callback_query.register(cb_save_back, F.data.startswith('back:'))
