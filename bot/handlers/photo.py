@@ -23,7 +23,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
             "Пришли, пожалуйста, одно фото блюда — и я всё рассчитаю!"
         )
         return
-
     await message.reply("Готово! 🔍\nАнализирую фото…")
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
