@@ -29,6 +29,7 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
                 model="gpt-4o",
                 messages=messages,
                 max_tokens=200,
+                temperature=0.2,
             )
             content = resp.choices[0].message.content
             logging.info("OpenAI response: %s", content)
@@ -158,6 +159,7 @@ async def analyze_photo(photo_path: str) -> Dict[str, any]:
         "{\"is_food\": false}. Если еда есть, назови блюдо по-русски с большой буквы, "
         "оцени уверенность распознавания (0-1), укажи примерный вес полной порции "
         "в граммах целым числом и расчитай калории, белки, жиры и углеводы. "
+        "Старайся давать схожие результаты при повторном анализе одного и того же блюда. "
         "Ответ только JSON вида {is_food, confidence, name, serving, calories, protein, fat, carbs}."
     )
     content = await _chat(
@@ -212,7 +214,8 @@ async def analyze_photo_with_hint(photo_path: str, hint: str) -> Dict[str, any]:
         f"{hint}. Сравни текст с изображением и, если уточнение относится к "
         "блюду, обнови название, вес и подсчитай калории, белки, жиры и углеводы. "
         "Название верни на русском с большой буквы, вес укажи целым числом в граммах "
-        "за всю порцию. Если уточнение не относится к еде, ответь JSON {success: false}. "
+        "за всю порцию. Старайся выдавать близкие значения при повторной проверке того же фото. "
+        "Если уточнение не относится к еде, ответь JSON {success: false}. "
         "В остальных случаях ответь только JSON вида "
         "{success: true, name, serving, calories, protein, fat, carbs}."
     )
