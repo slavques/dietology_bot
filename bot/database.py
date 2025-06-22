@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Boolean,
+    text,  # for raw SQL migrations
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 
@@ -20,7 +21,6 @@ Base = declarative_base()
 
 def _column_names(table: str) -> set[str]:
     """Return existing column names for given table."""
-    from sqlalchemy import text
 
     with engine.connect() as conn:
         rows = conn.execute(text(f"PRAGMA table_info({table})")).mappings().all()
@@ -38,7 +38,8 @@ def _ensure_columns():
         if "requests_used" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN requests_used INTEGER DEFAULT 0"))
         if "period_start" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN period_start DATETIME"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN period_start DATETIME DEFAULT CURRENT_TIMESTAMP"))
+        conn.execute(text("UPDATE users SET period_start=CURRENT_TIMESTAMP WHERE period_start IS NULL"))
         if "period_end" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN period_end DATETIME"))
         if "notified_7d" not in existing:
