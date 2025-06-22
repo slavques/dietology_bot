@@ -1,0 +1,4 @@
+aiogram>=3
+sqlalchemy
+openai
+python-dotenv
