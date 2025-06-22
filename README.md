@@ -22,7 +22,29 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
    python bot.py
    ```
 
-The database is stored in `bot.db` in the project root by default. You can change this by setting `DATABASE_URL`.
+The database is stored in `bot.db` in the project root by default. You can change
+this by setting `DATABASE_URL`.
+
+### Manual database access
+
+The default SQLite database can be inspected and edited directly. Install the
+`sqlite3` command line tool or any graphical client such as **DB Browser for
+SQLite**, then open `bot.db`:
+
+```bash
+sqlite3 bot.db
+```
+
+Within the shell you can list tables with `.tables`, show table schemas with
+`.schema users` or `.schema meals` and execute regular SQL statements. For
+example, granting a user paid status:
+
+```sql
+UPDATE users SET grade='paid' WHERE telegram_id = 12345;
+```
+
+Exit the shell with `.quit` once your changes are complete. If you configured a
+different `DATABASE_URL`, open that file instead.
 
 ### Subscription testing
 
