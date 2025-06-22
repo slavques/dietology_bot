@@ -17,6 +17,38 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
+
+def _column_names(table: str) -> set[str]:
+    """Return existing column names for given table."""
+    from sqlalchemy import text
+
+    with engine.connect() as conn:
+        rows = conn.execute(text(f"PRAGMA table_info({table})")).mappings().all()
+    return {row["name"] for row in rows}
+
+
+def _ensure_columns():
+    """Add new columns to old databases if they are missing."""
+    existing = _column_names("users")
+    with engine.begin() as conn:
+        if "grade" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN grade TEXT DEFAULT 'free'"))
+        if "request_limit" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN request_limit INTEGER DEFAULT 20"))
+        if "requests_used" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN requests_used INTEGER DEFAULT 0"))
+        if "period_start" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN period_start DATETIME"))
+        if "period_end" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN period_end DATETIME"))
+        if "notified_7d" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN notified_7d BOOLEAN DEFAULT 0"))
+        if "notified_3d" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN notified_3d BOOLEAN DEFAULT 0"))
+        if "notified_0d" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN notified_0d BOOLEAN DEFAULT 0"))
+
+
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
@@ -47,3 +79,4 @@ class Meal(Base):
     user = relationship('User', back_populates='meals')
 
 Base.metadata.create_all(engine)
+_ensure_columns()
