@@ -53,6 +53,7 @@ Two helper commands imitate payment results:
 ```
 /success1467  # activate or extend paid plan
 /refused1467  # simulate payment refusal
+/notify1467  # force sending pending subscription reminders
 ```
 
 Paid users receive 800 GPT requests per month. Free users get 20 requests that renew every month from the account start date. Daily checks send reminders 7 and 3 days before expiry and on the last day.
