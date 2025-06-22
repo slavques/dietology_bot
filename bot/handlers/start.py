@@ -2,6 +2,7 @@ from aiogram import types, Dispatcher
 from aiogram.filters import Command
 
 from ..database import SessionLocal, User
+from ..subscriptions import ensure_user
 from ..keyboards import main_menu_kb
 
 WELCOME_TEXT = (
@@ -15,11 +16,7 @@ WELCOME_TEXT = (
 
 async def cmd_start(message: types.Message):
     session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=message.from_user.id).first()
-    if not user:
-        user = User(telegram_id=message.from_user.id)
-        session.add(user)
-        session.commit()
+    ensure_user(session, message.from_user.id)
     session.close()
     await message.answer(WELCOME_TEXT, reply_markup=main_menu_kb())
 

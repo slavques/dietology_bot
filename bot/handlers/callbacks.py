@@ -5,6 +5,8 @@ from aiogram.filters import StateFilter
 
 from ..database import SessionLocal, User, Meal
 from ..services import analyze_photo_with_hint
+from ..subscriptions import consume_request, ensure_user
+from datetime import timedelta
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import meal_actions_kb, save_options_kb, confirm_save_kb, main_menu_kb
 from ..states import EditMeal
@@ -71,6 +73,18 @@ async def process_edit(message: types.Message, state: FSMContext):
         await state.clear()
         return
     meal = pending_meals[meal_id]
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    if not consume_request(session, user):
+        reset = user.period_start + timedelta(days=30)
+        await message.answer(
+            f"Твои бесплатные запросы обновятся {reset.date()}, но ты можешь перейти на безлимитную подписку",
+            reply_markup=main_menu_kb(),
+        )
+        session.close()
+        await state.clear()
+        return
+    session.close()
     MAX_LEN = 200
     if not message.text or len(message.text) > MAX_LEN:
         await message.answer(

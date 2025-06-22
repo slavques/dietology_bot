@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from aiogram import types, Dispatcher, F
 import tempfile
 from aiogram.fsm.context import FSMContext
@@ -7,14 +7,21 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..services import analyze_photo, analyze_photo_with_hint
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import meal_actions_kb, back_menu_kb
+from ..subscriptions import consume_request, ensure_user, FREE_LIMIT, PAID_LIMIT
+from ..database import SessionLocal
 from ..states import EditMeal
 from ..storage import pending_meals
 
 async def request_photo(message: types.Message):
-    await message.answer(
-        "\U0001F525\u041E\u0442\u043B\u0438\u0447\u043D\u043E! \u041E\u0442\u043F\u0440\u0430\u0432\u044C \u0444\u043E\u0442\u043E \u0435\u0434\u044B \u2014 \u044F \u0432\u0441\u0451 \u043F\u043E\u0441\u0447\u0438\u0442\u0430\u044E \u0441\u0430\u043C.",
-        reply_markup=back_menu_kb(),
-    )
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    if not consume_request(session, user):
+        reset = user.period_start + timedelta(days=30)
+        await message.answer(f"Твои бесплатные запросы обновятся {reset.date()}, но ты можешь перейти на безлимитную подписку", reply_markup=back_menu_kb())
+        session.close()
+        return
+    session.close()
+    await message.answer("🔥Отлично! Отправь фото еды — я всё посчитаю сам.", reply_markup=back_menu_kb())
 
 async def handle_photo(message: types.Message, state: FSMContext):
     if message.media_group_id:
@@ -23,6 +30,19 @@ async def handle_photo(message: types.Message, state: FSMContext):
             "Пришли, пожалуйста, одно фото блюда — и я всё рассчитаю!"
         )
         return
+
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    if not consume_request(session, user):
+        reset = user.period_start + timedelta(days=30)
+        await message.answer(
+            f"Твои бесплатные запросы обновятся {reset.date()}, но ты можешь перейти на безлимитную подписку",
+            reply_markup=back_menu_kb(),
+        )
+        session.close()
+        return
+    session.close()
+
     await message.reply("Готово! 🔍\nАнализирую фото…")
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
