@@ -45,7 +45,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
     await message.reply("Готово! 🔍\nАнализирую фото…")
     photo = message.photo[-1]
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(prefix="diet_photo_", delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
     result = await analyze_photo(photo_path)

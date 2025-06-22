@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Boolean,
+    text,  # for raw SQL migrations
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 
@@ -20,7 +21,6 @@ Base = declarative_base()
 
 def _column_names(table: str) -> set[str]:
     """Return existing column names for given table."""
-    from sqlalchemy import text
 
     with engine.connect() as conn:
         rows = conn.execute(text(f"PRAGMA table_info({table})")).mappings().all()
