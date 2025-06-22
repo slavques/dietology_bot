@@ -29,6 +29,8 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
 
 def update_limits(user: User) -> None:
     now = datetime.utcnow()
+    if user.period_start is None:
+        user.period_start = now
     if user.grade == "paid":
         if user.period_end and now > user.period_end:
             # subscription expired

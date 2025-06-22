@@ -38,7 +38,8 @@ def _ensure_columns():
         if "requests_used" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN requests_used INTEGER DEFAULT 0"))
         if "period_start" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN period_start DATETIME"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN period_start DATETIME DEFAULT CURRENT_TIMESTAMP"))
+        conn.execute(text("UPDATE users SET period_start=CURRENT_TIMESTAMP WHERE period_start IS NULL"))
         if "period_end" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN period_end DATETIME"))
         if "notified_7d" not in existing:
