@@ -3,10 +3,11 @@ from aiogram import types, Dispatcher
 from aiogram.filters import Command
 
 from ..database import SessionLocal
-from ..subscriptions import ensure_user, process_payment_success
+from ..subscriptions import ensure_user, process_payment_success, _daily_check
 
 SUCCESS_CMD = "success1467"
 REFUSED_CMD = "refused1467"
+NOTIFY_CMD = "notify1467"
 
 async def cmd_success(message: types.Message):
     if not message.text.startswith(f"/{SUCCESS_CMD}"):
@@ -23,6 +24,14 @@ async def cmd_refused(message: types.Message):
     await message.answer("Оплата отменена.")
 
 
+async def cmd_notify(message: types.Message):
+    if not message.text.startswith(f"/{NOTIFY_CMD}"):
+        return
+    await _daily_check(message.bot)
+    await message.answer("Уведомления отправлены")
+
+
 def register(dp: Dispatcher):
     dp.message.register(cmd_success, Command(SUCCESS_CMD))
     dp.message.register(cmd_refused, Command(REFUSED_CMD))
+    dp.message.register(cmd_notify, Command(NOTIFY_CMD))
