@@ -6,6 +6,7 @@ from typing import Optional
 import asyncio
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from .keyboards import subscribe_button
 
 from .database import SessionLocal, User
 
@@ -24,6 +25,7 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             requests_used=0,
             period_start=now,
             period_end=now + timedelta(days=30),
+            notified_1d=False,
         )
         session.add(user)
         session.commit()
@@ -44,6 +46,7 @@ def update_limits(user: User) -> None:
             user.period_end = now + timedelta(days=30)
             user.notified_7d = False
             user.notified_3d = False
+            user.notified_1d = False
             user.notified_0d = False
     else:
         if user.period_end is None:
@@ -96,6 +99,7 @@ def process_payment_success(session: SessionLocal, user: User):
     user.requests_used = 0
     user.notified_7d = False
     user.notified_3d = False
+    user.notified_1d = False
     user.notified_0d = False
     session.commit()
 
@@ -121,18 +125,37 @@ async def _daily_check(bot: Bot):
             days = (user.period_end.date() - now.date()).days
             text = None
             if days <= 0 and not user.notified_0d:
-                text = "Твоя подписка закончилась"
+                text = (
+                    "🔴 Подписка приостановлена.\n\n"
+                    "Я по-прежнему с тобой, но теперь могу отвечать только ограниченно.\n\n"
+                    "Хочешь, чтобы всё снова было как раньше?\nПродли подписку \ud83d\udc47\n\n"
+                    "🔥Всего за 159 ₽/мес."
+                )
                 user.notified_0d = True
+            elif days == 1 and not user.notified_1d:
+                text = (
+                    "📅 Последний день подписки.\n\n"
+                    "Завтра ты проснёшься без помощника. Без мгновенного КБЖУ, без истории, без разбора приёмов пищи.\n\n"
+                    "Хочешь — я продолжу. Просто продли подписку \ud83d\udc47\n\n"
+                    "🔥Всего за 159 ₽/мес."
+                )
+                user.notified_1d = True
             elif days == 3 and not user.notified_3d:
-                text = "Твоя подписка заканчивается через 3 дня"
+                text = (
+                    "📅 3 дня до финиша подписки.\n\n"
+                    "Твоя тарелка всё ещё под наблюдением. Хочешь сохранить ритм? Продли на следующий период.\n\n"
+                    "🔥Всего за 159 ₽/мес."
+                )
                 user.notified_3d = True
             elif days == 7 and not user.notified_7d:
-                text = "Твоя подписка заканчивается через 7 дней"
+                text = (
+                    "📅 До окончания подписки осталось 7 дней.\n\n"
+                    "Не дай еде стать тайной — продли подписку и продолжай получать КБЖУ в кликов!\n\n"
+                    "🔥Всего за 159 ₽/мес."
+                )
                 user.notified_7d = True
             if text:
-                kb = InlineKeyboardMarkup(
-                    inline_keyboard=[[InlineKeyboardButton(text="Оплатить", callback_data="pay")]]
-                )
+                kb = subscribe_button("\ud83d\udd04Продлить подписку")
                 try:
                     await bot.send_message(user.telegram_id, text, reply_markup=kb)
                 except Exception:
@@ -142,7 +165,11 @@ async def _daily_check(bot: Bot):
         update_limits(user)
         if prev_grade == "free" and prev_end and prev_end <= now < user.period_end:
             try:
-                await bot.send_message(user.telegram_id, "Бесплатный лимит обновлён")
+                await bot.send_message(
+                    user.telegram_id,
+                    "🎯Новый день — новые запросы\nТвои 20 бесплатных КБЖУ-анализов доступны!\n\nГотов продолжить?",
+                    reply_markup=subscribe_button("⚡Снять ограничение"),
+                )
             except Exception:
                 pass
     session.commit()
