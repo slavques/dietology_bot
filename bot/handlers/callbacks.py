@@ -8,7 +8,7 @@ from ..services import analyze_photo_with_hint
 from ..subscriptions import consume_request, ensure_user
 from datetime import timedelta
 from ..utils import format_meal_message, parse_serving, to_float
-from ..keyboards import meal_actions_kb, save_options_kb, confirm_save_kb, main_menu_kb
+from ..keyboards import meal_actions_kb, save_options_kb, confirm_save_kb, main_menu_kb, pay_kb
 from ..states import EditMeal
 from ..storage import pending_meals
 
@@ -22,13 +22,13 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
         clar = pending_meals[meal_id].get("clarifications", 0)
     text = (
         "✏️ Хорошо!\n"
-        "Напиши название блюда и его вес (в граммах).\n"
+        "Напиши название блюда и его вес (в граммах).\n\n"
+        "Например: Паста с соусом, 250 г\n\n"
     )
     if clar == 0:
-        text += "У тебя есть две попытки уточнить нюансы по блюду.\n\n"
+        text += "У тебя есть две попытки уточнить нюансы по блюду."
     else:
-        text += "Осталась еще одна попытка.\n\n"
-    text += "Например: Паста с соусом, 250 г"
+        text += "Осталась еще одна попытка."
     await query.message.edit_text(text, reply_markup=None)
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -54,13 +54,13 @@ async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     clar = pending_meals.get(meal_id, {}).get("clarifications", 0)
     text = (
         "✏️ Хорошо!\n"
-        "Напиши название блюда и его вес (в граммах).\n"
+        "Напиши название блюда и его вес (в граммах).\n\n"
+        "Например: Паста с соусом, 250 г\n\n"
     )
     if clar == 0:
-        text += "У тебя есть две попытки уточнить нюансы по блюду.\n\n"
+        text += "У тебя есть две попытки уточнить нюансы по блюду."
     else:
-        text += "Осталась еще одна попытка.\n\n"
-    text += "Например: Паста с соусом, 250 г"
+        text += "Осталась еще одна попытка."
     await query.message.edit_text(text, reply_markup=None)
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -76,10 +76,10 @@ async def process_edit(message: types.Message, state: FSMContext):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
     if not consume_request(session, user):
-        reset = user.period_start + timedelta(days=30)
+        reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
         await message.answer(
-            f"Твои бесплатные запросы обновятся {reset.date()}, но ты можешь перейти на безлимитную подписку",
-            reply_markup=main_menu_kb(),
+            f"Твои бесплатные запросы обновятся {reset}, но ты можешь перейти на безлимитную подписку",
+            reply_markup=pay_kb(),
         )
         session.close()
         await state.clear()
@@ -93,7 +93,9 @@ async def process_edit(message: types.Message, state: FSMContext):
         return
 
     result = await analyze_photo_with_hint(meal['photo_path'], message.text, meal)
-    if result.get('error') or not result.get('success'):
+    if result.get('error') or (
+        result.get('success') is False and not any(k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs'))
+    ):
         if meal['clarifications'] == 0:
             await message.answer("Ваше уточнение некорректно. Осталась ещё одна попытка.")
         else:
