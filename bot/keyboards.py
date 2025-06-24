@@ -88,7 +88,7 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
     )
 
 
-def pay_kb(code: str | None = None) -> InlineKeyboardMarkup:
+def pay_kb(code: Optional[str] = None) -> InlineKeyboardMarkup:
     """Inline keyboard with a single payment button.
 
     Optionally encodes the selected plan in callback data so invoice
