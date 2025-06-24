@@ -10,8 +10,8 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
    ```
 2. Create a `.env` file with `BOT_TOKEN` (Telegram token) and optionally
    `OPENAI_API_KEY` for OpenAI integration. These values are loaded in
-   `bot/config.py`. You can also set `ADMIN_COMMAND` (default `admin1467`) and
-   `DATABASE_URL` here.
+   `bot/config.py`. You can also set `ADMIN_COMMAND` (default `admin1467`),
+   `DATABASE_URL`, and `YOOKASSA_TOKEN` for payments here.
 
 3. Run the bot (package version):
    ```bash

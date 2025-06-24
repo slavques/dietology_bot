@@ -4,6 +4,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
+from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
@@ -69,9 +70,9 @@ def main_menu_kb() -> ReplyKeyboardMarkup:
     """Main menu with four actions arranged vertically."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📸 Новое фото")],
             [KeyboardButton(text="🧾 Отчёт за день")],
             [KeyboardButton(text="📊 Мои приёмы")],
+            [KeyboardButton(text="⚡ Подписка")],
             [KeyboardButton(text="❓ ЧаВО")],
         ],
         resize_keyboard=True,
@@ -84,3 +85,50 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
         keyboard=[[KeyboardButton(text="🥑 Главное меню")]],
         resize_keyboard=True,
     )
+
+
+def pay_kb(code: Optional[str] = None) -> InlineKeyboardMarkup:
+    """Inline keyboard with a single payment button.
+
+    Optionally encodes the selected plan in callback data so invoice
+    handlers can determine which subscription to bill for.
+    """
+    builder = InlineKeyboardBuilder()
+    cb = f"pay:{code}" if code else "pay"
+    builder.button(text="Оплатить", callback_data=cb)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def subscription_plans_kb() -> ReplyKeyboardMarkup:
+    """Keyboard with subscription duration options."""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🚶‍♂️1 месяц - 149₽")],
+            [KeyboardButton(text="🏃‍♂️3 месяца - 399₽")],
+            [KeyboardButton(text="🧘‍♂️6 месяцев - 799₽")],
+            [KeyboardButton(text="🥑 Главное меню")],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def payment_methods_kb() -> ReplyKeyboardMarkup:
+    """Keyboard with payment method choices."""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="💳 Банковская карта")],
+            [KeyboardButton(text="✨Telegram Stars")],
+            [KeyboardButton(text="🪙Crypto")],
+            [KeyboardButton(text="🔙 Назад")],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def subscribe_button(text: str) -> InlineKeyboardMarkup:
+    """Inline keyboard leading to the subscription menu."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=text, callback_data="subscribe")
+    builder.adjust(1)
+    return builder.as_markup()
