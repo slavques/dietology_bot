@@ -73,6 +73,7 @@ def main_menu_kb() -> ReplyKeyboardMarkup:
             [KeyboardButton(text="📊 Мои приёмы")],
             [KeyboardButton(text="⚡ Подписка")],
             [KeyboardButton(text="❓ ЧаВО")],
+            [KeyboardButton(text="⚡ Подписка")],
         ],
         resize_keyboard=True,
     )
