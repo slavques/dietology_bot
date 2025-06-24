@@ -6,8 +6,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..services import analyze_photo, analyze_photo_with_hint
 from ..utils import format_meal_message, parse_serving, to_float
-from ..keyboards import meal_actions_kb, back_menu_kb
-from ..subscriptions import consume_request, ensure_user, FREE_LIMIT, PAID_LIMIT
+from ..keyboards import meal_actions_kb, back_menu_kb, pay_kb
+from ..subscriptions import consume_request, ensure_user, has_request_quota, FREE_LIMIT, PAID_LIMIT
 from ..database import SessionLocal
 from ..states import EditMeal
 from ..storage import pending_meals
@@ -15,9 +15,12 @@ from ..storage import pending_meals
 async def request_photo(message: types.Message):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
-    if not consume_request(session, user):
-        reset = user.period_start + timedelta(days=30)
-        await message.answer(f"Твои бесплатные запросы обновятся {reset.date()}, но ты можешь перейти на безлимитную подписку", reply_markup=back_menu_kb())
+    if not has_request_quota(session, user):
+        reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
+        await message.answer(
+            f"Твои бесплатные запросы обновятся {reset}, но ты можешь перейти на безлимитную подписку",
+            reply_markup=pay_kb(),
+        )
         session.close()
         return
     session.close()
@@ -34,10 +37,10 @@ async def handle_photo(message: types.Message, state: FSMContext):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
     if not consume_request(session, user):
-        reset = user.period_start + timedelta(days=30)
+        reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
         await message.answer(
-            f"Твои бесплатные запросы обновятся {reset.date()}, но ты можешь перейти на безлимитную подписку",
-            reply_markup=back_menu_kb(),
+            f"Твои бесплатные запросы обновятся {reset}, но ты можешь перейти на безлимитную подписку",
+            reply_markup=pay_kb(),
         )
         session.close()
         return
@@ -115,6 +118,5 @@ async def handle_document(message: types.Message):
 
 
 def register(dp: Dispatcher):
-    dp.message.register(request_photo, F.text == "📸 Новое фото")
     dp.message.register(handle_photo, F.photo)
     dp.message.register(handle_document, F.document)
