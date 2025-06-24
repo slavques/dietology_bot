@@ -64,7 +64,7 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
             totals["carbs"] += m.carbs
         text_lines.extend(
             [
-                f"• 🔥 Калории: {int(totals['calories'])} ккал",
+                f"🔥 Калории: {int(totals['calories'])} ккал",
                 f"• Белки: {int(totals['protein'])} г",
                 f"• Жиры: {int(totals['fat'])} г",
                 f"• Углеводы: {int(totals['carbs'])} г",
@@ -89,7 +89,7 @@ async def cmd_history(message: types.Message):
         0,
         header=True,
     )
-    await message.answer("", reply_markup=back_menu_kb())
+    await message.answer("🥑 Главное меню", reply_markup=back_menu_kb())
 
 async def cb_history(query: types.CallbackQuery):
     offset = int(query.data.split(':', 1)[1])

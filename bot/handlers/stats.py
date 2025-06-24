@@ -84,7 +84,7 @@ async def report_day(message: types.Message):
         "🧾 Отчёт за день",
         "",
         "📊 Итого:",
-        f"• 🔥 Калории: {int(totals['calories'])} ккал",
+        f"🔥 Калории: {int(totals['calories'])} ккал",
         f"• Белки: {int(totals['protein'])} г  ",
         f"• Жиры: {int(totals['fat'])} г  ",
         f"• Углеводы: {int(totals['carbs'])} г  ",

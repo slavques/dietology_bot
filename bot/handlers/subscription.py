@@ -75,10 +75,10 @@ async def choose_method(message: types.Message, state: FSMContext):
         "Создали запрос на покупку.\n"
         f"{message.text}\n"
         f"({plan})\n\n"
-        "Оплата доступна по кнопке \"Оплатить\" \ud83d\udc47"
+        "Оплата доступна по кнопке \"Оплатить\" 👇"
     )
     await message.answer(text, reply_markup=pay_kb())
-    await message.answer("", reply_markup=back_menu_kb())
+    await message.answer("🥑 Главное меню", reply_markup=back_menu_kb())
     await state.clear()
 
 async def cmd_success(message: types.Message):

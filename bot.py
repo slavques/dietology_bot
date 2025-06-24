@@ -124,6 +124,7 @@ def main_menu_kb() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text="\U0001F9FE \u041E\u0442\u0447\u0451\u0442 \u0437\u0430 \u0434\u0435\u043D\u044C")],
             [KeyboardButton(text="\U0001F4CA \u041C\u043E\u0438 \u043F\u0440\u0438\u0451\u043C\u044B")],
+            [KeyboardButton(text="\u26A1 \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430")],
             [KeyboardButton(text="\u2753 \u0427\u0430\u0412\u041E")],
             [KeyboardButton(text="\u26A1 \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430")],
         ],
