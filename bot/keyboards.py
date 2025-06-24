@@ -84,3 +84,11 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
         keyboard=[[KeyboardButton(text="🥑 Главное меню")]],
         resize_keyboard=True,
     )
+
+
+def pay_kb() -> InlineKeyboardMarkup:
+    """Inline keyboard with a single payment button."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Оплатить", callback_data="pay")
+    builder.adjust(1)
+    return builder.as_markup()
