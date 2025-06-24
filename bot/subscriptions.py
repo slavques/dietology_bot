@@ -79,21 +79,21 @@ def days_left(user: User) -> Optional[int]:
     return (user.period_end.date() - datetime.utcnow().date()).days
 
 
-def process_payment_success(session: SessionLocal, user: User):
+def process_payment_success(session: SessionLocal, user: User, months: int = 1):
     now = datetime.utcnow()
 
-    def add_month(dt: datetime) -> datetime:
-        month = dt.month + 1
+    def add_month(dt: datetime, count: int = 1) -> datetime:
+        month = dt.month + count
         year = dt.year + (month - 1) // 12
         month = (month - 1) % 12 + 1
         day = min(dt.day, monthrange(year, month)[1])
         return dt.replace(year=year, month=month, day=day)
 
     if user.period_end and user.period_end > now:
-        user.period_end = add_month(user.period_end)
+        user.period_end = add_month(user.period_end, months)
     else:
         base = user.period_end if user.period_end else now
-        user.period_end = add_month(base)
+        user.period_end = add_month(base, months)
     user.grade = "paid"
     user.request_limit = PAID_LIMIT
     user.requests_used = 0

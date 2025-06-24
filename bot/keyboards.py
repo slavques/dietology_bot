@@ -4,6 +4,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
+from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
@@ -87,10 +88,15 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
     )
 
 
-def pay_kb() -> InlineKeyboardMarkup:
-    """Inline keyboard with a single payment button."""
+def pay_kb(code: str | None = None) -> InlineKeyboardMarkup:
+    """Inline keyboard with a single payment button.
+
+    Optionally encodes the selected plan in callback data so invoice
+    handlers can determine which subscription to bill for.
+    """
     builder = InlineKeyboardBuilder()
-    builder.button(text="Оплатить", callback_data="pay")
+    cb = f"pay:{code}" if code else "pay"
+    builder.button(text="Оплатить", callback_data=cb)
     builder.adjust(1)
     return builder.as_markup()
 

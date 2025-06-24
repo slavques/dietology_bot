@@ -1,5 +1,5 @@
 from datetime import datetime
-from aiogram import types, Dispatcher, F
+from aiogram import types, Dispatcher, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 
@@ -12,6 +12,8 @@ from ..keyboards import (
     pay_kb,
     back_menu_kb,
 )
+from ..config import YOOKASSA_TOKEN
+from aiogram.types import LabeledPrice
 from ..states import SubscriptionState
 
 SUCCESS_CMD = "success1467"
@@ -35,11 +37,40 @@ PLAN_TEXT = (
     "👇 Выбери удобный способ, чтобы бот продолжал считать КБЖУ по каждому фото:"
 )
 
+# map subscription plans to invoice details
+PLAN_MAP = {
+    "🚶‍♂️1 месяц - 149₽": ("1 месяц", 14900, 1),
+    "🏃‍♂️3 месяца - 399₽": ("3 месяца", 39900, 3),
+    "🧘‍♂️6 месяцев - 799₽": ("6 месяцев", 79900, 6),
+}
+PLAN_CODES = {
+    "🚶‍♂️1 месяц - 149₽": "1m",
+    "🏃‍♂️3 месяца - 399₽": "3m",
+    "🧘‍♂️6 месяцев - 799₽": "6m",
+}
+
 
 async def cb_pay(query: types.CallbackQuery):
-    """Show payment instructions."""
-    await query.message.answer(
-        "Чтобы оформить подписку, используйте команду /success1467 или свяжитесь с поддержкой."
+    """Send an invoice via YooKassa when the user presses the pay button."""
+    parts = query.data.split(":", 1)
+    code = parts[1] if len(parts) > 1 else None
+    if not code or code not in {"1m", "3m", "6m"}:
+        await query.message.answer(
+            "Чтобы оформить подписку, используйте команду /success1467 или свяжитесь с поддержкой."
+        )
+        await query.answer()
+        return
+    plan_text = next(key for key, val in PLAN_CODES.items() if val == code)
+    title, amount, months = PLAN_MAP[plan_text]
+    price = LabeledPrice(label="К оплате", amount=amount)
+    await query.bot.send_invoice(
+        chat_id=query.from_user.id,
+        title="Подписка",
+        description=title,
+        payload=code,
+        provider_token=YOOKASSA_TOKEN,
+        currency="RUB",
+        prices=[price],
     )
     await query.answer()
 
@@ -71,13 +102,14 @@ async def choose_method(message: types.Message, state: FSMContext):
         return
     data = await state.get_data()
     plan = data.get("plan", "")
+    code = PLAN_CODES.get(plan)
     text = (
         "Создали запрос на покупку.\n"
         f"{message.text}\n"
         f"({plan})\n\n"
         "Оплата доступна по кнопке \"Оплатить\" 👇"
     )
-    await message.answer(text, reply_markup=pay_kb())
+    await message.answer(text, reply_markup=pay_kb(code))
     await message.answer("🥑 Главное меню", reply_markup=back_menu_kb())
     await state.clear()
 
@@ -94,6 +126,23 @@ async def cmd_refused(message: types.Message):
     if not message.text.startswith(f"/{REFUSED_CMD}"):
         return
     await message.answer("Оплата отменена.")
+
+
+async def handle_pre_checkout(query: types.PreCheckoutQuery, bot: Bot):
+    """Confirm pre-checkout query from Telegram."""
+    await bot.answer_pre_checkout_query(query.id, ok=True)
+
+
+async def handle_successful_payment(message: types.Message):
+    payload = message.successful_payment.invoice_payload
+    months = {"1m": 1, "3m": 3, "6m": 6}.get(payload, 1)
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    process_payment_success(session, user, months)
+    session.close()
+    await message.answer(
+        "Оплата принята. Подписка активирована.", reply_markup=back_menu_kb()
+    )
 
 
 async def cmd_notify(message: types.Message):
@@ -122,5 +171,7 @@ def register(dp: Dispatcher):
         choose_method,
         SubscriptionState.choosing_method,
     )
-    dp.callback_query.register(cb_pay, F.data == "pay")
+    dp.callback_query.register(cb_pay, F.data.startswith("pay"))
+    dp.pre_checkout_query.register(handle_pre_checkout)
+    dp.message.register(handle_successful_payment, F.successful_payment)
     dp.callback_query.register(cb_subscribe, F.data == "subscribe")
