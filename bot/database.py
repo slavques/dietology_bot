@@ -48,6 +48,8 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE users ADD COLUMN notified_3d BOOLEAN DEFAULT 0"))
         if "notified_0d" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN notified_0d BOOLEAN DEFAULT 0"))
+        if "notified_1d" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN notified_1d BOOLEAN DEFAULT 0"))
 
 
 class User(Base):
@@ -62,6 +64,7 @@ class User(Base):
     period_end = Column(DateTime, nullable=True)
     notified_7d = Column(Boolean, default=False)
     notified_3d = Column(Boolean, default=False)
+    notified_1d = Column(Boolean, default=False)
     notified_0d = Column(Boolean, default=False)
     meals = relationship('Meal', back_populates='user')
 

@@ -6,3 +6,7 @@ class EditMeal(StatesGroup):
 
 class AdminState(StatesGroup):
     waiting_broadcast = State()
+
+
+class SubscriptionState(StatesGroup):
+    choosing_method = State()
