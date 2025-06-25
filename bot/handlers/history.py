@@ -89,7 +89,6 @@ async def cmd_history(message: types.Message):
         0,
         header=True,
     )
-    await message.answer("🥑 Главное меню", reply_markup=back_menu_kb())
 
 async def cb_history(query: types.CallbackQuery):
     offset = int(query.data.split(':', 1)[1])
