@@ -7,6 +7,13 @@ import asyncio
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from .keyboards import subscribe_button
+from .texts import (
+    SUB_END_7D,
+    SUB_END_3D,
+    SUB_END_1D,
+    SUB_PAUSED,
+    FREE_DAY_TEXT,
+)
 
 from .database import SessionLocal, User
 
@@ -92,11 +99,10 @@ def process_payment_success(session: SessionLocal, user: User, months: int = 1):
         day = min(dt.day, monthrange(year, month)[1])
         return dt.replace(year=year, month=month, day=day)
 
-    if user.period_end and user.period_end > now:
+    if user.grade == "paid" and user.period_end and user.period_end > now:
         user.period_end = add_month(user.period_end, months)
     else:
-        base = user.period_end if user.period_end else now
-        user.period_end = add_month(base, months)
+        user.period_end = add_month(now, months)
     user.grade = "paid"
     user.request_limit = PAID_LIMIT
     user.requests_used = 0
@@ -127,34 +133,16 @@ async def _daily_check(bot: Bot):
             days = (user.period_end.date() - now.date()).days
             text = None
             if days <= 0 and not user.notified_0d:
-                text = (
-                    "🔴 Подписка приостановлена.\n\n"
-                    "Я по-прежнему с тобой, но теперь могу отвечать только ограниченно.\n\n"
-                    "Хочешь, чтобы всё снова было как раньше?\nПродли подписку 👇\n\n"
-                    "🔥Всего за 159 ₽/мес."
-                )
+                text = SUB_PAUSED
                 user.notified_0d = True
             elif days == 1 and not user.notified_1d:
-                text = (
-                    "📅 Последний день подписки.\n\n"
-                    "Завтра ты проснёшься без помощника. Без мгновенного КБЖУ, без истории, без разбора приёмов пищи.\n\n"
-                    "Хочешь — я продолжу. Просто продли подписку 👇\n\n"
-                    "🔥Всего за 159 ₽/мес."
-                )
+                text = SUB_END_1D
                 user.notified_1d = True
             elif days == 3 and not user.notified_3d:
-                text = (
-                    "📅 3 дня до финиша подписки.\n\n"
-                    "Твоя тарелка всё ещё под наблюдением. Хочешь сохранить ритм? Продли на следующий период.\n\n"
-                    "🔥Всего за 159 ₽/мес."
-                )
+                text = SUB_END_3D
                 user.notified_3d = True
             elif days == 7 and not user.notified_7d:
-                text = (
-                    "📅 До окончания подписки осталось 7 дней.\n\n"
-                    "Не дай еде стать тайной — продли подписку и продолжай получать КБЖУ в кликов!\n\n"
-                    "🔥Всего за 159 ₽/мес."
-                )
+                text = SUB_END_7D
                 user.notified_7d = True
             if text:
                 kb = subscribe_button("🔄Продлить подписку")
@@ -167,7 +155,7 @@ async def _daily_check(bot: Bot):
             try:
                 await bot.send_message(
                     user.telegram_id,
-                    "🎯Новый день — новые запросы\nТвои 20 бесплатных КБЖУ-анализов доступны!\n\nГотов продолжить?",
+                    FREE_DAY_TEXT,
                     reply_markup=subscribe_button("⚡Снять ограничение"),
                 )
                 user.notified_free = True
