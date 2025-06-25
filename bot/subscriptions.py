@@ -26,7 +26,7 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             period_start=now,
             period_end=now + timedelta(days=30),
             notified_1d=False,
-            notified_free=True,
+            notified_free=False,
         )
         session.add(user)
         session.commit()
