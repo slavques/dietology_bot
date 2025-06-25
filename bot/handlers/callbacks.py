@@ -95,8 +95,15 @@ async def process_edit(message: types.Message, state: FSMContext):
         result.get('success') is False and not any(k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs'))
     ):
         if meal['clarifications'] == 0:
-            await message.answer("Ваше уточнение некорректно. Осталась ещё одна попытка.")
+            err = await message.answer("Ваше уточнение некорректно. Осталась ещё одна попытка.")
+            meal['error_msg'] = err.message_id
         else:
+            if meal.get('error_msg'):
+                try:
+                    await message.bot.delete_message(message.chat.id, meal['error_msg'])
+                except Exception:
+                    pass
+                meal.pop('error_msg', None)
             await message.answer(
                 "Попытки закончились.\n\nТы можешь сохранить или удалить запись, если она некорректна."
             )
@@ -124,6 +131,12 @@ async def process_edit(message: types.Message, state: FSMContext):
         'macros': macros,
         'orig_macros': macros.copy(),
     })
+    if meal.get('error_msg'):
+        try:
+            await message.bot.delete_message(message.chat.id, meal['error_msg'])
+        except Exception:
+            pass
+        meal.pop('error_msg', None)
     meal['clarifications'] += 1
     await message.delete()
     await message.bot.edit_message_text(

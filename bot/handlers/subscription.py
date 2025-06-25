@@ -12,6 +12,7 @@ from ..keyboards import (
     subscribe_button,
     pay_kb,
     back_menu_kb,
+    payment_method_inline,
 )
 from ..config import YOOKASSA_TOKEN
 from aiogram.types import LabeledPrice
@@ -35,7 +36,7 @@ PLAN_TEXT = (
     "🫶 Спасибо за доверие!\n\n"
     "Ты на шаг ближе к понятному, стабильному и осознанному питанию — без пауз и ограничений.\n\n"
     "Мы постарались сделать оплату простой и быстрой.\n\n"
-    "👇 Выбери удобный способ, чтобы бот продолжал считать КБЖУ по каждому фото:"
+    "👇 Выбери удобный способ, чтобы бот продолжал считать КБЖУ по каждому фото"
 )
 
 # map subscription plans to invoice details
@@ -49,6 +50,7 @@ PLAN_CODES = {
     f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽": "3m",
     f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽": "6m",
 }
+PLAN_DISPLAY = {v: k.split(" ", 1)[1] for k, v in PLAN_CODES.items()}
 
 
 async def cb_pay(query: types.CallbackQuery):
@@ -94,29 +96,30 @@ async def choose_plan(message: types.Message, state: FSMContext):
     }
     if message.text not in options:
         return
-    await state.set_state(SubscriptionState.choosing_method)
-    await state.update_data(plan=message.text)
-    await message.answer(PLAN_TEXT, reply_markup=payment_methods_kb())
+    code = PLAN_CODES.get(message.text)
+    await message.answer(
+        PLAN_TEXT,
+        reply_markup=payment_methods_kb(),
+    )
+    await message.answer(
+        "💳 Банковская карта",
+        reply_markup=payment_method_inline(code),
+    )
 
 
-async def choose_method(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
-        await state.clear()
-        await show_subscription_menu(message)
-        return
-    if message.text not in {"💳 Банковская карта"}:
-        return
-    data = await state.get_data()
-    plan = data.get("plan", "")
-    code = PLAN_CODES.get(plan)
+async def cb_method(query: types.CallbackQuery):
+    parts = query.data.split(":", 1)
+    code = parts[1] if len(parts) > 1 else ""
+    plan = PLAN_DISPLAY.get(code, "")
     text = (
         "Создали запрос на покупку.\n"
-        f"{message.text}\n"
+        "💳 Банковская карта\n"
         f"({plan})\n\n"
-        "Оплата доступна по кнопке \"Оплатить\" 👇"
+        "Оплата доступна по кнопке \"Оплатить\""
     )
-    await message.answer(text, reply_markup=pay_kb(code))
-    await state.clear()
+    await query.message.answer(text, reply_markup=pay_kb(code))
+    await query.message.answer("🥑 Главное меню", reply_markup=back_menu_kb())
+    await query.answer()
 
 async def cmd_success(message: types.Message):
     if not message.text.startswith(f"/{SUCCESS_CMD}"):
@@ -125,7 +128,10 @@ async def cmd_success(message: types.Message):
     user = ensure_user(session, message.from_user.id)
     process_payment_success(session, user)
     session.close()
-    await message.answer("Оплата принята. Подписка активирована.")
+    await message.answer(
+        "🫶 Спасибо за доверие!\n\n"
+        "Ты на шаг ближе к понятному, стабильному и осознанному питанию — без пауз и ограничений."
+    )
 
 async def cmd_refused(message: types.Message):
     if not message.text.startswith(f"/{REFUSED_CMD}"):
@@ -146,7 +152,9 @@ async def handle_successful_payment(message: types.Message):
     process_payment_success(session, user, months)
     session.close()
     await message.answer(
-        "Оплата принята. Подписка активирована.", reply_markup=back_menu_kb()
+        "🫶 Спасибо за доверие!\n\n"
+        "Ты на шаг ближе к понятному, стабильному и осознанному питанию — без пауз и ограничений.",
+        reply_markup=back_menu_kb(),
     )
 
 
@@ -172,10 +180,8 @@ def register(dp: Dispatcher):
             }
         ),
     )
-    dp.message.register(
-        choose_method,
-        SubscriptionState.choosing_method,
-    )
+    dp.message.register(show_subscription_menu, F.text == "🔙 Назад")
+    dp.callback_query.register(cb_method, F.data.startswith("method:"))
     dp.callback_query.register(cb_pay, F.data.startswith("pay"))
     dp.pre_checkout_query.register(handle_pre_checkout)
     dp.message.register(handle_successful_payment, F.successful_payment)

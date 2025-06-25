@@ -118,11 +118,18 @@ def payment_methods_kb() -> ReplyKeyboardMarkup:
     """Keyboard with payment method choices."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="💳 Банковская карта")],
             [KeyboardButton(text="🔙 Назад")],
         ],
         resize_keyboard=True,
     )
+
+
+def payment_method_inline(code: str) -> InlineKeyboardMarkup:
+    """Inline keyboard with a single payment method button."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="💳 Банковская карта", callback_data=f"method:{code}")
+    builder.adjust(1)
+    return builder.as_markup()
 
 
 def subscribe_button(text: str) -> InlineKeyboardMarkup:

@@ -91,11 +91,24 @@ async def report_day(message: types.Message):
         "",
         "📂 Приёмы пищи:",
     ]
+
+    dishes = []
+    drinks = []
     for meal in meals:
-        emoji = "🥤" if is_drink(meal.name) else "🍜"
-        lines.append(
-            f"• {emoji} {meal.name}\n(🔥 {int(meal.calories)} ккал / Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
+        line = (
+            f"• {'🥤' if is_drink(meal.name) else '🍜'} {meal.name}\n"
+            f"(Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
         )
+        if is_drink(meal.name):
+            drinks.append(line)
+        else:
+            dishes.append(line)
+
+    lines.extend(dishes)
+    if drinks:
+        lines.append("")
+        lines.extend(drinks)
+
     await message.answer("\n".join(lines), reply_markup=main_menu_kb())
 
 
