@@ -4,16 +4,10 @@ from aiogram.filters import Command
 from ..database import SessionLocal, User
 from ..subscriptions import ensure_user, days_left, update_limits
 from ..keyboards import main_menu_kb
+from ..texts import WELCOME_BASE, BTN_MAIN_MENU
 
 
-BASE_TEXT = (
-    "Я — твой AI-диетолог 🧠\n\n"
-    "Загрузи фото еды, и за секунды получишь:\n"
-    "— Калории\n"
-    "— Белки, жиры, углеводы\n"
-    "— Быстрый отчёт в историю\n\n"
-    "🔍 Готов? Отправь фото."
-)
+BASE_TEXT = WELCOME_BASE
 
 
 def get_welcome_text(user: User) -> str:
@@ -49,5 +43,5 @@ def register(dp: Dispatcher):
     dp.message.register(cmd_start, Command('start'))
     dp.message.register(
         back_to_menu,
-        lambda m: m.text == "🥑 Главное меню",
+        lambda m: m.text == BTN_MAIN_MENU,
     )
