@@ -5,19 +5,26 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timedelta
 from ..database import SessionLocal, Meal, User
 from ..keyboards import back_menu_kb, history_nav_kb
-from ..texts import MONTHS_RU
+from ..texts import (
+    MONTHS_RU,
+    HISTORY_HEADER,
+    HISTORY_NO_MEALS,
+    BTN_LEFT_HISTORY,
+    BTN_RIGHT_HISTORY,
+    BTN_MY_MEALS,
+)
 
 async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header: bool = False):
     """Send totals for two days starting from offset."""
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=user_id).first()
-    text_lines = ["📊 Мои приёмы", ""] if header else []
+    text_lines = [HISTORY_HEADER, ""] if header else []
     if not user:
         for i in range(2):
             day = datetime.utcnow().date() - timedelta(days=offset + i)
             month = MONTHS_RU.get(day.month, day.strftime('%B'))
             text_lines.append(f"📊 Итого за {day.day} {month}:")
-            text_lines.append("Нет ни одного приёма пищи.")
+            text_lines.append(HISTORY_NO_MEALS)
             text_lines.append("")
         await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=history_nav_kb(offset, 1))
         session.close()
@@ -38,7 +45,7 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
         month = MONTHS_RU.get(day.month, day.strftime('%B'))
         text_lines.append(f"📊 Итого за {day.day} {month}:")
         if not meals:
-            text_lines.append("Нет ни одного приёма пищи.")
+            text_lines.append(HISTORY_NO_MEALS)
             text_lines.append("")
             continue
         any_data = True
@@ -60,9 +67,9 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
     session.close()
     builder = InlineKeyboardBuilder()
     count = 1
-    builder.button(text="⬅️ Записи ранее", callback_data=f"hist:{offset+1}")
+    builder.button(text=BTN_LEFT_HISTORY, callback_data=f"hist:{offset+1}")
     if offset > 0:
-        builder.button(text="Записи позже ➡️", callback_data=f"hist:{offset-1}")
+        builder.button(text=BTN_RIGHT_HISTORY, callback_data=f"hist:{offset-1}")
         count += 1
     builder.adjust(count)
     await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=builder.as_markup())
@@ -85,5 +92,5 @@ async def cb_history(query: types.CallbackQuery):
 
 def register(dp: Dispatcher):
     dp.message.register(cmd_history, Command('history'))
-    dp.message.register(cmd_history, F.text == "📊 Мои приёмы")
+    dp.message.register(cmd_history, F.text == BTN_MY_MEALS)
     dp.callback_query.register(cb_history, F.data.startswith('hist:'))
