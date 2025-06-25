@@ -212,12 +212,19 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
         b64 = base64.b64encode(f.read()).decode()
     prev_json = json.dumps(prev or {}, ensure_ascii=False)
     prompt = (
-        "Ты диетолог. Пользователь уточняет блюдо или напиток: "
-        f"{hint}. Предыдущие данные: {prev_json}. "
-        "Если в тексте есть информация о еде или напитке, обнови название, вес и подсчитай калории, белки, жиры и углеводы. "
-        "Название пиши на русском с большой буквы, вес указывай целым числом в граммах. "
-        "Если текст не связан с едой или напитками, верни JSON {success: false}. "
-        "Иначе ответь только JSON вида {success: true, name, serving, calories, protein, fat, carbs}."
+        "Ты — ассистент-диетолог с поддержкой анализа изображений. "
+        "Тебе придут три элемента:\n"
+        "1) фото блюда или напитка,\n"
+        "2) предыдущий JSON-анализ,\n"
+        "3) уточнение пользователя.\n\n"
+        "Инструкции:\n"
+        "1. Объедини визуальные данные, предыдущий JSON и уточнение.\n"
+        "2. Название пиши по-русски с заглавной буквы.\n"
+        "3. Укажи примерный вес порции в граммах (целое число).\n"
+        "4. Рассчитай КБЖУ: calories (ккал), protein, fat, carbs (в граммах).\n"
+        "5. Верни только один JSON:\n"
+        '{"success": true, "name": "<Название>", "serving": <Вес>, "calories": <Ккал>, "protein": <Белки>, "fat": <Жиры>, "carbs": <Углеводы>}\n'
+        "Если в уточнении нет новой информации о блюде/напитке, верни: {\"success\": false}"
     )
     content = await _chat(
         [
@@ -231,6 +238,8 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
                     }
                 ],
             },
+            {"role": "user", "content": "Previous analysis:\n" + prev_json},
+            {"role": "user", "content": "User clarification:\n" + hint},
         ]
     )
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
