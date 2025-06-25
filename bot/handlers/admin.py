@@ -5,20 +5,21 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..database import SessionLocal, User
 from ..states import AdminState
 from ..config import ADMIN_COMMAND
+from ..texts import BTN_BROADCAST, BTN_BACK, SERVER_ERROR
 
 admins = set()
 
 
 def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Рассылка", callback_data="admin:broadcast")
+    builder.button(text=BTN_BROADCAST, callback_data="admin:broadcast")
     builder.adjust(1)
     return builder.as_markup()
 
 
 def admin_back_kb() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Назад", callback_data="admin:menu")
+    builder.button(text=BTN_BACK, callback_data="admin:menu")
     builder.adjust(1)
     return builder.as_markup()
 

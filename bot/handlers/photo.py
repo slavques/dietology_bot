@@ -11,7 +11,19 @@ from ..subscriptions import consume_request, ensure_user, has_request_quota, FRE
 from ..database import SessionLocal
 from ..states import EditMeal
 from ..storage import pending_meals
-from ..texts import LIMIT_REACHED_TEXT, format_date_ru
+from ..texts import (
+    LIMIT_REACHED_TEXT,
+    format_date_ru,
+    REQUEST_PHOTO,
+    PHOTO_ANALYZING,
+    MULTI_PHOTO_ERROR,
+    RECOGNITION_ERROR,
+    NO_FOOD_ERROR,
+    CLARIFY_PROMPT,
+    BTN_EDIT,
+    BTN_DELETE,
+    DELETE_NOTIFY,
+)
 
 async def request_photo(message: types.Message):
     session = SessionLocal()
@@ -23,16 +35,12 @@ async def request_photo(message: types.Message):
         session.close()
         return
     session.close()
-    await message.answer("🔥Отлично! Отправь фото еды — я всё посчитаю сам.", reply_markup=back_menu_kb())
+    await message.answer(REQUEST_PHOTO, reply_markup=back_menu_kb())
 
 async def handle_photo(message: types.Message, state: FSMContext):
     if message.media_group_id:
-        await message.answer(
-            "🤖 Хм… похоже, ты отправил сразу несколько изображений или файл в неподдерживаемом формате.\n\n"
-            "Пришли, пожалуйста, одно фото блюда — и я всё рассчитаю!"
-        )
+        await message.answer(MULTI_PHOTO_ERROR)
         return
-
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
     if not consume_request(session, user):
@@ -43,20 +51,17 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
     session.close()
 
-    await message.reply("Готово! 🔍\nАнализирую фото…")
+    await message.reply(PHOTO_ANALYZING)
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(prefix="diet_photo_", delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
     result = await analyze_photo(photo_path)
     if result.get('error'):
-        await message.answer("Сервис распознавания недоступен. Попробуйте позднее.")
+        await message.answer(RECOGNITION_ERROR)
         return
     if not result.get('is_food') or result.get('confidence', 0) < 0.7:
-        await message.answer(
-            "🤔 Еду на этом фото найти не удалось.\n"
-            "Попробуй отправить другое изображение — постараюсь распознать."
-        )
+        await message.answer(NO_FOOD_ERROR)
         return
 
     name = result.get('name')
@@ -85,13 +90,12 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
     if not name:
         builder = InlineKeyboardBuilder()
-        builder.button(text="✏️ Уточнить", callback_data="refine")
-        builder.button(text="🗑 Удалить", callback_data="cancel")
+        builder.button(text=BTN_EDIT, callback_data="refine")
+        builder.button(text=BTN_DELETE, callback_data="cancel")
         builder.adjust(2)
         await state.update_data(meal_id=meal_id)
         msg = await message.answer(
-            "🤔 Не удалось точно распознать блюдо на фото.\n"
-            "Можешь ввести название и вес вручную?",
+            CLARIFY_PROMPT,
             reply_markup=builder.as_markup(),
         )
         pending_meals[meal_id]["message_id"] = msg.message_id
@@ -108,10 +112,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
 
 async def handle_document(message: types.Message):
-    await message.answer(
-        "🤖 Хм… похоже, ты отправил сразу несколько изображений или файл в неподдерживаемом формате.\n\n"
-        "Пришли, пожалуйста, одно фото блюда — и я всё рассчитаю!"
-    )
+    await message.answer(MULTI_PHOTO_ERROR)
 
 
 def register(dp: Dispatcher):

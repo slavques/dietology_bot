@@ -11,6 +11,11 @@ from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import meal_actions_kb, save_options_kb, confirm_save_kb, main_menu_kb
 from ..states import EditMeal
 from ..storage import pending_meals
+from ..texts import (
+    DELETE_NOTIFY,
+    SESSION_EXPIRED,
+    SAVE_DONE,
+)
 
 
 async def cb_refine(query: types.CallbackQuery, state: FSMContext):
@@ -44,7 +49,7 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
     await query.bot.send_message(
         query.from_user.id,
-        "🗑 Запись удалена.\nЕсли хочешь отправить другое блюдо — просто пришли фото",
+        DELETE_NOTIFY
     )
 
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
@@ -67,7 +72,7 @@ async def process_edit(message: types.Message, state: FSMContext):
     data = await state.get_data()
     meal_id = data.get('meal_id')
     if not meal_id or meal_id not in pending_meals:
-        await message.answer("Сессия устарела. Отправьте фото заново.")
+        await message.answer(SESSION_EXPIRED + ". Отправьте фото заново.")
         await state.clear()
         return
     meal = pending_meals[meal_id]
@@ -145,13 +150,13 @@ async def cb_delete(query: types.CallbackQuery):
     await query.answer()
     await query.bot.send_message(
         query.from_user.id,
-        "🗑 Запись удалена.\nЕсли хочешь отправить другое блюдо — просто пришли фото",
+        DELETE_NOTIFY
     )
 
 async def cb_save(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     if meal_id not in pending_meals:
-        await query.answer("Сессия устарела", show_alert=True)
+        await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     pending_meals[meal_id].pop('portion', None)
     await query.message.edit_reply_markup(reply_markup=save_options_kb(meal_id))
@@ -193,18 +198,15 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     await query.answer()
     await query.bot.send_message(
         query.from_user.id,
-        "✅ Готово! Блюдо добавлено в историю.\n"
-        "📂 Хочешь посмотреть приёмы за сегодня — нажми ниже \n"
-        "🧾 Отчёт за день",
+        SAVE_DONE,
         reply_markup=main_menu_kb(),
     )
-
 
 async def cb_save_full(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     meal = pending_meals.get(meal_id)
     if not meal:
-        await query.answer("Сессия устарела", show_alert=True)
+        await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     meal['portion'] = 1.0
     serving = int(round(meal.get('orig_serving', meal['serving']) * 1.0))
@@ -225,7 +227,7 @@ async def cb_save_half(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     meal = pending_meals.get(meal_id)
     if not meal:
-        await query.answer("Сессия устарела", show_alert=True)
+        await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     meal['portion'] = 0.5
     serving = int(round(meal.get('orig_serving', meal['serving']) * 0.5))
@@ -246,7 +248,7 @@ async def cb_save_quarter(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     meal = pending_meals.get(meal_id)
     if not meal:
-        await query.answer("Сессия устарела", show_alert=True)
+        await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     meal['portion'] = 0.25
     serving = int(round(meal.get('orig_serving', meal['serving']) * 0.25))
@@ -267,7 +269,7 @@ async def cb_save_threeq(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     meal = pending_meals.get(meal_id)
     if not meal:
-        await query.answer("Сессия устарела", show_alert=True)
+        await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     meal['portion'] = 0.75
     serving = int(round(meal.get('orig_serving', meal['serving']) * 0.75))
@@ -308,7 +310,7 @@ async def cb_add(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     meal = pending_meals.get(meal_id)
     if not meal:
-        await query.answer("Сессия устарела", show_alert=True)
+        await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     fraction = meal.pop('portion', 1.0)
     await _final_save(query, meal_id, fraction)
