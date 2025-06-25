@@ -23,6 +23,7 @@ from ..texts import (
     BTN_EDIT,
     BTN_DELETE,
     DELETE_NOTIFY,
+    BTN_REMOVE_LIMITS,
 )
 
 async def request_photo(message: types.Message):
@@ -31,7 +32,7 @@ async def request_photo(message: types.Message):
     if not has_request_quota(session, user):
         reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
         text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
-        await message.answer(text, reply_markup=subscribe_button("⚡ Снять ограничения"))
+        await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
         session.close()
         return
     session.close()
@@ -46,7 +47,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
     if not consume_request(session, user):
         reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
         text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
-        await message.answer(text, reply_markup=subscribe_button("⚡ Снять ограничения"))
+        await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
         session.close()
         return
     session.close()

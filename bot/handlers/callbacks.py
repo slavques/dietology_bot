@@ -15,6 +15,13 @@ from ..texts import (
     DELETE_NOTIFY,
     SESSION_EXPIRED,
     SAVE_DONE,
+    REFINE_BASE,
+    REFINE_TWO_ATTEMPTS,
+    REFINE_ONE_ATTEMPT,
+    REFINE_TOO_LONG,
+    REFINE_BAD_ATTEMPT,
+    REFINE_END,
+    NOTHING_TO_SAVE,
 )
 
 
@@ -25,14 +32,11 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
     clar = 0
     if meal_id and meal_id in pending_meals:
         clar = pending_meals[meal_id].get("clarifications", 0)
-    text = (
-        "✏️ Хорошо!\n"
-        "Уточни ингредиенты, их вес или метод приготовления.  \n\n"
-    )
+    text = REFINE_BASE
     if clar == 0:
-        text += "У тебя есть две попытки уточнить нюансы по блюду."
+        text += REFINE_TWO_ATTEMPTS
     else:
-        text += "Осталась еще одна попытка."
+        text += REFINE_ONE_ATTEMPT
     await query.message.edit_text(text, reply_markup=None)
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -56,14 +60,11 @@ async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
     clar = pending_meals.get(meal_id, {}).get("clarifications", 0)
-    text = (
-        "✏️ Хорошо!\n"
-        "Уточни ингредиенты, их вес или метод приготовления.  \n\n"
-    )
+    text = REFINE_BASE
     if clar == 0:
-        text += "У тебя есть две попытки уточнить нюансы по блюду."
+        text += REFINE_TWO_ATTEMPTS
     else:
-        text += "Осталась еще одна попытка."
+        text += REFINE_ONE_ATTEMPT
     await query.message.edit_text(text, reply_markup=None)
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -82,7 +83,7 @@ async def process_edit(message: types.Message, state: FSMContext):
     MAX_LEN = 200
     if not message.text or len(message.text) > MAX_LEN:
         await message.answer(
-            f"Уточнение должно быть текстом до {MAX_LEN} символов."
+            REFINE_TOO_LONG.format(max=MAX_LEN)
         )
         return
 
@@ -91,7 +92,7 @@ async def process_edit(message: types.Message, state: FSMContext):
         result.get('success') is False and not any(k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs'))
     ):
         if meal['clarifications'] == 0:
-            err = await message.answer("Ваше уточнение некорректно. Осталась ещё одна попытка.")
+            err = await message.answer(REFINE_BAD_ATTEMPT)
             meal['error_msg'] = err.message_id
         else:
             if meal.get('error_msg'):
@@ -100,9 +101,7 @@ async def process_edit(message: types.Message, state: FSMContext):
                 except Exception:
                     pass
                 meal.pop('error_msg', None)
-            await message.answer(
-                "Попытки закончились.\n\nТы можешь сохранить или удалить запись, если она некорректна."
-            )
+            await message.answer(REFINE_END)
         meal['clarifications'] += 1
         if meal['clarifications'] >= 2:
             await message.bot.edit_message_text(
@@ -166,7 +165,7 @@ async def cb_save(query: types.CallbackQuery):
 async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float = 1.0):
     meal = pending_meals.pop(meal_id, None)
     if not meal:
-        await query.answer("Нечего сохранять", show_alert=True)
+        await query.answer(NOTHING_TO_SAVE, show_alert=True)
         return
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=query.from_user.id).first()

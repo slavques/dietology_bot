@@ -5,7 +5,16 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..database import SessionLocal, User
 from ..states import AdminState
 from ..config import ADMIN_COMMAND
-from ..texts import BTN_BROADCAST, BTN_BACK, SERVER_ERROR
+from ..texts import (
+    BTN_BROADCAST,
+    BTN_BACK,
+    SERVER_ERROR,
+    ADMIN_MODE,
+    ADMIN_UNAVAILABLE,
+    BROADCAST_PROMPT,
+    BROADCAST_ERROR,
+    BROADCAST_DONE,
+)
 
 admins = set()
 
@@ -28,23 +37,23 @@ async def admin_login(message: types.Message):
     if message.text != f"/{ADMIN_COMMAND}":
         return
     admins.add(message.from_user.id)
-    await message.answer("Админ режим", reply_markup=admin_menu_kb())
+    await message.answer(ADMIN_MODE, reply_markup=admin_menu_kb())
 
 
 async def admin_menu(query: types.CallbackQuery):
     if query.from_user.id not in admins:
-        await query.answer("Недоступно", show_alert=True)
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
         return
-    await query.message.edit_text("Админ режим", reply_markup=admin_menu_kb())
+    await query.message.edit_text(ADMIN_MODE, reply_markup=admin_menu_kb())
     await query.answer()
 
 
 async def admin_broadcast_prompt(query: types.CallbackQuery, state: FSMContext):
     if query.from_user.id not in admins:
-        await query.answer("Недоступно", show_alert=True)
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
         return
     await state.set_state(AdminState.waiting_broadcast)
-    await query.message.edit_text("Введите сообщение", reply_markup=admin_back_kb())
+    await query.message.edit_text(BROADCAST_PROMPT, reply_markup=admin_back_kb())
     await query.answer()
 
 
@@ -62,7 +71,7 @@ async def process_broadcast(message: types.Message, state: FSMContext):
             error = True
     session.close()
     await message.answer(
-        "Ошибка при отправке сообщения" if error else "Рассылка отправлена",
+        BROADCAST_ERROR if error else BROADCAST_DONE,
         reply_markup=admin_menu_kb(),
     )
     await state.clear()

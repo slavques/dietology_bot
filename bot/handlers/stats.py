@@ -5,10 +5,17 @@ from aiogram.filters import Command
 from ..database import SessionLocal, Meal, User
 from ..utils import make_bar_chart, is_drink
 from ..keyboards import stats_period_kb, back_menu_kb, main_menu_kb
+from ..texts import (
+    STATS_CHOOSE_PERIOD,
+    STATS_NO_DATA,
+    STATS_NO_DATA_PERIOD,
+    REPORT_EMPTY,
+    BTN_REPORT_DAY,
+)
 
 async def cmd_stats(message: types.Message):
     await message.answer(
-        "Выберите период:", reply_markup=stats_period_kb()
+        STATS_CHOOSE_PERIOD, reply_markup=stats_period_kb()
     )
 
 async def cb_stats(query: types.CallbackQuery):
@@ -16,7 +23,7 @@ async def cb_stats(query: types.CallbackQuery):
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=query.from_user.id).first()
     if not user:
-        await query.answer("Нет данных", show_alert=True)
+        await query.answer(STATS_NO_DATA, show_alert=True)
         session.close()
         return
     now = datetime.utcnow()
@@ -29,7 +36,7 @@ async def cb_stats(query: types.CallbackQuery):
     meals = session.query(Meal).filter(Meal.user_id == user.id, Meal.timestamp >= start).all()
     session.close()
     if not meals:
-        await query.message.edit_text("Нет данных за выбранный период.")
+        await query.message.edit_text(STATS_NO_DATA_PERIOD)
         await query.answer()
         return
     totals = {'calories': 0.0, 'protein': 0.0, 'fat': 0.0, 'carbs': 0.0}
@@ -52,7 +59,7 @@ async def report_day(message: types.Message):
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=message.from_user.id).first()
     if not user:
-        await message.answer("Нет данных", reply_markup=main_menu_kb())
+        await message.answer(STATS_NO_DATA, reply_markup=main_menu_kb())
         session.close()
         return
     start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -66,9 +73,7 @@ async def report_day(message: types.Message):
     session.close()
     if not meals:
         await message.answer(
-            "🧾 Отчёт за день\n\n"
-            "Пока нет ни одного приёма пищи.\n\n"
-            "📸 Отправь фото еды — и я добавлю первую запись!",
+            REPORT_EMPTY,
             reply_markup=main_menu_kb(),
         )
         return
@@ -114,5 +119,5 @@ async def report_day(message: types.Message):
 
 def register(dp: Dispatcher):
     dp.message.register(cmd_stats, Command('stats'))
-    dp.message.register(report_day, F.text == "🧾 Отчёт за день")
+    dp.message.register(report_day, F.text == BTN_REPORT_DAY)
     dp.callback_query.register(cb_stats, F.data.startswith('stats:'))
