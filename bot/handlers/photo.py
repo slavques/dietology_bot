@@ -6,21 +6,20 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..services import analyze_photo, analyze_photo_with_hint
 from ..utils import format_meal_message, parse_serving, to_float
-from ..keyboards import meal_actions_kb, back_menu_kb, pay_kb
+from ..keyboards import meal_actions_kb, back_menu_kb, subscribe_button
 from ..subscriptions import consume_request, ensure_user, has_request_quota, FREE_LIMIT, PAID_LIMIT
 from ..database import SessionLocal
 from ..states import EditMeal
 from ..storage import pending_meals
+from ..texts import LIMIT_REACHED_TEXT, format_date_ru
 
 async def request_photo(message: types.Message):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
     if not has_request_quota(session, user):
         reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
-        await message.answer(
-            f"Твои бесплатные запросы обновятся {reset}, но ты можешь перейти на безлимитную подписку",
-            reply_markup=pay_kb(),
-        )
+        text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
+        await message.answer(text, reply_markup=subscribe_button("⚡ Снять ограничения"))
         session.close()
         return
     session.close()
@@ -38,10 +37,8 @@ async def handle_photo(message: types.Message, state: FSMContext):
     user = ensure_user(session, message.from_user.id)
     if not consume_request(session, user):
         reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
-        await message.answer(
-            f"Твои бесплатные запросы обновятся {reset}, но ты можешь перейти на безлимитную подписку",
-            reply_markup=pay_kb(),
-        )
+        text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
+        await message.answer(text, reply_markup=subscribe_button("⚡ Снять ограничения"))
         session.close()
         return
     session.close()

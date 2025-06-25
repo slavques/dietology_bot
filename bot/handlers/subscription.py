@@ -1,5 +1,4 @@
 from ..settings import PLAN_PRICES
-from datetime import datetime
 from aiogram import types, Dispatcher, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
@@ -17,27 +16,11 @@ from ..keyboards import (
 from ..config import YOOKASSA_TOKEN
 from aiogram.types import LabeledPrice
 from ..states import SubscriptionState
+from ..texts import INTRO_TEXT, PLAN_TEXT
 
 SUCCESS_CMD = "success1467"
 REFUSED_CMD = "refused1467"
 NOTIFY_CMD = "notify1467"
-
-INTRO_TEXT = (
-    "🍞 Разблокируй ритм!\n\n"
-    "Не считай запросы.\n"
-    "Не сбивайся.\n"
-    "Просто продолжай — в том же темпе.\n"
-    "Оставь еду под контролем — без лишнего напряга.\n\n"
-    "📉 Чем дольше срок — тем ниже цена!\n"
-    " Подключение и оплата — в пару кликов."
-)
-
-PLAN_TEXT = (
-    "🫶 Спасибо за доверие!\n\n"
-    "Ты на шаг ближе к понятному, стабильному и осознанному питанию — без пауз и ограничений.\n\n"
-    "Мы постарались сделать оплату простой и быстрой.\n\n"
-    "👇 Выбери удобный способ, чтобы бот продолжал считать КБЖУ по каждому фото"
-)
 
 # map subscription plans to invoice details
 PLAN_MAP = {
@@ -87,6 +70,10 @@ async def show_subscription_menu(message: types.Message):
 
 
 async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
     await show_subscription_menu(query.message)
     await state.clear()
     await query.answer()

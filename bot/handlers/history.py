@@ -5,21 +5,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timedelta
 from ..database import SessionLocal, Meal, User
 from ..keyboards import back_menu_kb, history_nav_kb
-
-MONTHS_RU = {
-    1: "января",
-    2: "февраля",
-    3: "марта",
-    4: "апреля",
-    5: "мая",
-    6: "июня",
-    7: "июля",
-    8: "августа",
-    9: "сентября",
-    10: "октября",
-    11: "ноября",
-    12: "декабря",
-}
+from ..texts import MONTHS_RU
 
 async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header: bool = False):
     """Send totals for two days starting from offset."""
