@@ -22,8 +22,7 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
         clar = pending_meals[meal_id].get("clarifications", 0)
     text = (
         "✏️ Хорошо!\n"
-        "Напиши название блюда и его вес (в граммах).\n\n"
-        "Например: Паста с соусом, 250 г\n\n"
+        "Уточни ингредиенты, их вес или метод приготовления.  \n\n"
     )
     if clar == 0:
         text += "У тебя есть две попытки уточнить нюансы по блюду."
@@ -54,8 +53,7 @@ async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     clar = pending_meals.get(meal_id, {}).get("clarifications", 0)
     text = (
         "✏️ Хорошо!\n"
-        "Напиши название блюда и его вес (в граммах).\n\n"
-        "Например: Паста с соусом, 250 г\n\n"
+        "Уточни ингредиенты, их вес или метод приготовления.  \n\n"
     )
     if clar == 0:
         text += "У тебя есть две попытки уточнить нюансы по блюду."
@@ -104,7 +102,8 @@ async def process_edit(message: types.Message, state: FSMContext):
             )
         meal['clarifications'] += 1
         if meal['clarifications'] >= 2:
-            await message.bot.edit_message_reply_markup(
+            await message.bot.edit_message_text(
+                format_meal_message(meal['name'], meal['serving'], meal['macros']),
                 chat_id=meal['chat_id'],
                 message_id=meal['message_id'],
                 reply_markup=meal_actions_kb(meal_id, meal['clarifications'])
@@ -191,7 +190,8 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     await query.bot.send_message(
         query.from_user.id,
         "✅ Готово! Блюдо добавлено в историю.\n"
-        "📂 Хочешь посмотреть приёмы за сегодня — нажми ниже \n\"🧾 Отчёт за день\"",
+        "📂 Хочешь посмотреть приёмы за сегодня — нажми ниже \n"
+        "🧾 Отчёт за день",
         reply_markup=main_menu_kb(),
     )
 
