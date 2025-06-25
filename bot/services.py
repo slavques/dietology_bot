@@ -196,7 +196,7 @@ async def analyze_photo(photo_path: str) -> Dict[str, Any]:
 
 
 async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Re-analyze photo using user clarification text."""
+    """Re-analyze a photo using user clarification about the dish or beverage."""
     if not client.api_key:
         # simple stub when API key is missing
         return {
