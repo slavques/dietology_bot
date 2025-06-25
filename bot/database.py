@@ -51,7 +51,7 @@ def _ensure_columns():
         if "notified_1d" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN notified_1d BOOLEAN DEFAULT 0"))
         if "notified_free" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT 1"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT 0"))
 
 
 class User(Base):
@@ -68,7 +68,7 @@ class User(Base):
     notified_3d = Column(Boolean, default=False)
     notified_1d = Column(Boolean, default=False)
     notified_0d = Column(Boolean, default=False)
-    notified_free = Column(Boolean, default=True)
+    notified_free = Column(Boolean, default=False)
     meals = relationship('Meal', back_populates='user')
 
 class Meal(Base):
