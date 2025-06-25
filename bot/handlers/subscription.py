@@ -87,6 +87,10 @@ async def show_subscription_menu(message: types.Message):
 
 
 async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
     await show_subscription_menu(query.message)
     await state.clear()
     await query.answer()
