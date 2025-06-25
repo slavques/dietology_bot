@@ -31,6 +31,13 @@ def make_bar_chart(totals: Dict[str, float]) -> str:
     max_val = max(totals.values()) if totals else 1
     chart = ""
     for key, val in totals.items():
+
         bar = '█' * int((val / max_val) * 10)
         chart += f"{key[:1].upper()}: {bar} {val}\n"
     return chart
+DRINK_KEYWORDS = ["кофе", "чай", "сок", "вода", "компот", "молоко", "коктейль", "квас", "морс", "лимонад", "пиво", "вино", "стакан", "какао"]
+
+def is_drink(name: str) -> bool:
+    low = name.lower()
+    return any(word in low for word in DRINK_KEYWORDS)
+

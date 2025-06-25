@@ -1,3 +1,4 @@
+from ..settings import PLAN_PRICES
 from datetime import datetime
 from aiogram import types, Dispatcher, F, Bot
 from aiogram.fsm.context import FSMContext
@@ -39,14 +40,14 @@ PLAN_TEXT = (
 
 # map subscription plans to invoice details
 PLAN_MAP = {
-    "🚶‍♂️1 месяц - 149₽": ("1 месяц", 14900, 1),
-    "🏃‍♂️3 месяца - 399₽": ("3 месяца", 39900, 3),
-    "🧘‍♂️6 месяцев - 799₽": ("6 месяцев", 79900, 6),
+    f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽": ("1 месяц", PLAN_PRICES['1m'] * 100, 1),
+    f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽": ("3 месяца", PLAN_PRICES['3m'] * 100, 3),
+    f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽": ("6 месяцев", PLAN_PRICES['6m'] * 100, 6),
 }
 PLAN_CODES = {
-    "🚶‍♂️1 месяц - 149₽": "1m",
-    "🏃‍♂️3 месяца - 399₽": "3m",
-    "🧘‍♂️6 месяцев - 799₽": "6m",
+    f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽": "1m",
+    f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽": "3m",
+    f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽": "6m",
 }
 
 
@@ -86,7 +87,12 @@ async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
 
 
 async def choose_plan(message: types.Message, state: FSMContext):
-    if message.text not in {"🚶‍♂️1 месяц - 149₽", "🏃‍♂️3 месяца - 399₽", "🧘‍♂️6 месяцев - 799₽"}:
+    options = {
+        f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽",
+        f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽",
+        f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽",
+    }
+    if message.text not in options:
         return
     await state.set_state(SubscriptionState.choosing_method)
     await state.update_data(plan=message.text)
@@ -98,7 +104,7 @@ async def choose_method(message: types.Message, state: FSMContext):
         await state.clear()
         await show_subscription_menu(message)
         return
-    if message.text not in {"💳 Банковская карта", "✨Telegram Stars", "🪙Crypto"}:
+    if message.text not in {"💳 Банковская карта"}:
         return
     data = await state.get_data()
     plan = data.get("plan", "")
@@ -110,7 +116,6 @@ async def choose_method(message: types.Message, state: FSMContext):
         "Оплата доступна по кнопке \"Оплатить\" 👇"
     )
     await message.answer(text, reply_markup=pay_kb(code))
-    await message.answer("🥑 Главное меню", reply_markup=back_menu_kb())
     await state.clear()
 
 async def cmd_success(message: types.Message):
@@ -161,9 +166,9 @@ def register(dp: Dispatcher):
         choose_plan,
         F.text.in_(
             {
-                "🚶‍♂️1 месяц - 149₽",
-                "🏃‍♂️3 месяца - 399₽",
-                "🧘‍♂️6 месяцев - 799₽",
+                f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽",
+                f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽",
+                f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽",
             }
         ),
     )
