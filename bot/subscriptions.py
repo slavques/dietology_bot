@@ -49,7 +49,7 @@ def update_limits(user: User) -> None:
             user.notified_3d = False
             user.notified_1d = False
             user.notified_0d = False
-            user.notified_free = False
+            user.notified_free = True
     else:
         if user.period_end is None:
             user.period_end = user.period_start + timedelta(days=30)
@@ -92,11 +92,10 @@ def process_payment_success(session: SessionLocal, user: User, months: int = 1):
         day = min(dt.day, monthrange(year, month)[1])
         return dt.replace(year=year, month=month, day=day)
 
-    if user.period_end and user.period_end > now:
+    if user.grade == "paid" and user.period_end and user.period_end > now:
         user.period_end = add_month(user.period_end, months)
     else:
-        base = user.period_end if user.period_end else now
-        user.period_end = add_month(base, months)
+        user.period_end = add_month(now, months)
     user.grade = "paid"
     user.request_limit = PAID_LIMIT
     user.requests_used = 0
