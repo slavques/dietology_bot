@@ -75,6 +75,10 @@ async def cb_pay(query: types.CallbackQuery):
         currency="RUB",
         prices=[price],
     )
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
     await query.answer()
 
 
@@ -99,10 +103,6 @@ async def choose_plan(message: types.Message, state: FSMContext):
     code = PLAN_CODES.get(message.text)
     await message.answer(
         PLAN_TEXT,
-        reply_markup=payment_methods_kb(),
-    )
-    await message.answer(
-        "💳 Банковская карта",
         reply_markup=payment_method_inline(code),
     )
 
@@ -117,8 +117,7 @@ async def cb_method(query: types.CallbackQuery):
         f"({plan})\n\n"
         "Оплата доступна по кнопке \"Оплатить\""
     )
-    await query.message.answer(text, reply_markup=pay_kb(code))
-    await query.message.answer("🥑 Главное меню", reply_markup=back_menu_kb())
+    await query.message.edit_text(text, reply_markup=pay_kb(code))
     await query.answer()
 
 async def cmd_success(message: types.Message):
@@ -151,6 +150,7 @@ async def handle_successful_payment(message: types.Message):
     user = ensure_user(session, message.from_user.id)
     process_payment_success(session, user, months)
     session.close()
+    await message.delete()
     await message.answer(
         "🫶 Спасибо за доверие!\n\n"
         "Ты на шаг ближе к понятному, стабильному и осознанному питанию — без пауз и ограничений.",

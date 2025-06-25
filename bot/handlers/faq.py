@@ -11,7 +11,7 @@ FAQ_TEXT = (
 )
 
 async def cmd_faq(message: types.Message):
-    await message.answer(FAQ_TEXT, reply_markup=back_menu_kb())
+    await message.answer(FAQ_TEXT, reply_markup=back_menu_kb(), parse_mode="Markdown")
 
 
 def register(dp: Dispatcher):
