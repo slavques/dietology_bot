@@ -26,7 +26,7 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             period_start=now,
             period_end=now + timedelta(days=30),
             notified_1d=False,
-            notified_free=True,
+            notified_free=False,
         )
         session.add(user)
         session.commit()
@@ -108,14 +108,13 @@ def process_payment_success(session: SessionLocal, user: User, months: int = 1):
 
 
 def subscription_watcher(bot: Bot, check_interval: int = 3600):
+    """Check subscriptions periodically and notify users."""
+
     async def _watch():
-        last_date = None
         while True:
-            now = datetime.utcnow() + timedelta(hours=3)  # Moscow time
-            if last_date != now.date():
-                last_date = now.date()
-                await _daily_check(bot)
+            await _daily_check(bot)
             await asyncio.sleep(check_interval)
+
     return _watch
 
 
