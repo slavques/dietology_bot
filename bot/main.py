@@ -3,7 +3,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from .config import API_TOKEN
+from .config import API_TOKEN, SUBSCRIPTION_CHECK_INTERVAL
 from .handlers import start, photo, history, stats, callbacks, faq, admin, subscription
 from .subscriptions import subscription_watcher
 from .cleanup import cleanup_watcher
@@ -25,7 +25,7 @@ subscription.register(dp)
 dp.errors.register(handle_error)
 
 async def main() -> None:
-    watcher = subscription_watcher(bot)()
+    watcher = subscription_watcher(bot, check_interval=SUBSCRIPTION_CHECK_INTERVAL)()
     cleanup = cleanup_watcher()()
     tasks = [
         asyncio.create_task(watcher),
