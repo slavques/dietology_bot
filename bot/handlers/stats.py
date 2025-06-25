@@ -3,7 +3,7 @@ from aiogram import types, Dispatcher, F
 from aiogram.filters import Command
 
 from ..database import SessionLocal, Meal, User
-from ..utils import make_bar_chart
+from ..utils import make_bar_chart, is_drink
 from ..keyboards import stats_period_kb, back_menu_kb, main_menu_kb
 
 async def cmd_stats(message: types.Message):
@@ -91,10 +91,24 @@ async def report_day(message: types.Message):
         "",
         "📂 Приёмы пищи:",
     ]
+
+    dishes = []
+    drinks = []
     for meal in meals:
-        lines.append(
-            f"• {meal.name}\n(🔥 {int(meal.calories)} ккал / Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
+        line = (
+            f"• {'🥤' if is_drink(meal.name) else '🍜'} {meal.name}\n"
+            f"(Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
         )
+        if is_drink(meal.name):
+            drinks.append(line)
+        else:
+            dishes.append(line)
+
+    lines.extend(dishes)
+    if drinks:
+        lines.append("")
+        lines.extend(drinks)
+
     await message.answer("\n".join(lines), reply_markup=main_menu_kb())
 
 

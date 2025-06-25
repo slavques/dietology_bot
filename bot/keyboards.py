@@ -4,6 +4,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
+from .settings import PLAN_PRICES
 from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -74,7 +75,6 @@ def main_menu_kb() -> ReplyKeyboardMarkup:
             [KeyboardButton(text="📊 Мои приёмы")],
             [KeyboardButton(text="⚡ Подписка")],
             [KeyboardButton(text="❓ ЧаВО")],
-            [KeyboardButton(text="⚡ Подписка")],
         ],
         resize_keyboard=True,
     )
@@ -105,9 +105,9 @@ def subscription_plans_kb() -> ReplyKeyboardMarkup:
     """Keyboard with subscription duration options."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🚶‍♂️1 месяц - 149₽")],
-            [KeyboardButton(text="🏃‍♂️3 месяца - 399₽")],
-            [KeyboardButton(text="🧘‍♂️6 месяцев - 799₽")],
+            [KeyboardButton(text=f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽")],
+            [KeyboardButton(text=f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽")],
+            [KeyboardButton(text=f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽")],
             [KeyboardButton(text="🥑 Главное меню")],
         ],
         resize_keyboard=True,
@@ -118,13 +118,18 @@ def payment_methods_kb() -> ReplyKeyboardMarkup:
     """Keyboard with payment method choices."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="💳 Банковская карта")],
-            [KeyboardButton(text="✨Telegram Stars")],
-            [KeyboardButton(text="🪙Crypto")],
             [KeyboardButton(text="🔙 Назад")],
         ],
         resize_keyboard=True,
     )
+
+
+def payment_method_inline(code: str) -> InlineKeyboardMarkup:
+    """Inline keyboard with a single payment method button."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="💳 Банковская карта", callback_data=f"method:{code}")
+    builder.adjust(1)
+    return builder.as_markup()
 
 
 def subscribe_button(text: str) -> InlineKeyboardMarkup:
