@@ -26,6 +26,7 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             period_start=now,
             period_end=now + timedelta(days=30),
             notified_1d=False,
+            notified_free=True,
         )
         session.add(user)
         session.commit()
@@ -48,6 +49,7 @@ def update_limits(user: User) -> None:
             user.notified_3d = False
             user.notified_1d = False
             user.notified_0d = False
+            user.notified_free = False
     else:
         if user.period_end is None:
             user.period_end = user.period_start + timedelta(days=30)
@@ -55,6 +57,7 @@ def update_limits(user: User) -> None:
             user.period_start = now
             user.period_end = now + timedelta(days=30)
             user.requests_used = 0
+            user.notified_free = False
 
 
 def has_request_quota(session: SessionLocal, user: User) -> bool:
@@ -160,16 +163,15 @@ async def _daily_check(bot: Bot):
                     await bot.send_message(user.telegram_id, text, reply_markup=kb)
                 except Exception:
                     pass
-        prev_end = user.period_end
-        prev_grade = user.grade
         update_limits(user)
-        if prev_grade == "free" and prev_end and prev_end <= now < user.period_end:
+        if user.grade == "free" and not user.notified_free:
             try:
                 await bot.send_message(
                     user.telegram_id,
                     "🎯Новый день — новые запросы\nТвои 20 бесплатных КБЖУ-анализов доступны!\n\nГотов продолжить?",
                     reply_markup=subscribe_button("⚡Снять ограничение"),
                 )
+                user.notified_free = True
             except Exception:
                 pass
     session.commit()
