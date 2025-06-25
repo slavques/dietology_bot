@@ -196,7 +196,7 @@ async def analyze_photo(photo_path: str) -> Dict[str, Any]:
 
 
 async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Re-analyze photo using user clarification text."""
+    """Re-analyze a photo using user clarification about the dish or beverage."""
     if not client.api_key:
         # simple stub when API key is missing
         return {
@@ -212,11 +212,11 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
         b64 = base64.b64encode(f.read()).decode()
     prev_json = json.dumps(prev or {}, ensure_ascii=False)
     prompt = (
-        "Ты диетолог. Пользователь уточняет блюдо: "
+        "Ты диетолог. Пользователь уточняет блюдо или напиток: "
         f"{hint}. Предыдущие данные: {prev_json}. "
-        "Если в тексте есть информация о еде, обнови название, вес и подсчитай калории, белки, жиры и углеводы. "
+        "Если в тексте есть информация о еде или напитке, обнови название, вес и подсчитай калории, белки, жиры и углеводы. "
         "Название пиши на русском с большой буквы, вес указывай целым числом в граммах. "
-        "Если текст не связан с едой, верни JSON {success: false}. "
+        "Если текст не связан с едой или напитками, верни JSON {success: false}. "
         "Иначе ответь только JSON вида {success: true, name, serving, calories, protein, fat, carbs}."
     )
     content = await _chat(
