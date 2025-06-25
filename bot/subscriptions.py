@@ -49,7 +49,7 @@ def update_limits(user: User) -> None:
             user.notified_3d = False
             user.notified_1d = False
             user.notified_0d = False
-            user.notified_free = False
+            user.notified_free = True
     else:
         if user.period_end is None:
             user.period_end = user.period_start + timedelta(days=30)
