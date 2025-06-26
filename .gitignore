@@ -3,3 +3,5 @@ __pycache__/
 .env
 bot.db
 README.md
+services.py
+settings.py
