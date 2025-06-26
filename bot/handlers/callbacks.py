@@ -23,6 +23,7 @@ from ..texts import (
     REFINE_END,
     NOTHING_TO_SAVE,
     SESSION_EXPIRED_RETRY,
+    PORTION_PREFIXES,
 )
 
 
@@ -179,8 +180,7 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         k: to_float(v) * fraction
         for k, v in meal.get('orig_macros', meal['macros']).items()
     }
-    prefixes = {1.0: "", 0.5: "1/2 ", 0.25: "1/4 ", 0.75: "3/4 "}
-    name = prefixes.get(fraction, "") + meal['name']
+    name = PORTION_PREFIXES.get(fraction, "") + meal['name']
     new_meal = Meal(
         user_id=user.id,
         name=name,

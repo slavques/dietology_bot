@@ -108,6 +108,18 @@ BTN_PAY = "Оплатить"
 BTN_BACK_TEXT = "🔙 Назад"
 BTN_BANK_CARD = "💳 Банковская карта"
 BTN_BROADCAST = "Рассылка"
+
+# Portion prefixes used when saving partial servings
+PREFIX_FULL = ""
+PREFIX_HALF = "1/2 "
+PREFIX_QUARTER = "1/4 "
+PREFIX_THREEQ = "3/4 "
+PORTION_PREFIXES = {
+    1.0: PREFIX_FULL,
+    0.5: PREFIX_HALF,
+    0.25: PREFIX_QUARTER,
+    0.75: PREFIX_THREEQ,
+}
 # Common messages
 WELCOME_BASE = (
     "Я — твой AI-диетолог 🧠\n\n"
