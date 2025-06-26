@@ -11,4 +11,4 @@ PLAN_PRICES = {
 }
 
 # Link to FAQ article
-FAQ_LINK = "https://t.me/nomnomly_faq"
+FAQ_LINK = "https://telegra.ph/CHaVo-06-25-3"
