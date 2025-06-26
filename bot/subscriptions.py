@@ -5,7 +5,6 @@ from typing import Optional
 
 import asyncio
 from aiogram import Bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from .keyboards import subscribe_button
 from .texts import (
     SUB_END_7D,

@@ -4,7 +4,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from datetime import datetime, timedelta
 from ..database import SessionLocal, Meal, User
-from ..keyboards import back_menu_kb, history_nav_kb
+from ..keyboards import history_nav_kb
 from ..texts import (
     MONTHS_RU,
     HISTORY_HEADER,

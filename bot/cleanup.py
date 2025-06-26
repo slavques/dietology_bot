@@ -4,7 +4,7 @@ import tempfile
 import time
 
 PREFIX = "diet_photo_"
-RETENTION_DAYS = 30
+RETENTION_DAYS = 7
 
 
 def cleanup_watcher(check_interval: int = 24 * 3600):

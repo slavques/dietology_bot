@@ -4,7 +4,7 @@ from aiogram.filters import Command
 
 from ..database import SessionLocal, Meal, User
 from ..utils import make_bar_chart, is_drink
-from ..keyboards import stats_period_kb, back_menu_kb, main_menu_kb
+from ..keyboards import stats_period_kb, main_menu_kb
 from ..texts import (
     STATS_CHOOSE_PERIOD,
     STATS_NO_DATA,

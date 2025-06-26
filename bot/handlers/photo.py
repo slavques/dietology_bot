@@ -4,10 +4,10 @@ import tempfile
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ..services import analyze_photo, analyze_photo_with_hint
+from ..services import analyze_photo
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import meal_actions_kb, back_menu_kb, subscribe_button
-from ..subscriptions import consume_request, ensure_user, has_request_quota, FREE_LIMIT, PAID_LIMIT
+from ..subscriptions import consume_request, ensure_user, has_request_quota
 from ..database import SessionLocal
 from ..states import EditMeal
 from ..storage import pending_meals
@@ -22,7 +22,6 @@ from ..texts import (
     CLARIFY_PROMPT,
     BTN_EDIT,
     BTN_DELETE,
-    DELETE_NOTIFY,
     BTN_REMOVE_LIMITS,
 )
 

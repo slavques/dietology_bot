@@ -1,6 +1,5 @@
 from aiogram.types import (
     InlineKeyboardMarkup,
-    InlineKeyboardButton,
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
@@ -26,7 +25,6 @@ from .texts import (
     BTN_PAY,
     BTN_BACK_TEXT,
     BTN_BANK_CARD,
-    BTN_BROADCAST,
     BTN_PLAN_1M,
     BTN_PLAN_3M,
     BTN_PLAN_6M,

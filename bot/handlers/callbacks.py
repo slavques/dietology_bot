@@ -1,4 +1,3 @@
-from datetime import datetime
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter

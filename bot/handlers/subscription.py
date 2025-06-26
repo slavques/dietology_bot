@@ -7,15 +7,12 @@ from ..database import SessionLocal
 from ..subscriptions import ensure_user, process_payment_success, _daily_check
 from ..keyboards import (
     subscription_plans_kb,
-    payment_methods_kb,
-    subscribe_button,
     pay_kb,
     back_menu_kb,
     payment_method_inline,
 )
 from ..config import YOOKASSA_TOKEN
 from aiogram.types import LabeledPrice
-from ..states import SubscriptionState
 from ..texts import (
     INTRO_TEXT,
     PLAN_TEXT,
@@ -24,9 +21,6 @@ from ..texts import (
     SUB_SUCCESS,
     SUB_CANCELLED,
     NOTIFY_SENT,
-    BTN_RENEW_SUB,
-    BTN_REMOVE_LIMITS,
-    BTN_REMOVE_LIMIT,
     BTN_SUBSCRIPTION,
     BTN_BACK_TEXT,
     BTN_PLAN_1M,

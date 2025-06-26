@@ -8,7 +8,6 @@ from ..config import ADMIN_COMMAND
 from ..texts import (
     BTN_BROADCAST,
     BTN_BACK,
-    SERVER_ERROR,
     ADMIN_MODE,
     ADMIN_UNAVAILABLE,
     BROADCAST_PROMPT,
