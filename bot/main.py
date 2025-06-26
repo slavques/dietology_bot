@@ -1,9 +1,11 @@
 import logging
+import logging.handlers
+import os
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from .config import API_TOKEN, SUBSCRIPTION_CHECK_INTERVAL
+from .config import API_TOKEN, SUBSCRIPTION_CHECK_INTERVAL, LOG_DIR
 from .handlers import start, photo, history, stats, callbacks, faq, admin, subscription
 from .subscriptions import subscription_watcher
 from .cleanup import cleanup_watcher
@@ -37,5 +39,13 @@ async def main() -> None:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    os.makedirs(LOG_DIR, exist_ok=True)
+    log_file = os.path.join(LOG_DIR, 'bot.log')
+    file_handler = logging.handlers.TimedRotatingFileHandler(
+        log_file, when='D', backupCount=3
+    )
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=[file_handler, logging.StreamHandler()]
+    )
     asyncio.run(main())
