@@ -16,7 +16,28 @@ from ..keyboards import (
 from ..config import YOOKASSA_TOKEN
 from aiogram.types import LabeledPrice
 from ..states import SubscriptionState
-from ..texts import INTRO_TEXT, PLAN_TEXT
+from ..texts import (
+    INTRO_TEXT,
+    PLAN_TEXT,
+    SUB_INVALID_PLAN,
+    SUB_METHOD_TEXT,
+    SUB_SUCCESS,
+    SUB_CANCELLED,
+    NOTIFY_SENT,
+    BTN_RENEW_SUB,
+    BTN_REMOVE_LIMITS,
+    BTN_REMOVE_LIMIT,
+    BTN_SUBSCRIPTION,
+    BTN_BACK_TEXT,
+    BTN_PLAN_1M,
+    BTN_PLAN_3M,
+    BTN_PLAN_6M,
+    PLAN_TITLE_1M,
+    PLAN_TITLE_3M,
+    PLAN_TITLE_6M,
+    INVOICE_LABEL,
+    INVOICE_TITLE,
+)
 
 SUCCESS_CMD = "success1467"
 REFUSED_CMD = "refused1467"
@@ -24,14 +45,14 @@ NOTIFY_CMD = "notify1467"
 
 # map subscription plans to invoice details
 PLAN_MAP = {
-    f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽": ("1 месяц", PLAN_PRICES['1m'] * 100, 1),
-    f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽": ("3 месяца", PLAN_PRICES['3m'] * 100, 3),
-    f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽": ("6 месяцев", PLAN_PRICES['6m'] * 100, 6),
+    BTN_PLAN_1M.format(price=PLAN_PRICES['1m']): (PLAN_TITLE_1M, PLAN_PRICES['1m'] * 100, 1),
+    BTN_PLAN_3M.format(price=PLAN_PRICES['3m']): (PLAN_TITLE_3M, PLAN_PRICES['3m'] * 100, 3),
+    BTN_PLAN_6M.format(price=PLAN_PRICES['6m']): (PLAN_TITLE_6M, PLAN_PRICES['6m'] * 100, 6),
 }
 PLAN_CODES = {
-    f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽": "1m",
-    f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽": "3m",
-    f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽": "6m",
+    BTN_PLAN_1M.format(price=PLAN_PRICES['1m']): "1m",
+    BTN_PLAN_3M.format(price=PLAN_PRICES['3m']): "3m",
+    BTN_PLAN_6M.format(price=PLAN_PRICES['6m']): "6m",
 }
 PLAN_DISPLAY = {v: k.split(" ", 1)[1] for k, v in PLAN_CODES.items()}
 
@@ -42,16 +63,16 @@ async def cb_pay(query: types.CallbackQuery):
     code = parts[1] if len(parts) > 1 else None
     if not code or code not in {"1m", "3m", "6m"}:
         await query.message.answer(
-            "Чтобы оформить подписку, используйте команду /success1467 или свяжитесь с поддержкой."
+            SUB_INVALID_PLAN
         )
         await query.answer()
         return
     plan_text = next(key for key, val in PLAN_CODES.items() if val == code)
     title, amount, months = PLAN_MAP[plan_text]
-    price = LabeledPrice(label="К оплате", amount=amount)
+    price = LabeledPrice(label=INVOICE_LABEL, amount=amount)
     await query.bot.send_invoice(
         chat_id=query.from_user.id,
-        title="Подписка",
+        title=INVOICE_TITLE,
         description=title,
         payload=code,
         provider_token=YOOKASSA_TOKEN,
@@ -81,9 +102,9 @@ async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
 
 async def choose_plan(message: types.Message, state: FSMContext):
     options = {
-        f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽",
-        f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽",
-        f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽",
+        BTN_PLAN_1M.format(price=PLAN_PRICES['1m']),
+        BTN_PLAN_3M.format(price=PLAN_PRICES['3m']),
+        BTN_PLAN_6M.format(price=PLAN_PRICES['6m']),
     }
     if message.text not in options:
         return
@@ -98,13 +119,10 @@ async def cb_method(query: types.CallbackQuery):
     parts = query.data.split(":", 1)
     code = parts[1] if len(parts) > 1 else ""
     plan = PLAN_DISPLAY.get(code, "")
-    text = (
-        "Создали запрос на покупку.\n"
-        "💳 Банковская карта\n"
-        f"({plan})\n\n"
-        "Оплата доступна по кнопке \"Оплатить\""
+    await query.message.edit_text(
+        SUB_METHOD_TEXT.format(plan=plan),
+        reply_markup=pay_kb(code),
     )
-    await query.message.edit_text(text, reply_markup=pay_kb(code))
     await query.answer()
 
 async def cmd_success(message: types.Message):
@@ -114,15 +132,12 @@ async def cmd_success(message: types.Message):
     user = ensure_user(session, message.from_user.id)
     process_payment_success(session, user)
     session.close()
-    await message.answer(
-        "🫶 Спасибо за доверие!\n\n"
-        "Ты на шаг ближе к понятному, стабильному и осознанному питанию — без пауз и ограничений."
-    )
+    await message.answer(SUB_SUCCESS)
 
 async def cmd_refused(message: types.Message):
     if not message.text.startswith(f"/{REFUSED_CMD}"):
         return
-    await message.answer("Оплата отменена.")
+    await message.answer(SUB_CANCELLED)
 
 
 async def handle_pre_checkout(query: types.PreCheckoutQuery, bot: Bot):
@@ -139,8 +154,7 @@ async def handle_successful_payment(message: types.Message):
     session.close()
     await message.delete()
     await message.answer(
-        "🫶 Спасибо за доверие!\n\n"
-        "Ты на шаг ближе к понятному, стабильному и осознанному питанию — без пауз и ограничений.",
+        SUB_SUCCESS,
         reply_markup=back_menu_kb(),
     )
 
@@ -149,25 +163,25 @@ async def cmd_notify(message: types.Message):
     if not message.text.startswith(f"/{NOTIFY_CMD}"):
         return
     await _daily_check(message.bot)
-    await message.answer("Уведомления отправлены")
+    await message.answer(NOTIFY_SENT)
 
 
 def register(dp: Dispatcher):
     dp.message.register(cmd_success, Command(SUCCESS_CMD))
     dp.message.register(cmd_refused, Command(REFUSED_CMD))
     dp.message.register(cmd_notify, Command(NOTIFY_CMD))
-    dp.message.register(show_subscription_menu, F.text == "⚡ Подписка")
+    dp.message.register(show_subscription_menu, F.text == BTN_SUBSCRIPTION)
     dp.message.register(
         choose_plan,
         F.text.in_(
             {
-                f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽",
-                f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽",
-                f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽",
+                BTN_PLAN_1M.format(price=PLAN_PRICES['1m']),
+                BTN_PLAN_3M.format(price=PLAN_PRICES['3m']),
+                BTN_PLAN_6M.format(price=PLAN_PRICES['6m']),
             }
         ),
     )
-    dp.message.register(show_subscription_menu, F.text == "🔙 Назад")
+    dp.message.register(show_subscription_menu, F.text == BTN_BACK_TEXT)
     dp.callback_query.register(cb_method, F.data.startswith("method:"))
     dp.callback_query.register(cb_pay, F.data.startswith("pay"))
     dp.pre_checkout_query.register(handle_pre_checkout)
