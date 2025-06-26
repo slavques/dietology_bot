@@ -4,7 +4,12 @@ from aiogram.filters import Command
 from ..database import SessionLocal, User
 from ..subscriptions import ensure_user, days_left, update_limits
 from ..keyboards import main_menu_kb
-from ..texts import WELCOME_BASE, BTN_MAIN_MENU
+from ..texts import (
+    WELCOME_BASE,
+    BTN_MAIN_MENU,
+    REMAINING_FREE,
+    REMAINING_DAYS,
+)
 
 
 BASE_TEXT = WELCOME_BASE
@@ -14,10 +19,10 @@ def get_welcome_text(user: User) -> str:
     update_limits(user)
     if user.grade == "free":
         remaining = max(user.request_limit - user.requests_used, 0)
-        extra = f"(осталось бесплатных запросов: {remaining})"
+        extra = REMAINING_FREE.format(remaining=remaining)
     else:
         days = days_left(user) or 0
-        extra = f"(осталось дней подписки: {days})"
+        extra = REMAINING_DAYS.format(days=days)
     return f"{BASE_TEXT}\n{extra}"
 
 async def cmd_start(message: types.Message):

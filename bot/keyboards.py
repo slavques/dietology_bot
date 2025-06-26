@@ -27,6 +27,9 @@ from .texts import (
     BTN_BACK_TEXT,
     BTN_BANK_CARD,
     BTN_BROADCAST,
+    BTN_PLAN_1M,
+    BTN_PLAN_3M,
+    BTN_PLAN_6M,
 )
 from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -128,9 +131,9 @@ def subscription_plans_kb() -> ReplyKeyboardMarkup:
     """Keyboard with subscription duration options."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽")],
-            [KeyboardButton(text=f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽")],
-            [KeyboardButton(text=f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽")],
+            [KeyboardButton(text=BTN_PLAN_1M.format(price=PLAN_PRICES['1m']))],
+            [KeyboardButton(text=BTN_PLAN_3M.format(price=PLAN_PRICES['3m']))],
+            [KeyboardButton(text=BTN_PLAN_6M.format(price=PLAN_PRICES['6m']))],
             [KeyboardButton(text=BTN_MAIN_MENU)],
         ],
         resize_keyboard=True,

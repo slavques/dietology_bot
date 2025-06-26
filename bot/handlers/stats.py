@@ -9,7 +9,16 @@ from ..texts import (
     STATS_CHOOSE_PERIOD,
     STATS_NO_DATA,
     STATS_NO_DATA_PERIOD,
+    STATS_TOTALS,
     REPORT_EMPTY,
+    REPORT_HEADER,
+    REPORT_TOTAL,
+    REPORT_LINE_CAL,
+    REPORT_LINE_P,
+    REPORT_LINE_F,
+    REPORT_LINE_C,
+    REPORT_MEALS_TITLE,
+    MEAL_LINE,
     BTN_REPORT_DAY,
 )
 
@@ -45,10 +54,12 @@ async def cb_stats(query: types.CallbackQuery):
         totals['protein'] += m.protein
         totals['fat'] += m.fat
         totals['carbs'] += m.carbs
-    text = (
-        f"Всего за период:\n"
-        f"{totals['calories']} ккал / {totals['protein']} г / {totals['fat']} г / {totals['carbs']} г\n\n"
-        f"{make_bar_chart(totals)}"
+    text = STATS_TOTALS.format(
+        calories=int(totals['calories']),
+        protein=int(totals['protein']),
+        fat=int(totals['fat']),
+        carbs=int(totals['carbs']),
+        chart=make_bar_chart(totals),
     )
     await query.message.edit_text(text)
     await query.answer()
@@ -86,23 +97,27 @@ async def report_day(message: types.Message):
         totals["carbs"] += m.carbs
 
     lines = [
-        "🧾 Отчёт за день",
+        REPORT_HEADER,
         "",
-        "📊 Итого:",
-        f"🔥 Калории: {int(totals['calories'])} ккал",
-        f"• Белки: {int(totals['protein'])} г  ",
-        f"• Жиры: {int(totals['fat'])} г  ",
-        f"• Углеводы: {int(totals['carbs'])} г  ",
+        REPORT_TOTAL,
+        REPORT_LINE_CAL.format(cal=int(totals['calories'])),
+        REPORT_LINE_P.format(protein=int(totals['protein'])),
+        REPORT_LINE_F.format(fat=int(totals['fat'])),
+        REPORT_LINE_C.format(carbs=int(totals['carbs'])),
         "",
-        "📂 Приёмы пищи:",
+        REPORT_MEALS_TITLE,
     ]
 
     dishes = []
     drinks = []
     for meal in meals:
-        line = (
-            f"• {'🥤' if is_drink(meal.name) else '🍜'} {meal.name}\n"
-            f"(Белки: {int(meal.protein)} г / Жиры: {int(meal.fat)} г  / Углеводы: {int(meal.carbs)} г)"
+        icon = '🥤' if is_drink(meal.name) else '🍜'
+        line = MEAL_LINE.format(
+            icon=icon,
+            name=meal.name,
+            protein=int(meal.protein),
+            fat=int(meal.fat),
+            carbs=int(meal.carbs),
         )
         if is_drink(meal.name):
             drinks.append(line)

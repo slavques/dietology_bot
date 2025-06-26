@@ -29,6 +29,11 @@ from ..texts import (
     BTN_REMOVE_LIMIT,
     BTN_SUBSCRIPTION,
     BTN_BACK_TEXT,
+    BTN_PLAN_1M,
+    BTN_PLAN_3M,
+    BTN_PLAN_6M,
+    INVOICE_LABEL,
+    INVOICE_TITLE,
 )
 
 SUCCESS_CMD = "success1467"
@@ -37,14 +42,14 @@ NOTIFY_CMD = "notify1467"
 
 # map subscription plans to invoice details
 PLAN_MAP = {
-    f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽": ("1 месяц", PLAN_PRICES['1m'] * 100, 1),
-    f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽": ("3 месяца", PLAN_PRICES['3m'] * 100, 3),
-    f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽": ("6 месяцев", PLAN_PRICES['6m'] * 100, 6),
+    BTN_PLAN_1M.format(price=PLAN_PRICES['1m']): ("1 месяц", PLAN_PRICES['1m'] * 100, 1),
+    BTN_PLAN_3M.format(price=PLAN_PRICES['3m']): ("3 месяца", PLAN_PRICES['3m'] * 100, 3),
+    BTN_PLAN_6M.format(price=PLAN_PRICES['6m']): ("6 месяцев", PLAN_PRICES['6m'] * 100, 6),
 }
 PLAN_CODES = {
-    f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽": "1m",
-    f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽": "3m",
-    f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽": "6m",
+    BTN_PLAN_1M.format(price=PLAN_PRICES['1m']): "1m",
+    BTN_PLAN_3M.format(price=PLAN_PRICES['3m']): "3m",
+    BTN_PLAN_6M.format(price=PLAN_PRICES['6m']): "6m",
 }
 PLAN_DISPLAY = {v: k.split(" ", 1)[1] for k, v in PLAN_CODES.items()}
 
@@ -61,10 +66,10 @@ async def cb_pay(query: types.CallbackQuery):
         return
     plan_text = next(key for key, val in PLAN_CODES.items() if val == code)
     title, amount, months = PLAN_MAP[plan_text]
-    price = LabeledPrice(label="К оплате", amount=amount)
+    price = LabeledPrice(label=INVOICE_LABEL, amount=amount)
     await query.bot.send_invoice(
         chat_id=query.from_user.id,
-        title="Подписка",
+        title=INVOICE_TITLE,
         description=title,
         payload=code,
         provider_token=YOOKASSA_TOKEN,
@@ -94,9 +99,9 @@ async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
 
 async def choose_plan(message: types.Message, state: FSMContext):
     options = {
-        f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽",
-        f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽",
-        f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽",
+        BTN_PLAN_1M.format(price=PLAN_PRICES['1m']),
+        BTN_PLAN_3M.format(price=PLAN_PRICES['3m']),
+        BTN_PLAN_6M.format(price=PLAN_PRICES['6m']),
     }
     if message.text not in options:
         return
@@ -167,9 +172,9 @@ def register(dp: Dispatcher):
         choose_plan,
         F.text.in_(
             {
-                f"🚶‍♂️1 месяц - {PLAN_PRICES['1m']}₽",
-                f"🏃‍♂️3 месяца - {PLAN_PRICES['3m']}₽",
-                f"🧘‍♂️6 месяцев - {PLAN_PRICES['6m']}₽",
+                BTN_PLAN_1M.format(price=PLAN_PRICES['1m']),
+                BTN_PLAN_3M.format(price=PLAN_PRICES['3m']),
+                BTN_PLAN_6M.format(price=PLAN_PRICES['6m']),
             }
         ),
     )

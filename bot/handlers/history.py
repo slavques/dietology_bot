@@ -9,6 +9,11 @@ from ..texts import (
     MONTHS_RU,
     HISTORY_HEADER,
     HISTORY_NO_MEALS,
+    HISTORY_DAY_HEADER,
+    HISTORY_LINE_CAL,
+    HISTORY_LINE_P,
+    HISTORY_LINE_F,
+    HISTORY_LINE_C,
     BTN_LEFT_HISTORY,
     BTN_RIGHT_HISTORY,
     BTN_MY_MEALS,
@@ -23,7 +28,7 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
         for i in range(2):
             day = datetime.utcnow().date() - timedelta(days=offset + i)
             month = MONTHS_RU.get(day.month, day.strftime('%B'))
-            text_lines.append(f"📊 Итого за {day.day} {month}:")
+            text_lines.append(HISTORY_DAY_HEADER.format(day=day.day, month=month))
             text_lines.append(HISTORY_NO_MEALS)
             text_lines.append("")
         await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=history_nav_kb(offset, 1))
@@ -43,7 +48,7 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
             .all()
         )
         month = MONTHS_RU.get(day.month, day.strftime('%B'))
-        text_lines.append(f"📊 Итого за {day.day} {month}:")
+        text_lines.append(HISTORY_DAY_HEADER.format(day=day.day, month=month))
         if not meals:
             text_lines.append(HISTORY_NO_MEALS)
             text_lines.append("")
@@ -57,10 +62,10 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
             totals["carbs"] += m.carbs
         text_lines.extend(
             [
-                f"🔥 Калории: {int(totals['calories'])} ккал",
-                f"• Белки: {int(totals['protein'])} г",
-                f"• Жиры: {int(totals['fat'])} г",
-                f"• Углеводы: {int(totals['carbs'])} г",
+                HISTORY_LINE_CAL.format(cal=int(totals['calories'])),
+                HISTORY_LINE_P.format(protein=int(totals['protein'])),
+                HISTORY_LINE_F.format(fat=int(totals['fat'])),
+                HISTORY_LINE_C.format(carbs=int(totals['carbs'])),
                 "",
             ]
         )

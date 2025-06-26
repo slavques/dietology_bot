@@ -22,6 +22,7 @@ from ..texts import (
     REFINE_BAD_ATTEMPT,
     REFINE_END,
     NOTHING_TO_SAVE,
+    SESSION_EXPIRED_RETRY,
 )
 
 
@@ -73,7 +74,7 @@ async def process_edit(message: types.Message, state: FSMContext):
     data = await state.get_data()
     meal_id = data.get('meal_id')
     if not meal_id or meal_id not in pending_meals:
-        await message.answer(SESSION_EXPIRED + ". Отправьте фото заново.")
+        await message.answer(SESSION_EXPIRED_RETRY)
         await state.clear()
         return
     meal = pending_meals[meal_id]
