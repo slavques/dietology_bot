@@ -45,97 +45,6 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
             return "__ERROR__"
 
 
-async def classify_food(photo_path: str) -> Dict[str, Any]:
-    """Determine if the photo contains food and return confidence."""
-    if not client.api_key:
-        return {"is_food": True, "confidence": 1.0}
-    with open(photo_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
-    prompt = (
-        "Определи, есть ли еда на изображении. Ответ только JSON вида "
-        "{is_food, confidence}."
-    )
-    content = await _chat([
-        {"role": "system", "content": prompt},
-        {
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
-            ],
-        },
-    ])
-    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
-        return {"error": content.strip("_").lower()}
-    try:
-        data = json.loads(content)
-        if 'serving' in data:
-            data['serving'] = parse_serving(data['serving'])
-        if 'calories' in data:
-            data['calories'] = to_float(data['calories'])
-        if 'protein' in data:
-            data['protein'] = to_float(data['protein'])
-        if 'fat' in data:
-            data['fat'] = to_float(data['fat'])
-        if 'carbs' in data:
-            data['carbs'] = to_float(data['carbs'])
-        if 'name' in data and isinstance(data['name'], str):
-            data['name'] = data['name'].strip().capitalize()
-        return data
-    except Exception:
-        match = re.search(r"\{.*\}", content, re.S)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                pass
-        return {"error": "parse"}
-
-
-async def recognize_dish(photo_path: str) -> Dict[str, Any]:
-    """Recognize dish name, ingredients and serving from a photo."""
-    if not client.api_key:
-        return {"name": "Пример блюда", "ingredients": ["ингредиент"], "serving": 200}
-    with open(photo_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
-    prompt = (
-        "Определи название блюда на русском и основные ингредиенты. "
-        "Примерный вес порции в граммах. "
-        "Ответ только JSON вида {name, ingredients, serving}."
-    )
-    content = await _chat([
-        {"role": "system", "content": prompt},
-        {
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
-            ],
-        },
-    ])
-    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
-        return {"error": content.strip("_").lower()}
-    try:
-        data = json.loads(content)
-        if 'serving' in data:
-            data['serving'] = parse_serving(data['serving'])
-        if 'calories' in data:
-            data['calories'] = to_float(data['calories'])
-        if 'protein' in data:
-            data['protein'] = to_float(data['protein'])
-        if 'fat' in data:
-            data['fat'] = to_float(data['fat'])
-        if 'carbs' in data:
-            data['carbs'] = to_float(data['carbs'])
-        if 'name' in data and isinstance(data['name'], str):
-            data['name'] = data['name'].strip().capitalize()
-        return data
-    except Exception:
-        match = re.search(r"\{.*\}", content, re.S)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                pass
-        return {"error": "parse"}
 
 
 async def analyze_photo(photo_path: str) -> Dict[str, Any]:
@@ -145,6 +54,7 @@ async def analyze_photo(photo_path: str) -> Dict[str, Any]:
             "is_food": True,
             "confidence": 1.0,
             "name": "Пример блюда",
+            "type": "meal",
             "serving": 200,
             "calories": 250,
             "protein": 15,
@@ -158,10 +68,10 @@ async def analyze_photo(photo_path: str) -> Dict[str, Any]:
         "Определи, есть ли еда на фото. Если еды нет, верни JSON "
         "{\"is_food\": false}. Если еда есть, назови блюдо по-русски с большой буквы, "
         "оцени уверенность распознавания (0-1), укажи примерный вес полной порции "
-        "в граммах целым числом и расчитай калории, белки, жиры и углеводы. "
+        "в граммах целым числом, определи тип — drink или meal, и расчитай калории, белки, жиры и углеводы. "
         "При необходимости используй поиск в интернете для более точной оценки. "
         "Старайся давать схожие результаты при повторном анализе одного и того же блюда. "
-        "Ответ только JSON вида {is_food, confidence, name, serving, calories, protein, fat, carbs}."
+        "Ответ только JSON вида {is_food, confidence, type, name, serving, calories, protein, fat, carbs}."
     )
     content = await _chat(
         [
@@ -181,9 +91,15 @@ async def analyze_photo(photo_path: str) -> Dict[str, Any]:
         return {"error": content.strip("_").lower()}
     try:
         data = json.loads(content)
+        if 'serving' in data:
+            data['serving'] = parse_serving(data['serving'])
         for k in ('calories', 'protein', 'fat', 'carbs'):
             if k in data:
                 data[k] = to_float(data[k])
+        if 'name' in data and isinstance(data['name'], str):
+            data['name'] = data['name'].strip().capitalize()
+        if 'type' in data and isinstance(data['type'], str):
+            data['type'] = data['type'].lower()
         return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
@@ -202,6 +118,7 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
         return {
             "success": True,
             "name": hint,
+            "type": "meal",
             "serving": 200,
             "calories": 250,
             "protein": 15,
@@ -221,10 +138,12 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
         "1. Объедини визуальные данные, предыдущий JSON и уточнение.\n"
         "2. Название пиши по-русски с заглавной буквы.\n"
         "3. Укажи примерный вес порции в граммах (целое число).\n"
-        "4. Рассчитай КБЖУ: calories (ккал), protein, fat, carbs (в граммах).\n"
-        "5. Верни только один JSON:\n"
-        '{"success": true, "name": "<Название>", "serving": <Вес>, "calories": <Ккал>, "protein": <Белки>, "fat": <Жиры>, "carbs": <Углеводы>}\n'
-        "Если в уточнении нет новой информации о блюде/напитке, верни: {\"success\": false}"
+        "4. Определи тип — drink или meal.\n"
+        "5. Рассчитай КБЖУ: calories (ккал), protein, fat, carbs (в граммах).\n"
+        "6. Верни только один JSON:\n"
+        '{"success": true, "type": "drink", "name": "<Название>", "serving": <Вес>, "calories": <Ккал>, "protein": <Белки>, "fat": <Жиры>, "carbs": <Углеводы>}\n'
+        "Если в уточнении нет новой информации о блюде/напитке, верни: {\"success\": false}.\n"
+        "При необходимости используй поиск в интернете для более точной оценки"
     )
     content = await _chat(
         [
@@ -245,7 +164,17 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
-        return json.loads(content)
+        data = json.loads(content)
+        if 'serving' in data:
+            data['serving'] = parse_serving(data['serving'])
+        for k in ('calories', 'protein', 'fat', 'carbs'):
+            if k in data:
+                data[k] = to_float(data[k])
+        if 'name' in data and isinstance(data['name'], str):
+            data['name'] = data['name'].strip().capitalize()
+        if 'type' in data and isinstance(data['type'], str):
+            data['type'] = data['type'].lower()
+        return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
         if match:
@@ -256,27 +185,5 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
         return {"error": "parse"}
 
 
-async def calculate_macros(ingredients: List[str], serving: float) -> Dict[str, float]:
-    """Calculate approximate macros for a dish using GPT-4o."""
-    if not client.api_key:
-        return {"calories": 250, "protein": 20, "fat": 10, "carbs": 30}
-    prompt = (
-        "Рассчитай приблизительные калории, белки, жиры и углеводы для блюда "
-        f"из ингредиентов {', '.join(ingredients)} весом {serving} г. "
-        "Ответ только JSON вида {calories, protein, fat, carbs}."
-    )
-    content = await _chat([{"role": "system", "content": prompt}])
-    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
-        return {"error": content.strip("_").lower()}
-    try:
-        return json.loads(content)
-    except Exception:
-        match = re.search(r"\{.*\}", content, re.S)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                pass
-        return {"calories": 0, "protein": 0, "fat": 0, "carbs": 0}
 
 
