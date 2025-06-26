@@ -32,6 +32,9 @@ from ..texts import (
     BTN_PLAN_1M,
     BTN_PLAN_3M,
     BTN_PLAN_6M,
+    PLAN_TITLE_1M,
+    PLAN_TITLE_3M,
+    PLAN_TITLE_6M,
     INVOICE_LABEL,
     INVOICE_TITLE,
 )
@@ -42,9 +45,9 @@ NOTIFY_CMD = "notify1467"
 
 # map subscription plans to invoice details
 PLAN_MAP = {
-    BTN_PLAN_1M.format(price=PLAN_PRICES['1m']): ("1 месяц", PLAN_PRICES['1m'] * 100, 1),
-    BTN_PLAN_3M.format(price=PLAN_PRICES['3m']): ("3 месяца", PLAN_PRICES['3m'] * 100, 3),
-    BTN_PLAN_6M.format(price=PLAN_PRICES['6m']): ("6 месяцев", PLAN_PRICES['6m'] * 100, 6),
+    BTN_PLAN_1M.format(price=PLAN_PRICES['1m']): (PLAN_TITLE_1M, PLAN_PRICES['1m'] * 100, 1),
+    BTN_PLAN_3M.format(price=PLAN_PRICES['3m']): (PLAN_TITLE_3M, PLAN_PRICES['3m'] * 100, 3),
+    BTN_PLAN_6M.format(price=PLAN_PRICES['6m']): (PLAN_TITLE_6M, PLAN_PRICES['6m'] * 100, 6),
 }
 PLAN_CODES = {
     BTN_PLAN_1M.format(price=PLAN_PRICES['1m']): "1m",

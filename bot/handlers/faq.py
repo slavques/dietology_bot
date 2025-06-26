@@ -1,7 +1,7 @@
 from ..settings import SUPPORT_HANDLE, FAQ_LINK
 from aiogram import types, Dispatcher, F
 from ..keyboards import back_menu_kb
-from ..texts import FAQ_TEXT
+from ..texts import FAQ_TEXT, BTN_FAQ
 
 async def cmd_faq(message: types.Message):
     await message.answer(
@@ -12,4 +12,4 @@ async def cmd_faq(message: types.Message):
 
 
 def register(dp: Dispatcher):
-    dp.message.register(cmd_faq, F.text == "❓ ЧаВО")
+    dp.message.register(cmd_faq, F.text == BTN_FAQ)
