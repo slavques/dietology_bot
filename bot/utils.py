@@ -1,15 +1,16 @@
 from typing import Dict, Any
+from .texts import MEAL_TEMPLATE
 import re
 
 def format_meal_message(name: str, serving: float, macros: Dict[str, float]) -> str:
     """Format meal info using the new template."""
-    return (
-        f"🍽 {name}\n"
-        f"⚖ Вес: {serving} г\n"
-        f"🔥 Калории: {macros['calories']} ккал\n"
-        f"Белки: {macros['protein']} г\n"
-        f"Жиры: {macros['fat']} г\n"
-        f"Углеводы: {macros['carbs']} г"
+    return MEAL_TEMPLATE.format(
+        name=name,
+        serving=serving,
+        calories=macros["calories"],
+        protein=macros["protein"],
+        fat=macros["fat"],
+        carbs=macros["carbs"],
     )
 
 
