@@ -122,6 +122,7 @@ async def process_edit(message: types.Message, state: FSMContext):
     }
     meal.update({
         'name': result.get('name', meal['name']),
+        'type': result.get('type', meal.get('type', 'meal')),
         'serving': serving,
         'orig_serving': serving,
         'macros': macros,
@@ -184,6 +185,7 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         user_id=user.id,
         name=name,
         ingredients=','.join(meal['ingredients']),
+        type=meal.get('type', 'meal'),
         serving=serving,
         calories=macros['calories'],
         protein=macros['protein'],

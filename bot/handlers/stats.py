@@ -3,7 +3,7 @@ from aiogram import types, Dispatcher, F
 from aiogram.filters import Command
 
 from ..database import SessionLocal, Meal, User
-from ..utils import make_bar_chart, is_drink
+from ..utils import make_bar_chart
 from ..keyboards import stats_period_kb, main_menu_kb
 from ..texts import (
     STATS_CHOOSE_PERIOD,
@@ -111,7 +111,7 @@ async def report_day(message: types.Message):
     dishes = []
     drinks = []
     for meal in meals:
-        icon = '🥤' if is_drink(meal.name) else '🍜'
+        icon = '🥤' if getattr(meal, 'type', 'meal') == 'drink' else '🍜'
         line = MEAL_LINE.format(
             icon=icon,
             name=meal.name,
@@ -119,7 +119,7 @@ async def report_day(message: types.Message):
             fat=int(meal.fat),
             carbs=int(meal.carbs),
         )
-        if is_drink(meal.name):
+        if getattr(meal, 'type', 'meal') == 'drink':
             drinks.append(line)
         else:
             dishes.append(line)

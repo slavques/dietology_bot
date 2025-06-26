@@ -53,6 +53,11 @@ def _ensure_columns():
         if "notified_free" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT 0"))
 
+    existing = _column_names("meals")
+    with engine.begin() as conn:
+        if "type" not in existing:
+            conn.execute(text("ALTER TABLE meals ADD COLUMN type TEXT DEFAULT 'meal'"))
+
 
 class User(Base):
     __tablename__ = 'users'
@@ -77,6 +82,7 @@ class Meal(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     name = Column(String)
     ingredients = Column(String)
+    type = Column(String, default='meal')
     serving = Column(Float)
     calories = Column(Float)
     protein = Column(Float)

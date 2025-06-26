@@ -78,6 +78,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
     pending_meals[meal_id] = {
         'name': name,
         'ingredients': ingredients,
+        'type': result.get('type', 'meal'),
         'serving': serving,
         'orig_serving': serving,
         'macros': macros,
