@@ -13,6 +13,8 @@ from .texts import (
     SUB_END_1D,
     SUB_PAUSED,
     FREE_DAY_TEXT,
+    BTN_RENEW_SUB,
+    BTN_REMOVE_LIMIT,
 )
 
 from .database import SessionLocal, User
@@ -145,7 +147,7 @@ async def _daily_check(bot: Bot):
                 text = SUB_END_7D
                 user.notified_7d = True
             if text:
-                kb = subscribe_button("🔄Продлить подписку")
+                kb = subscribe_button(BTN_RENEW_SUB)
                 try:
                     await bot.send_message(user.telegram_id, text, reply_markup=kb)
                 except Exception:
@@ -156,7 +158,7 @@ async def _daily_check(bot: Bot):
                 await bot.send_message(
                     user.telegram_id,
                     FREE_DAY_TEXT,
-                    reply_markup=subscribe_button("⚡Снять ограничение"),
+                    reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
                 )
                 user.notified_free = True
             except Exception:
