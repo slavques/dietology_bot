@@ -27,6 +27,11 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
 The database is stored in `bot.db` in the project root by default. You can change
 this by setting `DATABASE_URL`.
 
+### Logging
+
+Log files are written to `logs/bot.log` by default (configurable via `LOG_DIR`).
+The handler rotates daily and keeps the three most recent log files.
+
 ### Manual database access
 
 The default SQLite database can be inspected and edited directly. Install the
