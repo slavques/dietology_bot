@@ -1,20 +1,15 @@
 from ..settings import SUPPORT_HANDLE, FAQ_LINK
 from aiogram import types, Dispatcher, F
 from ..keyboards import back_menu_kb
-
-FAQ_TEXT = f"""
-❓ Что, как и почему?
-Мы собрали все частые вопросы в одной статье: от распознавания еды до подписки.
-
-👇 Загляни в ЧаВо — там всё просто
-❓<a href="{FAQ_LINK}">ЧаВо</a>
-
-📬 Есть вопросы? Напишите нам: {SUPPORT_HANDLE}
-"""
+from ..texts import FAQ_TEXT, BTN_FAQ
 
 async def cmd_faq(message: types.Message):
-    await message.answer(FAQ_TEXT, reply_markup=back_menu_kb(), parse_mode="HTML")
+    await message.answer(
+        FAQ_TEXT.format(link=FAQ_LINK, support=SUPPORT_HANDLE),
+        reply_markup=back_menu_kb(),
+        parse_mode="HTML",
+    )
 
 
 def register(dp: Dispatcher):
-    dp.message.register(cmd_faq, F.text == "❓ ЧаВО")
+    dp.message.register(cmd_faq, F.text == BTN_FAQ)
