@@ -146,7 +146,8 @@ async def handle_successful_payment(message: types.Message):
     user = ensure_user(session, message.from_user.id)
     process_payment_success(session, user, months)
     session.close()
-    await message.delete()
+    # Don't delete the invoice message here so Telegram can replace it
+    # with the service notification that confirms the payment.
     await message.answer(
         SUB_SUCCESS,
         reply_markup=back_menu_kb(),
