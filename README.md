@@ -11,7 +11,7 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
 2. Create a `.env` file with `BOT_TOKEN` (Telegram token) and optionally
    `OPENAI_API_KEY` for OpenAI integration. These values are loaded in
    `bot/config.py`. You can also set `ADMIN_COMMAND` (default `admin1467`),
-   `DATABASE_URL`, and `YOOKASSA_TOKEN` for payments here. For testing, the
+   `DATABASE_URL` (defaults to `sqlite:///bot.db`), and `YOOKASSA_TOKEN` for payments here. For testing, the
    `SUBSCRIPTION_CHECK_INTERVAL` (in seconds) controls how often subscription
    statuses are checked (default `3600`).
 
@@ -24,8 +24,8 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
    python bot.py
    ```
 
-The database is stored in `bot.db` in the project root by default. You can change
-this by setting `DATABASE_URL`.
+The database is stored in `bot.db` in the project root by default (connection
+string `sqlite:///bot.db`). You can change this by setting `DATABASE_URL`.
 To use PostgreSQL instead of SQLite, install `psycopg2-binary` and set
 `DATABASE_URL` to a PostgreSQL connection string, e.g.
 `postgresql+psycopg2://user:password@host:5432/dbname`.
