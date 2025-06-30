@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Boolean,
     text,  # for raw SQL migrations
+    inspect,
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 
@@ -21,14 +22,18 @@ Base = declarative_base()
 
 def _column_names(table: str) -> set[str]:
     """Return existing column names for given table."""
-
-    with engine.connect() as conn:
-        rows = conn.execute(text(f"PRAGMA table_info({table})")).mappings().all()
-    return {row["name"] for row in rows}
+    inspector = inspect(engine)
+    try:
+        cols = inspector.get_columns(table)
+    except Exception:
+        return set()
+    return {c["name"] for c in cols}
 
 
 def _ensure_columns():
     """Add new columns to old databases if they are missing."""
+    if engine.dialect.name != "sqlite":
+        return
     existing = _column_names("users")
     with engine.begin() as conn:
         if "grade" not in existing:
