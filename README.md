@@ -1,6 +1,6 @@
 # Dietology Bot
 
-Telegram bot for tracking meals and calculating macros. Built with `aiogram` and SQLite using SQLAlchemy.
+Telegram bot for tracking meals and calculating macros. Built with `aiogram` and SQLAlchemy. Uses SQLite by default but also works with PostgreSQL.
 
 ## Setup
 
@@ -26,6 +26,10 @@ Telegram bot for tracking meals and calculating macros. Built with `aiogram` and
 
 The database is stored in `bot.db` in the project root by default. You can change
 this by setting `DATABASE_URL`.
+To use PostgreSQL instead of SQLite, install `psycopg2-binary` and set
+`DATABASE_URL` to a PostgreSQL connection string, e.g.
+`postgresql+psycopg2://user:password@host:5432/dbname`.
+
 
 ### Logging
 
