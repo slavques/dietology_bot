@@ -13,7 +13,7 @@ from .utils import parse_serving, to_float
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 # Use GPT‑4o with optional web search capability
-MODEL_NAME = "gpt-4o"
+MODEL_NAME = "gpt-4o-mini"
 
 
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
