@@ -12,6 +12,7 @@ from .config import OPENAI_API_KEY
 from .utils import parse_serving, to_float
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+MODEL_NAME = "gpt-4o-mini"
 
 
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
@@ -26,10 +27,17 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
     for attempt in range(retries):
         try:
             resp = await client.chat.completions.create(
-                model="gpt-4o",
+                model=MODEL_NAME,
                 messages=messages,
                 max_tokens=200,
                 temperature=0.2,
+                tools=[
+                    {
+                        "type": "web_search_preview",
+                        "user_location": {"type": "approximate", "timezone": "Europe/Moscow"},
+                        "search_context_size": "high",
+                    }
+                ],
             )
             content = resp.choices[0].message.content
             logging.info("OpenAI response: %s", content)
@@ -64,14 +72,14 @@ async def analyze_photo(photo_path: str) -> Dict[str, Any]:
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     prompt = (
-        "Ты диетолог/нутрициолог. "
-        "Определи, есть ли еда на фото. Если еды нет, верни JSON "
-        "{\"is_food\": false}. Если еда есть, назови блюдо по-русски с большой буквы, "
-        "оцени уверенность распознавания (0-1), укажи примерный вес полной порции "
-        "в граммах целым числом, определи тип — drink или meal, и расчитай калории, белки, жиры и углеводы. "
-        "При необходимости используй поиск в интернете для более точной оценки. "
-        "Старайся давать схожие результаты при повторном анализе одного и того же блюда. "
-        "Ответ только JSON вида {is_food, confidence, type, name, serving, calories, protein, fat, carbs}."
+        "Ты — профессиональный диетолог/нутрициолог с большим опытом. Тебе придёт изображение, и твоя задача:\n\n"
+        "Определи, есть ли на фото готовая еда или напиток.\n"
+        "• Если нет — верни {\"is_food\": false}.\n\n"
+        "Если на фото товар в заводской упаковке (банка, бутылка, контейнер и т. п.) — найди этот продукт в русскоязычной базе FatSecret (site:fatsecret.ru) и возьми оттуда массу нетто и КБЖУ на всю порцию.\n\n"
+        "Если на фото напиток или приготовленное блюдо — оцени визуально примерный вес порции в граммах и рассчитай КБЖУ.\n\n"
+        "Оцени уверенность распознавания от 0.0 до 1.0. Тип определи drink (напитки, жидкости) это или meal (еда, блюда). Название пиши на русском языке с большой буквы\n\n"
+        "Ответь только одним JSON:\n"
+        '{"is_food":, "confidence":, "type":, "name": "", "serving":, "calories":, "protein":, "fat":, "carbs":}'
     )
     content = await _chat(
         [
@@ -129,21 +137,20 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
         b64 = base64.b64encode(f.read()).decode()
     prev_json = json.dumps(prev or {}, ensure_ascii=False)
     prompt = (
-        "Ты — ассистент-диетолог с поддержкой анализа изображений. "
-        "Тебе придут три элемента:\n"
-        "1) фото блюда или напитка,\n"
-        "2) предыдущий JSON-анализ,\n"
-        "3) уточнение пользователя.\n\n"
-        "Инструкции:\n"
-        "1. Объедини визуальные данные, предыдущий JSON и уточнение.\n"
-        "2. Название пиши по-русски с заглавной буквы.\n"
-        "3. Укажи примерный вес порции в граммах (целое число).\n"
-        "4. Определи тип — drink или meal.\n"
-        "5. Рассчитай КБЖУ: calories (ккал), protein, fat, carbs (в граммах).\n"
-        "6. Верни только один JSON:\n"
-        '{"success": true, "type": "drink", "name": "<Название>", "serving": <Вес>, "calories": <Ккал>, "protein": <Белки>, "fat": <Жиры>, "carbs": <Углеводы>}\n'
-        "Если в уточнении нет новой информации о блюде/напитке, верни: {\"success\": false}.\n"
-        "При необходимости используй поиск в интернете для более точной оценки"
+        "Ты — профессиональный диетолог/нутрициолог. Ранее ты проанализировал фото и вернул JSON:\n"
+        f"{prev_json}\n"
+        f"Теперь пользователь прислал уточнение: «{hint}».\n\n"
+        "Твоя задача:\n"
+        "1. Игнорируй любые упоминания о технических деталях — только визуальный контекст и текст.\n"
+        "2. Если уточнение меняет название блюда/напитка — обнови `name` (по-русски, с заглавной буквы).\n"
+        "3. Если просят поменять вес, то просто обнови `serving` без перерасчета кбжу. А если просят поменять вес и сделать перерасчет явно, то делай полный перерасчет.\n"
+        "4. Если уточнение добавляет или уточняет ингредиенты или указывает на заводскую упаковку — скорректируй `type` и возьми массу нетто из FatSecret (для упакованного товара).\n"
+        "5. Пересчитай с точностью до десятых `calories`, `protein`, `fat`, `carbs`.\n"
+        "6. Оцени новую `confidence` (0.0–1.0).\n"
+        "7. Верни только один JSON:\n"
+        '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}\n'
+        "8. Если в уточнении нет никакой новой информации, верни:\n"
+        '{"success": false}'
     )
     content = await _chat(
         [
@@ -157,8 +164,6 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
                     }
                 ],
             },
-            {"role": "user", "content": "Previous analysis:\n" + prev_json},
-            {"role": "user", "content": "User clarification:\n" + hint},
         ]
     )
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
