@@ -12,7 +12,7 @@ from .config import OPENAI_API_KEY
 from .utils import parse_serving, to_float
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-# Use GPT‑4o with optional web search capability
+# Use GPT‑4o‑mini with built‑in web search
 MODEL_NAME = "gpt-4o-mini"
 
 
@@ -27,22 +27,32 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
         pass
     for attempt in range(retries):
         try:
-            resp = await client.chat.completions.create(
+            resp = await client.responses.create(
                 model=MODEL_NAME,
-                messages=messages,
-                max_tokens=200,
+                input=messages,
+                text={"format": {"type": "text"}},
+                reasoning={},
+                max_output_tokens=200,
                 temperature=0.2,
-                response_format={"type": "json_object"},
                 tools=[
                     {
-                        "type": "web_search",
+                        "type": "web_search_preview",
                         "user_location": {"type": "approximate", "timezone": "Europe/Moscow"},
                         "search_context_size": "high",
                     }
                 ],
                 tool_choice="auto",
+                top_p=1,
+                store=False,
             )
-            content = resp.choices[0].message.content
+            # Extract plain text from the response output
+            parts = []
+            for item in resp.output:
+                if getattr(item, "type", "") == "message":
+                    for c in getattr(item, "content", []):
+                        if getattr(c, "type", "") in {"output_text", "text"}:
+                            parts.append(getattr(c, "text", ""))
+            content = "".join(parts)
             logging.info("OpenAI response: %s", content)
             return content
         except RateLimitError:
