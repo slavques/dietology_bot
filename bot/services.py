@@ -12,6 +12,7 @@ from .config import OPENAI_API_KEY
 from .utils import parse_serving, to_float
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+# Use GPT‑4o with optional web search capability
 MODEL_NAME = "gpt-4o-mini"
 
 
@@ -31,13 +32,15 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
                 messages=messages,
                 max_tokens=200,
                 temperature=0.2,
+                response_format={"type": "json_object"},
                 tools=[
                     {
-                        "type": "web_search_preview",
+                        "type": "web_search",
                         "user_location": {"type": "approximate", "timezone": "Europe/Moscow"},
                         "search_context_size": "high",
                     }
                 ],
+                tool_choice="auto",
             )
             content = resp.choices[0].message.content
             logging.info("OpenAI response: %s", content)
