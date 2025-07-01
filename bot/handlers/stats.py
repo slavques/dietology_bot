@@ -4,7 +4,7 @@ from aiogram.filters import Command
 
 from ..database import SessionLocal, Meal, User
 from ..utils import make_bar_chart
-from ..keyboards import stats_period_kb, main_menu_kb
+from ..keyboards import stats_period_kb, main_menu_kb, stats_menu_kb
 from ..texts import (
     STATS_CHOOSE_PERIOD,
     STATS_NO_DATA,
@@ -20,7 +20,13 @@ from ..texts import (
     REPORT_MEALS_TITLE,
     MEAL_LINE,
     BTN_REPORT_DAY,
+    BTN_STATS,
+    STATS_MENU_TEXT,
+    BTN_BACK,
 )
+
+async def show_stats_menu(message: types.Message):
+    await message.answer(STATS_MENU_TEXT, reply_markup=stats_menu_kb())
 
 async def cmd_stats(message: types.Message):
     await message.answer(
@@ -134,5 +140,6 @@ async def report_day(message: types.Message):
 
 def register(dp: Dispatcher):
     dp.message.register(cmd_stats, Command('stats'))
+    dp.message.register(show_stats_menu, F.text == BTN_STATS)
     dp.message.register(report_day, F.text == BTN_REPORT_DAY)
     dp.callback_query.register(cb_stats, F.data.startswith('stats:'))

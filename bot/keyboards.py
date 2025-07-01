@@ -19,6 +19,7 @@ from .texts import (
     BTN_MONTH,
     BTN_REPORT_DAY,
     BTN_MY_MEALS,
+    BTN_STATS,
     BTN_SUBSCRIPTION,
     BTN_FAQ,
     BTN_MAIN_MENU,
@@ -91,12 +92,23 @@ def stats_period_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def main_menu_kb() -> ReplyKeyboardMarkup:
-    """Main menu with four actions arranged vertically."""
+def stats_menu_kb() -> ReplyKeyboardMarkup:
+    """Keyboard with stats actions."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BTN_REPORT_DAY)],
             [KeyboardButton(text=BTN_MY_MEALS)],
+            [KeyboardButton(text=BTN_BACK)],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def main_menu_kb() -> ReplyKeyboardMarkup:
+    """Main menu with four actions arranged vertically."""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_STATS)],
             [KeyboardButton(text=BTN_SUBSCRIPTION)],
             [KeyboardButton(text=BTN_FAQ)],
         ],
