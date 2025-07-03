@@ -85,6 +85,9 @@ def history_nav_kb(offset: int, include_back: bool = False) -> InlineKeyboardMar
         builder.adjust(count, 1)
     else:
         builder.adjust(count)
+    if include_back:
+        builder.button(text=BTN_BACK, callback_data="stats_menu")
+        builder.adjust(1)
     return builder.as_markup()
 
 
@@ -123,7 +126,6 @@ def main_menu_kb() -> ReplyKeyboardMarkup:
 def back_menu_kb() -> ReplyKeyboardMarkup:
     """Same as main_menu_kb for backward compatibility."""
     return main_menu_kb()
-
 
 def pay_kb(code: Optional[str] = None, include_back: bool = False) -> InlineKeyboardMarkup:
     """Inline keyboard with a payment button and optional back."""

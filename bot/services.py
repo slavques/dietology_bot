@@ -12,8 +12,8 @@ from .config import OPENAI_API_KEY
 from .utils import parse_serving, to_float
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-# Use GPT‑4o‑mini with built‑in web search
-MODEL_NAME = "gpt-4o-mini"
+# Use the standard GPT‑4o model
+MODEL_NAME = "gpt-4o"
 
 
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
@@ -27,32 +27,13 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
         pass
     for attempt in range(retries):
         try:
-            resp = await client.responses.create(
+            resp = await client.chat.completions.create(
                 model=MODEL_NAME,
-                input=messages,
-                text={"format": {"type": "text"}},
-                reasoning={},
-                max_output_tokens=200,
+                messages=messages,
+                max_tokens=200,
                 temperature=0.2,
-                tools=[
-                    {
-                        "type": "web_search_preview",
-                        "user_location": {"type": "approximate", "timezone": "Europe/Moscow"},
-                        "search_context_size": "high",
-                    }
-                ],
-                tool_choice="auto",
-                top_p=1,
-                store=False,
             )
-            # Extract plain text from the response output
-            parts = []
-            for item in resp.output:
-                if getattr(item, "type", "") == "message":
-                    for c in getattr(item, "content", []):
-                        if getattr(c, "type", "") in {"output_text", "text"}:
-                            parts.append(getattr(c, "text", ""))
-            content = "".join(parts)
+            content = resp.choices[0].message.content
             logging.info("OpenAI response: %s", content)
             return content
         except RateLimitError:
