@@ -23,6 +23,8 @@ from .texts import (
     BTN_SUBSCRIPTION,
     BTN_FAQ,
     BTN_MAIN_MENU,
+    BTN_LEFT_HISTORY,
+    BTN_RIGHT_HISTORY,
     BTN_PAY,
     BTN_BACK_TEXT,
     BTN_BANK_CARD,

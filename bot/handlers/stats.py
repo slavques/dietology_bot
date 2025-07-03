@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from aiogram import types, Dispatcher, F
 from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..database import SessionLocal, Meal, User
 from ..utils import make_bar_chart
@@ -153,7 +154,11 @@ async def cb_report_day(query: types.CallbackQuery):
     new_text = "\n".join(lines)
     if query.message.text != new_text:
         await query.message.edit_text(new_text)
-    await query.message.edit_reply_markup(reply_markup=stats_menu_inline_kb())
+    # Show only a back button leading to the stats menu
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data="stats_menu")
+    builder.adjust(1)
+    await query.message.edit_reply_markup(reply_markup=builder.as_markup())
     await query.answer()
 
 
