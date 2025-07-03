@@ -13,7 +13,7 @@ from .utils import parse_serving, to_float
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 # Use GPT‑4o‑mini with built‑in web search
-MODEL_NAME = "gpt-4o-mini"
+MODEL_NAME = "gpt-4o"
 
 
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
@@ -30,18 +30,22 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
             resp = await client.responses.create(
                 model=MODEL_NAME,
                 input=messages,
-                text={"format": {"type": "text"}},
+                text={"format": {"type": "json_object"}},
                 reasoning={},
-                max_output_tokens=200,
-                temperature=0.2,
                 tools=[
                     {
                         "type": "web_search_preview",
-                        "user_location": {"type": "approximate", "timezone": "Europe/Moscow"},
-                        "search_context_size": "high",
+                        "user_location": {
+                            "type": "approximate",
+                            "country": "RU",
+                            "region": "Moscow",
+                            "city": "Moscow",
+                        },
+                        "search_context_size": "medium",
                     }
                 ],
-                tool_choice="auto",
+                temperature=0.2,
+                max_output_tokens=200,
                 top_p=1,
                 store=False,
             )
