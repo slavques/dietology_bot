@@ -7,6 +7,7 @@ from ..keyboards import main_menu_kb
 from ..texts import (
     WELCOME_BASE,
     BTN_MAIN_MENU,
+    BTN_BACK,
     REMAINING_FREE,
     REMAINING_DAYS,
 )
@@ -48,5 +49,5 @@ def register(dp: Dispatcher):
     dp.message.register(cmd_start, Command('start'))
     dp.message.register(
         back_to_menu,
-        lambda m: m.text == BTN_MAIN_MENU,
+        lambda m: m.text in {BTN_MAIN_MENU, BTN_BACK},
     )
