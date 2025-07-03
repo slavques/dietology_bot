@@ -124,7 +124,6 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
     """Same as main_menu_kb for backward compatibility."""
     return main_menu_kb()
 
-
 def pay_kb(code: Optional[str] = None, include_back: bool = False) -> InlineKeyboardMarkup:
     """Inline keyboard with a payment button and optional back."""
     builder = InlineKeyboardBuilder()
@@ -197,6 +196,13 @@ def stats_menu_inline_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def back_inline_kb() -> InlineKeyboardMarkup:
+    """Single back button leading to the main menu."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data="menu")
+    builder.adjust(1)
+    return builder.as_markup()
+  
 def subscription_plans_inline_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_PLAN_1M.format(price=PLAN_PRICES['1m']), callback_data="plan:1m")

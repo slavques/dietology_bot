@@ -3,7 +3,7 @@ from aiogram.filters import Command
 
 from ..database import SessionLocal, User
 from ..subscriptions import ensure_user, days_left, update_limits
-from ..keyboards import main_menu_kb, menu_inline_kb
+from ..keyboards import main_menu_kb, menu_inline_kb, back_inline_kb
 from ..texts import (
     WELCOME_BASE,
     BTN_MAIN_MENU,
@@ -34,11 +34,8 @@ async def cmd_start(message: types.Message):
     session.commit()
     session.close()
     # Send a temporary message to update the persistent reply keyboard
-    tmp = await message.answer("\u2060", reply_markup=main_menu_kb())
-    # Main welcome message with inline menu
+    await message.answer("\u2060", reply_markup=main_menu_kb())
     await message.answer(text, reply_markup=menu_inline_kb())
-    # Remove the helper message so only the welcome text remains
-    await tmp.delete()
 
 
 async def back_to_menu(message: types.Message):
@@ -48,9 +45,8 @@ async def back_to_menu(message: types.Message):
     text = get_welcome_text(user)
     session.commit()
     session.close()
-    tmp = await message.answer("\u2060", reply_markup=main_menu_kb())
+    await message.answer("\u2060", reply_markup=main_menu_kb())
     await message.answer(text, reply_markup=menu_inline_kb())
-    await tmp.delete()
 
 
 async def cb_menu(query: types.CallbackQuery):
@@ -66,13 +62,13 @@ async def cb_menu(query: types.CallbackQuery):
 
 async def cb_manual(query: types.CallbackQuery):
     await query.message.edit_text(DEV_FEATURE)
-    await query.message.edit_reply_markup(reply_markup=menu_inline_kb())
+    await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await query.answer()
 
 
 async def cb_settings(query: types.CallbackQuery):
     await query.message.edit_text(DEV_FEATURE)
-    await query.message.edit_reply_markup(reply_markup=menu_inline_kb())
+    await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await query.answer()
 
 

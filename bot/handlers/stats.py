@@ -12,7 +12,7 @@ from ..keyboards import (
     menu_inline_kb,
     history_nav_kb,
 )
-from .history import send_history
+from .history import build_history_text
 from ..texts import (
     STATS_CHOOSE_PERIOD,
     STATS_NO_DATA,
@@ -220,14 +220,9 @@ async def report_day(message: types.Message):
 
 
 async def cb_my_meals(query: types.CallbackQuery):
-    await query.message.delete()
-    await send_history(
-        query.bot,
-        query.from_user.id,
-        query.message.chat.id,
-        0,
-        header=True,
-    )
+    text, markup = build_history_text(query.from_user.id, 0, header=True)
+    await query.message.edit_text(text)
+    await query.message.edit_reply_markup(reply_markup=markup)
     await query.answer()
 
 
