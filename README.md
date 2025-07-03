@@ -1,7 +1,7 @@
 # Dietology Bot
 
 Telegram bot for tracking meals and calculating macros. Built with `aiogram` and SQLAlchemy. Uses SQLite by default but also works with PostgreSQL.
-The bot relies on OpenAI's `gpt-4o-mini` model with the web search tool for more accurate food recognition.
+The bot relies on OpenAI's `gpt-4o` model for food recognition.
 
 ## Setup
 
