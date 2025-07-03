@@ -1,15 +1,16 @@
-from aiogram import types, Dispatcher
+from aiogram import types, Dispatcher, F
 from aiogram.filters import Command
 
 from ..database import SessionLocal, User
 from ..subscriptions import ensure_user, days_left, update_limits
-from ..keyboards import main_menu_kb
+from ..keyboards import main_menu_kb, menu_inline_kb
 from ..texts import (
     WELCOME_BASE,
     BTN_MAIN_MENU,
     BTN_BACK,
     REMAINING_FREE,
     REMAINING_DAYS,
+    DEV_FEATURE,
 )
 
 
@@ -32,7 +33,8 @@ async def cmd_start(message: types.Message):
     text = get_welcome_text(user)
     session.commit()
     session.close()
-    await message.answer(text, reply_markup=main_menu_kb())
+    msg = await message.answer(text, reply_markup=main_menu_kb())
+    await msg.edit_reply_markup(menu_inline_kb())
 
 
 async def back_to_menu(message: types.Message):
@@ -42,7 +44,31 @@ async def back_to_menu(message: types.Message):
     text = get_welcome_text(user)
     session.commit()
     session.close()
-    await message.answer(text, reply_markup=main_menu_kb())
+    msg = await message.answer(text, reply_markup=main_menu_kb())
+    await msg.edit_reply_markup(menu_inline_kb())
+
+
+async def cb_menu(query: types.CallbackQuery):
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    text = get_welcome_text(user)
+    session.commit()
+    session.close()
+    await query.message.edit_text(text)
+    await query.message.edit_reply_markup(menu_inline_kb())
+    await query.answer()
+
+
+async def cb_manual(query: types.CallbackQuery):
+    await query.message.edit_text(DEV_FEATURE)
+    await query.message.edit_reply_markup(menu_inline_kb())
+    await query.answer()
+
+
+async def cb_settings(query: types.CallbackQuery):
+    await query.message.edit_text(DEV_FEATURE)
+    await query.message.edit_reply_markup(menu_inline_kb())
+    await query.answer()
 
 
 def register(dp: Dispatcher):
@@ -51,3 +77,6 @@ def register(dp: Dispatcher):
         back_to_menu,
         lambda m: m.text in {BTN_MAIN_MENU, BTN_BACK},
     )
+    dp.callback_query.register(cb_menu, F.data == "menu")
+    dp.callback_query.register(cb_manual, F.data == "manual")
+    dp.callback_query.register(cb_settings, F.data == "settings")
