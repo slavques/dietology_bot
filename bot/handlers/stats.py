@@ -4,7 +4,15 @@ from aiogram.filters import Command
 
 from ..database import SessionLocal, Meal, User
 from ..utils import make_bar_chart
-from ..keyboards import stats_period_kb, main_menu_kb, stats_menu_kb
+from ..keyboards import (
+    stats_period_kb,
+    main_menu_kb,
+    stats_menu_kb,  # kept for legacy
+    stats_menu_inline_kb,
+    menu_inline_kb,
+    history_nav_kb,
+)
+from .history import send_history
 from ..texts import (
     STATS_CHOOSE_PERIOD,
     STATS_NO_DATA,
@@ -22,11 +30,18 @@ from ..texts import (
     BTN_REPORT_DAY,
     BTN_STATS,
     STATS_MENU_TEXT,
+    STATS_MENU_SHORT,
     BTN_BACK,
 )
 
 async def show_stats_menu(message: types.Message):
     await message.answer(STATS_MENU_TEXT, reply_markup=stats_menu_kb())
+
+
+async def cb_stats_menu(query: types.CallbackQuery):
+    await query.message.edit_text(STATS_MENU_SHORT)
+    await query.message.edit_reply_markup(reply_markup=stats_menu_inline_kb())
+    await query.answer()
 
 async def cmd_stats(message: types.Message):
     await message.answer(
@@ -68,6 +83,72 @@ async def cb_stats(query: types.CallbackQuery):
         chart=make_bar_chart(totals),
     )
     await query.message.edit_text(text)
+    await query.answer()
+
+
+async def cb_report_day(query: types.CallbackQuery):
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=query.from_user.id).first()
+    if not user:
+        await query.message.edit_text(STATS_NO_DATA)
+        await query.answer()
+        session.close()
+        return
+    start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+    meals = (
+        session.query(Meal)
+        .filter(Meal.user_id == user.id, Meal.timestamp >= start, Meal.timestamp < end)
+        .order_by(Meal.timestamp)
+        .all()
+    )
+    session.close()
+    if not meals:
+        await query.message.edit_text(REPORT_EMPTY)
+        await query.answer()
+        return
+
+    totals = {"calories": 0.0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
+    for m in meals:
+        totals["calories"] += m.calories
+        totals["protein"] += m.protein
+        totals["fat"] += m.fat
+        totals["carbs"] += m.carbs
+
+    lines = [
+        REPORT_HEADER,
+        "",
+        REPORT_TOTAL,
+        REPORT_LINE_CAL.format(cal=int(totals['calories'])),
+        REPORT_LINE_P.format(protein=int(totals['protein'])),
+        REPORT_LINE_F.format(fat=int(totals['fat'])),
+        REPORT_LINE_C.format(carbs=int(totals['carbs'])),
+        "",
+        REPORT_MEALS_TITLE,
+    ]
+
+    dishes = []
+    drinks = []
+    for meal in meals:
+        icon = '🥤' if getattr(meal, 'type', 'meal') == 'drink' else '🍜'
+        line = MEAL_LINE.format(
+            icon=icon,
+            name=meal.name,
+            protein=int(meal.protein),
+            fat=int(meal.fat),
+            carbs=int(meal.carbs),
+        )
+        if getattr(meal, 'type', 'meal') == 'drink':
+            drinks.append(line)
+        else:
+            dishes.append(line)
+
+    lines.extend(dishes)
+    if drinks:
+        lines.append("")
+        lines.extend(drinks)
+
+    await query.message.edit_text("\n".join(lines), reply_markup=stats_menu_inline_kb())
     await query.answer()
 
 
@@ -138,8 +219,23 @@ async def report_day(message: types.Message):
     await message.answer("\n".join(lines), reply_markup=main_menu_kb())
 
 
+async def cb_my_meals(query: types.CallbackQuery):
+    await query.message.delete()
+    await send_history(
+        query.bot,
+        query.from_user.id,
+        query.message.chat.id,
+        0,
+        header=True,
+    )
+    await query.answer()
+
+
 def register(dp: Dispatcher):
     dp.message.register(cmd_stats, Command('stats'))
     dp.message.register(show_stats_menu, F.text == BTN_STATS)
     dp.message.register(report_day, F.text == BTN_REPORT_DAY)
+    dp.callback_query.register(cb_stats_menu, F.data == 'stats_menu')
+    dp.callback_query.register(cb_report_day, F.data == 'report_day')
+    dp.callback_query.register(cb_my_meals, F.data == 'my_meals')
     dp.callback_query.register(cb_stats, F.data.startswith('stats:'))
