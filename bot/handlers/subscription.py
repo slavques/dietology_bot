@@ -88,7 +88,7 @@ async def show_subscription_menu(message: types.Message):
 
 async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
     await query.message.edit_text(INTRO_TEXT)
-    await query.message.edit_reply_markup(subscription_plans_inline_kb())
+    await query.message.edit_reply_markup(reply_markup=subscription_plans_inline_kb())
     await state.clear()
     await query.answer()
 
@@ -140,7 +140,7 @@ async def cb_method_back(query: types.CallbackQuery):
 
 async def cb_sub_plans(query: types.CallbackQuery):
     await query.message.edit_text(INTRO_TEXT)
-    await query.message.edit_reply_markup(subscription_plans_inline_kb())
+    await query.message.edit_reply_markup(reply_markup=subscription_plans_inline_kb())
     await query.answer()
 
 async def cmd_success(message: types.Message):

@@ -34,7 +34,7 @@ async def cmd_start(message: types.Message):
     session.commit()
     session.close()
     msg = await message.answer(text, reply_markup=main_menu_kb())
-    await msg.edit_reply_markup(menu_inline_kb())
+    await msg.edit_reply_markup(reply_markup=menu_inline_kb())
 
 
 async def back_to_menu(message: types.Message):
@@ -45,7 +45,7 @@ async def back_to_menu(message: types.Message):
     session.commit()
     session.close()
     msg = await message.answer(text, reply_markup=main_menu_kb())
-    await msg.edit_reply_markup(menu_inline_kb())
+    await msg.edit_reply_markup(reply_markup=menu_inline_kb())
 
 
 async def cb_menu(query: types.CallbackQuery):
@@ -55,19 +55,19 @@ async def cb_menu(query: types.CallbackQuery):
     session.commit()
     session.close()
     await query.message.edit_text(text)
-    await query.message.edit_reply_markup(menu_inline_kb())
+    await query.message.edit_reply_markup(reply_markup=menu_inline_kb())
     await query.answer()
 
 
 async def cb_manual(query: types.CallbackQuery):
     await query.message.edit_text(DEV_FEATURE)
-    await query.message.edit_reply_markup(menu_inline_kb())
+    await query.message.edit_reply_markup(reply_markup=menu_inline_kb())
     await query.answer()
 
 
 async def cb_settings(query: types.CallbackQuery):
     await query.message.edit_text(DEV_FEATURE)
-    await query.message.edit_reply_markup(menu_inline_kb())
+    await query.message.edit_reply_markup(reply_markup=menu_inline_kb())
     await query.answer()
 
 

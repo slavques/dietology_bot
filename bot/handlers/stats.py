@@ -40,7 +40,7 @@ async def show_stats_menu(message: types.Message):
 
 async def cb_stats_menu(query: types.CallbackQuery):
     await query.message.edit_text(STATS_MENU_SHORT)
-    await query.message.edit_reply_markup(stats_menu_inline_kb())
+    await query.message.edit_reply_markup(reply_markup=stats_menu_inline_kb())
     await query.answer()
 
 async def cmd_stats(message: types.Message):
