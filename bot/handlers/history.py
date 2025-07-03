@@ -31,7 +31,7 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
             text_lines.append(HISTORY_DAY_HEADER.format(day=day.day, month=month))
             text_lines.append(HISTORY_NO_MEALS)
             text_lines.append("")
-        await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=history_nav_kb(offset, 1))
+        await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=history_nav_kb(offset, 1, include_back=True))
         session.close()
         return
     
@@ -70,14 +70,8 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
             ]
         )
     session.close()
-    builder = InlineKeyboardBuilder()
-    count = 1
-    builder.button(text=BTN_LEFT_HISTORY, callback_data=f"hist:{offset+1}")
-    if offset > 0:
-        builder.button(text=BTN_RIGHT_HISTORY, callback_data=f"hist:{offset-1}")
-        count += 1
-    builder.adjust(count)
-    await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=builder.as_markup())
+    builder = history_nav_kb(offset, 1, include_back=True)
+    await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=builder)
 
 async def cmd_history(message: types.Message):
     await send_history(
