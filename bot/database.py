@@ -3,6 +3,7 @@ from sqlalchemy import (
     create_engine,
     Column,
     Integer,
+    BigInteger,
     String,
     Float,
     DateTime,
@@ -67,7 +68,7 @@ def _ensure_columns():
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
-    telegram_id = Column(Integer, unique=True, index=True)
+    telegram_id = Column(BigInteger, unique=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     grade = Column(String, default='free')  # 'free' or 'paid'
     request_limit = Column(Integer, default=20)
