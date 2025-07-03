@@ -31,7 +31,7 @@ def build_history_text(user_id: int, offset: int, header: bool = False):
             text_lines.append(HISTORY_DAY_HEADER.format(day=day.day, month=month))
             text_lines.append(HISTORY_NO_MEALS)
             text_lines.append("")
-        markup = history_nav_kb(offset, 1, include_back=True)
+        markup = history_nav_kb(offset, include_back=True)
         session.close()
         return "\n".join(text_lines), markup
     
@@ -70,7 +70,7 @@ def build_history_text(user_id: int, offset: int, header: bool = False):
             ]
         )
     session.close()
-    markup = history_nav_kb(offset, 1, include_back=True)
+    markup = history_nav_kb(offset, include_back=True)
     return "\n".join(text_lines), markup
 
 

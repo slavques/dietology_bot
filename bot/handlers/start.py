@@ -34,7 +34,8 @@ async def cmd_start(message: types.Message):
     session.commit()
     session.close()
     # Send a temporary message to update the persistent reply keyboard
-    await message.answer("\u2060", reply_markup=main_menu_kb())
+    temp = await message.answer("\u2060", reply_markup=main_menu_kb())
+    await temp.delete()
     await message.answer(text, reply_markup=menu_inline_kb())
 
 
@@ -45,7 +46,8 @@ async def back_to_menu(message: types.Message):
     text = get_welcome_text(user)
     session.commit()
     session.close()
-    await message.answer("\u2060", reply_markup=main_menu_kb())
+    temp = await message.answer("\u2060", reply_markup=main_menu_kb())
+    await temp.delete()
     await message.answer(text, reply_markup=menu_inline_kb())
 
 

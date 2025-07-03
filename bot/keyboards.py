@@ -71,16 +71,17 @@ def confirm_save_kb(meal_id: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def history_nav_kb(offset: int, total: int, include_back: bool = False) -> InlineKeyboardMarkup:
+def history_nav_kb(offset: int, include_back: bool = False) -> InlineKeyboardMarkup:
+    """Navigation keyboard for history with optional back button."""
     builder = InlineKeyboardBuilder()
-    count = 0
+    builder.button(text=BTN_LEFT_HISTORY, callback_data=f"hist:{offset+1}")
     if offset > 0:
-        builder.button(text=BTN_LEFT_HISTORY, callback_data=f"hist:{offset+1}")
-        count += 1
-    if offset < total - 1:
         builder.button(text=BTN_RIGHT_HISTORY, callback_data=f"hist:{offset-1}")
-        count += 1
-    if count:
+    count = 2 if offset > 0 else 1
+    if include_back:
+        builder.button(text=BTN_BACK, callback_data="stats_menu")
+        builder.adjust(count, 1)
+    else:
         builder.adjust(count)
     if include_back:
         builder.button(text=BTN_BACK, callback_data="stats_menu")
@@ -202,7 +203,8 @@ def back_inline_kb() -> InlineKeyboardMarkup:
     builder.button(text=BTN_BACK, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()
-  
+
+
 def subscription_plans_inline_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_PLAN_1M.format(price=PLAN_PRICES['1m']), callback_data="plan:1m")

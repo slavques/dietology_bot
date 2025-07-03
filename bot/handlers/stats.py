@@ -104,7 +104,9 @@ async def cb_report_day(query: types.CallbackQuery):
     )
     session.close()
     if not meals:
-        await query.message.edit_text(REPORT_EMPTY)
+        new_text = REPORT_EMPTY
+        if query.message.text != new_text:
+            await query.message.edit_text(new_text)
         await query.answer()
         return
 
@@ -148,7 +150,10 @@ async def cb_report_day(query: types.CallbackQuery):
         lines.append("")
         lines.extend(drinks)
 
-    await query.message.edit_text("\n".join(lines), reply_markup=stats_menu_inline_kb())
+    new_text = "\n".join(lines)
+    if query.message.text != new_text:
+        await query.message.edit_text(new_text)
+    await query.message.edit_reply_markup(reply_markup=stats_menu_inline_kb())
     await query.answer()
 
 
