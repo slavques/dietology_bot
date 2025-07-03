@@ -19,8 +19,8 @@ from ..texts import (
     BTN_MY_MEALS,
 )
 
-async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header: bool = False):
-    """Send totals for two days starting from offset."""
+def build_history_text(user_id: int, offset: int, header: bool = False):
+    """Prepare history text and navigation keyboard."""
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=user_id).first()
     text_lines = [HISTORY_HEADER, ""] if header else []
@@ -31,9 +31,9 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
             text_lines.append(HISTORY_DAY_HEADER.format(day=day.day, month=month))
             text_lines.append(HISTORY_NO_MEALS)
             text_lines.append("")
-        await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=history_nav_kb(offset, 1))
+        markup = history_nav_kb(offset, 1, include_back=True)
         session.close()
-        return
+        return "\n".join(text_lines), markup
     
     if not header:
         text_lines = []
@@ -70,14 +70,13 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
             ]
         )
     session.close()
-    builder = InlineKeyboardBuilder()
-    count = 1
-    builder.button(text=BTN_LEFT_HISTORY, callback_data=f"hist:{offset+1}")
-    if offset > 0:
-        builder.button(text=BTN_RIGHT_HISTORY, callback_data=f"hist:{offset-1}")
-        count += 1
-    builder.adjust(count)
-    await bot.send_message(chat_id, "\n".join(text_lines), reply_markup=builder.as_markup())
+    markup = history_nav_kb(offset, 1, include_back=True)
+    return "\n".join(text_lines), markup
+
+
+async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header: bool = False):
+    text, markup = build_history_text(user_id, offset, header)
+    await bot.send_message(chat_id, text, reply_markup=markup)
 
 async def cmd_history(message: types.Message):
     await send_history(
@@ -90,8 +89,9 @@ async def cmd_history(message: types.Message):
 
 async def cb_history(query: types.CallbackQuery):
     offset = int(query.data.split(':', 1)[1])
-    await query.message.delete()
-    await send_history(query.bot, query.from_user.id, query.message.chat.id, offset, header=True)
+    text, markup = build_history_text(query.from_user.id, offset, header=True)
+    await query.message.edit_text(text)
+    await query.message.edit_reply_markup(reply_markup=markup)
     await query.answer()
 
 

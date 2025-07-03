@@ -29,6 +29,8 @@ from .texts import (
     BTN_PLAN_1M,
     BTN_PLAN_3M,
     BTN_PLAN_6M,
+    BTN_MANUAL,
+    BTN_SETTINGS,
 )
 from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -69,17 +71,20 @@ def confirm_save_kb(meal_id: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def history_nav_kb(offset: int, total: int) -> InlineKeyboardMarkup:
+def history_nav_kb(offset: int, total: int, include_back: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     count = 0
     if offset > 0:
-        builder.button(text=BTN_LEFT_HISTORY, callback_data=f"hist:{offset-1}")
+        builder.button(text=BTN_LEFT_HISTORY, callback_data=f"hist:{offset+1}")
         count += 1
     if offset < total - 1:
-        builder.button(text=BTN_RIGHT_HISTORY, callback_data=f"hist:{offset+1}")
+        builder.button(text=BTN_RIGHT_HISTORY, callback_data=f"hist:{offset-1}")
         count += 1
     if count:
         builder.adjust(count)
+    if include_back:
+        builder.button(text=BTN_BACK, callback_data="stats_menu")
+        builder.adjust(1)
     return builder.as_markup()
 
 
@@ -105,11 +110,10 @@ def stats_menu_kb() -> ReplyKeyboardMarkup:
 
 
 def main_menu_kb() -> ReplyKeyboardMarkup:
-    """Main menu with four actions arranged vertically."""
+    """Persistent menu with two buttons."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_STATS)],
-            [KeyboardButton(text=BTN_SUBSCRIPTION)],
+            [KeyboardButton(text=BTN_MAIN_MENU)],
             [KeyboardButton(text=BTN_FAQ)],
         ],
         resize_keyboard=True,
@@ -117,22 +121,17 @@ def main_menu_kb() -> ReplyKeyboardMarkup:
 
 
 def back_menu_kb() -> ReplyKeyboardMarkup:
-    """Keyboard with a single button to return to the main menu."""
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=BTN_MAIN_MENU)]],
-        resize_keyboard=True,
-    )
+    """Same as main_menu_kb for backward compatibility."""
+    return main_menu_kb()
 
 
-def pay_kb(code: Optional[str] = None) -> InlineKeyboardMarkup:
-    """Inline keyboard with a single payment button.
-
-    Optionally encodes the selected plan in callback data so invoice
-    handlers can determine which subscription to bill for.
-    """
+def pay_kb(code: Optional[str] = None, include_back: bool = False) -> InlineKeyboardMarkup:
+    """Inline keyboard with a payment button and optional back."""
     builder = InlineKeyboardBuilder()
     cb = f"pay:{code}" if code else "pay"
     builder.button(text=BTN_PAY, callback_data=cb)
+    if include_back:
+        builder.button(text=BTN_BACK, callback_data=f"method_back:{code}")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -160,10 +159,12 @@ def payment_methods_kb() -> ReplyKeyboardMarkup:
     )
 
 
-def payment_method_inline(code: str) -> InlineKeyboardMarkup:
-    """Inline keyboard with a single payment method button."""
+def payment_method_inline(code: str, include_back: bool = False) -> InlineKeyboardMarkup:
+    """Inline keyboard with a payment method and optional back button."""
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_BANK_CARD, callback_data=f"method:{code}")
+    if include_back:
+        builder.button(text=BTN_BACK, callback_data="sub_plans")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -172,5 +173,43 @@ def subscribe_button(text: str) -> InlineKeyboardMarkup:
     """Inline keyboard leading to the subscription menu."""
     builder = InlineKeyboardBuilder()
     builder.button(text=text, callback_data="subscribe")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def menu_inline_kb() -> InlineKeyboardMarkup:
+    """Main inline menu under the welcome message."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_MANUAL, callback_data="manual")
+    builder.button(text=BTN_STATS, callback_data="stats_menu")
+    builder.button(text=BTN_SUBSCRIPTION, callback_data="subscribe")
+    builder.button(text=BTN_SETTINGS, callback_data="settings")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def stats_menu_inline_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_REPORT_DAY, callback_data="report_day")
+    builder.button(text=BTN_MY_MEALS, callback_data="my_meals")
+    builder.button(text=BTN_BACK, callback_data="menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def back_inline_kb() -> InlineKeyboardMarkup:
+    """Single back button leading to the main menu."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data="menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def subscription_plans_inline_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_PLAN_1M.format(price=PLAN_PRICES['1m']), callback_data="plan:1m")
+    builder.button(text=BTN_PLAN_3M.format(price=PLAN_PRICES['3m']), callback_data="plan:3m")
+    builder.button(text=BTN_PLAN_6M.format(price=PLAN_PRICES['6m']), callback_data="plan:6m")
+    builder.button(text=BTN_BACK, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()

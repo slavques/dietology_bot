@@ -102,11 +102,16 @@ BTN_MY_MEALS = "📊 Мои приёмы"
 BTN_STATS = "📈 Статистика"
 BTN_SUBSCRIPTION = "⚡ Подписка"
 BTN_FAQ = "❓ ЧаВО"
-BTN_MAIN_MENU = "🥑 Главное меню"
+BTN_MAIN_MENU = "Меню"
 BTN_PAY = "Оплатить"
 BTN_BACK_TEXT = "🔙 Назад"
 BTN_BANK_CARD = "💳 Банковская карта"
 BTN_BROADCAST = "Рассылка"
+BTN_MANUAL = "Отправить вручную"
+BTN_SETTINGS = "Настройки"
+
+DEV_FEATURE = "Функционал в разработке"
+STATS_MENU_SHORT = "Выберите раздел:"
 
 # Portion prefixes used when saving partial servings
 PREFIX_FULL = ""
