@@ -43,10 +43,19 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
-    if not consume_request(session, user):
-        reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
-        text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
-        await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
+    ok, reason = consume_request(session, user)
+    if not ok:
+        if reason == "daily":
+            from ..settings import SUPPORT_HANDLE
+            from ..texts import PAID_DAILY_LIMIT_TEXT
+            await message.answer(
+                PAID_DAILY_LIMIT_TEXT.format(support=SUPPORT_HANDLE),
+                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+            )
+        else:
+            reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
+            text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
+            await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
         session.close()
         return
     session.close()
@@ -56,6 +65,13 @@ async def handle_photo(message: types.Message, state: FSMContext):
     with tempfile.NamedTemporaryFile(prefix="diet_photo_", delete=False) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
+    try:
+        from PIL import Image
+        img = Image.open(photo_path)
+        img.thumbnail((300, 300))
+        img.save(photo_path, format="JPEG")
+    except Exception:
+        pass
     result = await analyze_photo(photo_path)
     if result.get('error'):
         await message.answer(RECOGNITION_ERROR)
@@ -85,6 +101,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         'orig_macros': macros.copy(),
         'photo_path': photo_path,
         'clarifications': 0,
+        'hints': [],
         'chat_id': message.chat.id,
         'message_id': None,
     }
@@ -106,7 +123,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
     msg = await message.answer(
         format_meal_message(name, serving, macros),
-        reply_markup=meal_actions_kb(meal_id, clarifications=0)
+        reply_markup=meal_actions_kb(meal_id)
     )
     pending_meals[meal_id]["message_id"] = msg.message_id
     pending_meals[meal_id]["chat_id"] = msg.chat.id

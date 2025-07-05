@@ -48,37 +48,6 @@ def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
     return instructions, input_items
 
 
-def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
-    """Convert chat messages to the format expected by the Responses API."""
-    instructions = None
-    input_items: List[Dict] = []
-    for msg in messages:
-        role = msg.get("role")
-        content = msg.get("content")
-        if role == "system" and isinstance(content, str):
-            # Treat the system prompt as instructions for the model
-            instructions = content
-            continue
-        parts: List[Dict] = []
-        if isinstance(content, list):
-            for part in content:
-                if part.get("type") == "image_url":
-                    parts.append(
-                        {
-                            "type": "input_image",
-                            "image_url": part["image_url"]["url"],
-                            "detail": "auto",
-                        }
-                    )
-                elif part.get("type") == "text":
-                    parts.append({"type": "input_text", "text": part["text"]})
-        elif isinstance(content, str):
-            parts.append({"type": "input_text", "text": content})
-        if parts:
-            input_items.append({"type": "message", "role": role, "content": parts})
-    return instructions, input_items
-
-
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
     if not client.api_key:
         return ""
@@ -194,7 +163,135 @@ async def analyze_photo(photo_path: str) -> Dict[str, Any]:
         return {"error": "parse"}
 
 
-async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def analyze_text(description: str) -> Dict[str, Any]:
+    """Analyze a text description of a meal or drink."""
+    if not client.api_key:
+        return {
+            "is_food": True,
+            "confidence": 1.0,
+            "name": description,
+            "type": "meal",
+            "serving": 200,
+            "calories": 250,
+            "protein": 15,
+            "fat": 10,
+            "carbs": 30,
+        }
+    prompt = (
+        "Ты — профессиональный диетолог/нутрициолог с большим опытом.\n"
+        "Тебе придёт текстовое описание, и твоя задача:\n\n"
+        "1. Определи, относится ли описание к готовой еде, напитку или продукту питания:\n"
+        "   • Если нет — верни {\"is_food\": false}.\n\n"
+        "2. Если в тексте упоминается товар с брендом или названием магазина:\n"
+        "   Найди этот конкретный продукт в русскоязычной базе FatSecret (site:fatsecret.ru), обязательно используя точное название бренда и продукта.\n"
+        "   • Используй КБЖУ и массу нетто порции из FatSecret строго для этого бренда и названия.\n\n"
+        "3. Если в тексте описано приготовленное блюдо или напиток без упаковки:\n"
+        "   Визуально (по описанию ингредиентов и объёмов) определи примерный вес порции и максимально точно рассчитай КБЖУ. При необходимости найди похожие блюда в интернете, в том числе на FatSecret.\n\n"
+        "4. Всегда указывай уверенность распознавания от 0.0 до 1.0, тип — drink или meal, название по-русски с заглавной буквы.\n\n"
+        "5. Старайся давать схожие результаты при повторном анализе одинаковых описаний.\n\n"
+        "Ответь строго в JSON без лишнего текста:\n"
+        '{"is_food":, "confidence":, "type":, "name":"", "serving":, "calories":, "protein":, "fat":, "carbs":}'
+    )
+    content = await _chat([
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": description},
+    ])
+    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
+        return {"error": content.strip("_").lower()}
+    try:
+        data = json.loads(content)
+        if 'serving' in data:
+            data['serving'] = parse_serving(data['serving'])
+        for k in ('calories', 'protein', 'fat', 'carbs'):
+            if k in data:
+                data[k] = to_float(data[k])
+        if 'name' in data and isinstance(data['name'], str):
+            data['name'] = data['name'].strip().capitalize()
+        if 'type' in data and isinstance(data['type'], str):
+            data['type'] = data['type'].lower()
+        return data
+    except Exception:
+        match = re.search(r"\{.*\}", content, re.S)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
+        return {"error": "parse"}
+
+
+async def analyze_text_with_hint(
+    description: str,
+    hint: str,
+    prev: Optional[Dict[str, Any]] = None,
+    hints: Optional[list[str]] = None,
+) -> Dict[str, Any]:
+    """Clarify text description with additional hint."""
+    if not client.api_key:
+        return {
+            "success": True,
+            "name": hint,
+            "type": "meal",
+            "serving": 200,
+            "calories": 250,
+            "protein": 15,
+            "fat": 10,
+            "carbs": 30,
+        }
+    prev_json = json.dumps(prev or {}, ensure_ascii=False)
+    hints_text = ""
+    if hints:
+        joined = "\n".join(f"{i+1}) {h}" for i, h in enumerate(hints, 1))
+        hints_text = f"Предыдущие уточнения:\n{joined}\n"
+    prompt = (
+        "Ты — профессиональный диетолог/нутрициолог. Ранее ты проанализировал текст и вернул такой JSON:\n"
+        f"{prev_json}\n"
+        f"{hints_text}Исходное описание: {description}\n"
+        f"Теперь пользователь прислал уточнение: «{hint}».\n\n"
+        "Твоя задача:\n"
+        "1. Обнови информацию, если уточнение касается ингредиентов, состава, бренда, упаковки, веса или типа блюда/напитка.\n"
+        "2. Если уточнение касается бренда или продукта в упаковке — найди соответствующий товар в русскоязычной базе FatSecret (site:fatsecret.ru) и обнови `serving`, `calories`, `protein`, `fat`, `carbs` по данным именно для этого бренда.\n"
+        "3. Если уточнение касается состава блюда/напитка (например, \"творог 2%\", \"без сахара\", \"без масла\") — пересчитай КБЖУ, исключив или заменив указанные компоненты.\n"
+        "4. Если уточнение касается веса:\n   • Если явно просят пересчитать КБЖУ — сделай это.\n   • Если сказано «измени только вес» — обнови только `serving`, КБЖУ оставь как есть.\n"
+        "5. Если пользователь указывает сохранить конкретные параметры — обязательно зафиксируй их значение из предыдущего JSON.\n"
+        "6. Всегда обновляй `confidence`, `name` и `type`.\n"
+        "7. Если в уточнении нет новой информации — верни: {\"success\": false}\n"
+        "8. Верни только один JSON строго по шаблону:\n"
+        '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
+    )
+    content = await _chat([
+        {"role": "system", "content": prompt},
+    ])
+    if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
+        return {"error": content.strip("_").lower()}
+    try:
+        data = json.loads(content)
+        if 'serving' in data:
+            data['serving'] = parse_serving(data['serving'])
+        for k in ('calories', 'protein', 'fat', 'carbs'):
+            if k in data:
+                data[k] = to_float(data[k])
+        if 'name' in data and isinstance(data['name'], str):
+            data['name'] = data['name'].strip().capitalize()
+        if 'type' in data and isinstance(data['type'], str):
+            data['type'] = data['type'].lower()
+        return data
+    except Exception:
+        match = re.search(r"\{.*\}", content, re.S)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
+        return {"error": "parse"}
+
+
+async def analyze_photo_with_hint(
+    photo_path: str,
+    hint: str,
+    prev: Optional[Dict[str, Any]] = None,
+    hints: Optional[list[str]] = None,
+) -> Dict[str, Any]:
     """Re-analyze a photo using user clarification about the dish or beverage."""
     if not client.api_key:
         # simple stub when API key is missing
@@ -211,21 +308,24 @@ async def analyze_photo_with_hint(photo_path: str, hint: str, prev: Optional[Dic
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     prev_json = json.dumps(prev or {}, ensure_ascii=False)
+    hints_text = ""
+    if hints:
+        joined = "\n".join(f"{i+1}) {h}" for i, h in enumerate(hints, 1))
+        hints_text = f"Предыдущие уточнения:\n{joined}\n"
     prompt = (
-        "Ты — профессиональный диетолог/нутрициолог. Ранее ты проанализировал фото и вернул JSON:\n"
+        "Ты — профессиональный диетолог/нутрициолог. Ранее ты проанализировал изображение и вернул такой JSON:\n"
         f"{prev_json}\n"
-        f"Теперь пользователь прислал уточнение: «{hint}».\n\n"
+        f"{hints_text}Теперь пользователь прислал уточнение: «{hint}».\n\n"
         "Твоя задача:\n"
-        "1. Игнорируй любые упоминания о технических деталях — только визуальный контекст и текст.\n"
-        "2. Если уточнение меняет название блюда/напитка — обнови `name` (по-русски, с заглавной буквы).\n"
-        "3. Если просят поменять вес, то просто обнови `serving` без перерасчета кбжу. А если просят поменять вес и сделать перерасчет явно, то делай полный перерасчет.\n"
-        "4. Если уточнение добавляет или уточняет ингредиенты или указывает на заводскую упаковку — скорректируй `type` и возьми массу нетто из FatSecret (для упакованного товара).\n"
-        "5. Пересчитай с точностью до десятых `calories`, `protein`, `fat`, `carbs`.\n"
-        "6. Оцени новую `confidence` (0.0–1.0).\n"
-        "7. Верни только один JSON:\n"
-        '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}\n'
-        "8. Если в уточнении нет никакой новой информации, верни:\n"
-        '{"success": false}'
+        "1. Обнови информацию, если уточнение касается ингредиентов, состава, бренда, упаковки, веса или типа блюда/напитка.\n"
+        "2. Если уточнение касается бренда или продукта в упаковке — найди соответствующий товар в русскоязычной базе FatSecret (site:fatsecret.ru) и обнови `serving`, `calories`, `protein`, `fat`, `carbs` по данным именно для этого бренда.\n"
+        "3. Если уточнение касается состава блюда/напитка (например, \"творог 2%\", \"без сахара\", \"без масла\") — пересчитай КБЖУ, исключив или заменив указанные компоненты.\n"
+        "4. Если уточнение касается веса:\n   • Если явно просят пересчитать КБЖУ — сделай это.\n   • Если сказано «измени только вес» — обнови только `serving`, КБЖУ оставь как есть.\n"
+        "5. Если пользователь указывает сохранить конкретные параметры — обязательно зафиксируй их значение из предыдущего JSON (например: «не меняй белки»).\n"
+        "6. Всегда обновляй `confidence` (0.0–1.0), `name` (по-русски, с заглавной буквы), `type` (\"meal\" или \"drink\").\n"
+        "7. Если в уточнении нет новой информации — верни: {\"success\": false}\n"
+        "8. Верни только один JSON строго по шаблону:\n"
+        '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
     )
     content = await _chat(
         [

@@ -4,6 +4,10 @@ class EditMeal(StatesGroup):
     waiting_input = State()
 
 
+class ManualMeal(StatesGroup):
+    waiting_text = State()
+
+
 class AdminState(StatesGroup):
     waiting_broadcast = State()
 
