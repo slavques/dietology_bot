@@ -36,7 +36,7 @@ async def cmd_start(message: types.Message):
     # Send a temporary message to update the persistent reply keyboard
     # Send a helper message with the reply keyboard and keep it so the
     # "Меню" and "ЧаВО" buttons remain persistent for the user.
-    await message.answer("\u2060", reply_markup=main_menu_kb())
+    await message.answer("🥑", reply_markup=main_menu_kb())
     await message.answer(text, reply_markup=menu_inline_kb())
 
 
@@ -47,7 +47,7 @@ async def back_to_menu(message: types.Message):
     text = get_welcome_text(user)
     session.commit()
     session.close()
-    await message.answer("\u2060", reply_markup=main_menu_kb())
+    await message.answer("🥑", reply_markup=main_menu_kb())
     await message.answer(text, reply_markup=menu_inline_kb())
 
 
@@ -59,12 +59,6 @@ async def cb_menu(query: types.CallbackQuery):
     session.close()
     await query.message.edit_text(text)
     await query.message.edit_reply_markup(reply_markup=menu_inline_kb())
-    await query.answer()
-
-
-async def cb_manual(query: types.CallbackQuery):
-    await query.message.edit_text(DEV_FEATURE)
-    await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await query.answer()
 
 
@@ -81,5 +75,4 @@ def register(dp: Dispatcher):
         lambda m: m.text in {BTN_MAIN_MENU, BTN_BACK},
     )
     dp.callback_query.register(cb_menu, F.data == "menu")
-    dp.callback_query.register(cb_manual, F.data == "manual")
     dp.callback_query.register(cb_settings, F.data == "settings")

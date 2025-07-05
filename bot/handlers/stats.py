@@ -226,7 +226,10 @@ async def report_day(message: types.Message):
         lines.append("")
         lines.extend(drinks)
 
-    await message.answer("\n".join(lines), reply_markup=main_menu_kb())
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data="stats_menu")
+    builder.adjust(1)
+    await message.answer("\n".join(lines), reply_markup=builder.as_markup())
 
 
 async def cb_my_meals(query: types.CallbackQuery):

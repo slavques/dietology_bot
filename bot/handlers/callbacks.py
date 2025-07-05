@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
 from ..database import SessionLocal, User, Meal
-from ..services import analyze_photo_with_hint
+from ..services import analyze_photo_with_hint, analyze_text_with_hint
 from ..subscriptions import ensure_user
 
 from ..utils import format_meal_message, parse_serving, to_float
@@ -15,11 +15,8 @@ from ..texts import (
     SESSION_EXPIRED,
     SAVE_DONE,
     REFINE_BASE,
-    REFINE_TWO_ATTEMPTS,
-    REFINE_ONE_ATTEMPT,
     REFINE_TOO_LONG,
     REFINE_BAD_ATTEMPT,
-    REFINE_END,
     NOTHING_TO_SAVE,
     SESSION_EXPIRED_RETRY,
     PORTION_PREFIXES,
@@ -30,14 +27,7 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
     """Prompt user to enter name and weight manually."""
     data = await state.get_data()
     meal_id = data.get("meal_id")
-    clar = 0
-    if meal_id and meal_id in pending_meals:
-        clar = pending_meals[meal_id].get("clarifications", 0)
     text = REFINE_BASE
-    if clar == 0:
-        text += REFINE_TWO_ATTEMPTS
-    else:
-        text += REFINE_ONE_ATTEMPT
     await query.message.edit_text(text, reply_markup=None)
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -60,12 +50,7 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
-    clar = pending_meals.get(meal_id, {}).get("clarifications", 0)
     text = REFINE_BASE
-    if clar == 0:
-        text += REFINE_TWO_ATTEMPTS
-    else:
-        text += REFINE_ONE_ATTEMPT
     await query.message.edit_text(text, reply_markup=None)
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
@@ -88,30 +73,29 @@ async def process_edit(message: types.Message, state: FSMContext):
         )
         return
 
-    result = await analyze_photo_with_hint(meal['photo_path'], message.text, meal)
+    meal.setdefault('hints', [])
+    if meal.get('photo_path'):
+        result = await analyze_photo_with_hint(
+            meal['photo_path'], message.text, meal, meal['hints']
+        )
+    else:
+        result = await analyze_text_with_hint(
+            meal.get('text', ''), message.text, meal, meal['hints']
+        )
     if result.get('error') or (
         result.get('success') is False and not any(k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs'))
     ):
-        if meal['clarifications'] == 0:
-            err = await message.answer(REFINE_BAD_ATTEMPT)
-            meal['error_msg'] = err.message_id
-        else:
-            if meal.get('error_msg'):
-                try:
-                    await message.bot.delete_message(message.chat.id, meal['error_msg'])
-                except Exception:
-                    pass
-                meal.pop('error_msg', None)
-            await message.answer(REFINE_END)
+        if meal.get('error_msg'):
+            try:
+                await message.bot.delete_message(message.chat.id, meal['error_msg'])
+            except Exception:
+                pass
+            meal.pop('error_msg', None)
+        err = await message.answer(REFINE_BAD_ATTEMPT)
+        meal['error_msg'] = err.message_id
+        meal.setdefault('clarifications', 0)
         meal['clarifications'] += 1
-        if meal['clarifications'] >= 2:
-            await message.bot.edit_message_text(
-                format_meal_message(meal['name'], meal['serving'], meal['macros']),
-                chat_id=meal['chat_id'],
-                message_id=meal['message_id'],
-                reply_markup=meal_actions_kb(meal_id, meal['clarifications'])
-            )
-            await state.clear()
+        meal['hints'].append(message.text)
         return
     serving = parse_serving(result.get('serving', meal['serving']))
     macros = {
@@ -134,13 +118,15 @@ async def process_edit(message: types.Message, state: FSMContext):
         except Exception:
             pass
         meal.pop('error_msg', None)
+    meal.setdefault('clarifications', 0)
     meal['clarifications'] += 1
+    meal['hints'].append(message.text)
     await message.delete()
     await message.bot.edit_message_text(
         text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
         chat_id=meal['chat_id'],
         message_id=meal['message_id'],
-        reply_markup=meal_actions_kb(meal_id, meal['clarifications'])
+        reply_markup=meal_actions_kb(meal_id)
     )
     await state.clear()
 
@@ -302,7 +288,7 @@ async def cb_save_back(query: types.CallbackQuery):
         else:
             await query.message.edit_text(
                 format_meal_message(meal['name'], meal['serving'], meal['macros']),
-                reply_markup=meal_actions_kb(meal_id, meal.get('clarifications', 0)),
+                reply_markup=meal_actions_kb(meal_id),
             )
     await query.answer()
 

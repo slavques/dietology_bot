@@ -58,6 +58,10 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE users ADD COLUMN notified_1d BOOLEAN DEFAULT 0"))
         if "notified_free" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT 0"))
+        if "daily_used" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN daily_used INTEGER DEFAULT 0"))
+        if "daily_start" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN daily_start DATETIME DEFAULT CURRENT_TIMESTAMP"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
@@ -80,6 +84,8 @@ class User(Base):
     notified_1d = Column(Boolean, default=False)
     notified_0d = Column(Boolean, default=False)
     notified_free = Column(Boolean, default=False)
+    daily_used = Column(Integer, default=0)
+    daily_start = Column(DateTime, default=datetime.utcnow)
     meals = relationship('Meal', back_populates='user')
 
 class Meal(Base):
