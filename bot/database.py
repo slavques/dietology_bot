@@ -33,9 +33,8 @@ def _column_names(table: str) -> set[str]:
 
 def _ensure_columns():
     """Add new columns to old databases if they are missing."""
-    if engine.dialect.name != "sqlite":
-        return
     existing = _column_names("users")
+    dt_type = "DATETIME" if engine.dialect.name == "sqlite" else "TIMESTAMP"
     with engine.begin() as conn:
         if "grade" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN grade TEXT DEFAULT 'free'"))
@@ -44,10 +43,10 @@ def _ensure_columns():
         if "requests_used" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN requests_used INTEGER DEFAULT 0"))
         if "period_start" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN period_start DATETIME DEFAULT CURRENT_TIMESTAMP"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN period_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
         conn.execute(text("UPDATE users SET period_start=CURRENT_TIMESTAMP WHERE period_start IS NULL"))
         if "period_end" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN period_end DATETIME"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN period_end {dt_type}"))
         if "notified_7d" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN notified_7d BOOLEAN DEFAULT 0"))
         if "notified_3d" not in existing:
@@ -61,7 +60,7 @@ def _ensure_columns():
         if "daily_used" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN daily_used INTEGER DEFAULT 0"))
         if "daily_start" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN daily_start DATETIME DEFAULT CURRENT_TIMESTAMP"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN daily_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
