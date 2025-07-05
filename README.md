@@ -38,7 +38,8 @@ so upgrades work without manual migrations on both SQLite and PostgreSQL.
 ### Logging
 
 Log files are written to `logs/bot.log` by default (configurable via `LOG_DIR`).
-The handler rotates daily and keeps the three most recent log files.
+Each entry starts with the timestamp `YYYY-MM-DD HH:MM:SS`. The handler rotates
+daily and keeps the three most recent log files.
 
 ### Manual database access
 
