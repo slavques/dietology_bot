@@ -41,6 +41,18 @@ Log files are written to `logs/bot.log` by default (configurable via `LOG_DIR`).
 Each entry starts with the timestamp `YYYY-MM-DD HH:MM:SS`. The handler rotates
 daily and keeps the three most recent log files.
 
+### Prompt sandbox
+
+To quickly test how the recognition prompts behave, run the helper script:
+
+```bash
+python scripts/prompt_sandbox.py path/to/photo.jpg
+python scripts/prompt_sandbox.py "описание блюда" --text
+```
+
+Add `--hint "ваше уточнение"` to simulate clarification requests. The script
+prints the JSON response from the OpenAI API.
+
 ### Manual database access
 
 The default SQLite database can be inspected and edited directly. Install the
