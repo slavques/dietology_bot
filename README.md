@@ -28,8 +28,11 @@ The bot relies on OpenAI's `gpt-4o` model for food recognition.
 The database is stored in `bot.db` in the project root by default (connection
 string `sqlite:///bot.db`). You can change this by setting `DATABASE_URL`.
 To use PostgreSQL instead of SQLite, install `psycopg2-binary` and set
+
 `DATABASE_URL` to a PostgreSQL connection string, e.g.
 `postgresql+psycopg2://user:password@host:5432/dbname`.
+The bot automatically adds any missing columns on startup,
+so upgrades work without manual migrations on both SQLite and PostgreSQL.
 
 
 ### Logging
