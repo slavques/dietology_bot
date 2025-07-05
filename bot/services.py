@@ -241,7 +241,7 @@ async def analyze_text_with_hint(
     prev_json = json.dumps(prev or {}, ensure_ascii=False)
     hints_text = ""
     if hints:
-        joined = "\n".join(f"{i+1}) {h}" for i, h in enumerate(hints, 1))
+        joined = "\n".join(f"{i}) {h}" for i, h in enumerate(hints, start=1))
         hints_text = f"Предыдущие уточнения:\n{joined}\n"
     prompt = (
         "Ты — профессиональный диетолог/нутрициолог. Ранее ты проанализировал текст и вернул такой JSON:\n"
@@ -311,7 +311,7 @@ async def analyze_photo_with_hint(
     prev_json = json.dumps(prev or {}, ensure_ascii=False)
     hints_text = ""
     if hints:
-        joined = "\n".join(f"{i+1}) {h}" for i, h in enumerate(hints, 1))
+        joined = "\n".join(f"{i}) {h}" for i, h in enumerate(hints, start=1))
         hints_text = f"Предыдущие уточнения:\n{joined}\n"
     prompt = (
         "Ты — профессиональный диетолог/нутрициолог. Ранее ты проанализировал изображение и вернул такой JSON:\n"
