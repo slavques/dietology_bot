@@ -95,7 +95,6 @@ async def process_edit(message: types.Message, state: FSMContext):
         meal['error_msg'] = err.message_id
         meal.setdefault('clarifications', 0)
         meal['clarifications'] += 1
-        meal['hints'].append(message.text)
         return
     serving = parse_serving(result.get('serving', meal['serving']))
     macros = {
