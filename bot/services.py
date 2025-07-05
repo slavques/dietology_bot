@@ -13,7 +13,39 @@ from .utils import parse_serving, to_float
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 # Use the standard GPT‑4o model
-MODEL_NAME = "gpt-4o"
+# Use the lightweight GPT‑4o model as default
+MODEL_NAME = "gpt-4o-mini"
+
+
+def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
+    """Convert chat messages to the format expected by the Responses API."""
+    instructions = None
+    input_items: List[Dict] = []
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content")
+        if role == "system" and isinstance(content, str):
+            # Treat the system prompt as instructions for the model
+            instructions = content
+            continue
+        parts: List[Dict] = []
+        if isinstance(content, list):
+            for part in content:
+                if part.get("type") == "image_url":
+                    parts.append(
+                        {
+                            "type": "input_image",
+                            "image_url": part["image_url"]["url"],
+                            "detail": "auto",
+                        }
+                    )
+                elif part.get("type") == "text":
+                    parts.append({"type": "input_text", "text": part["text"]})
+        elif isinstance(content, str):
+            parts.append({"type": "input_text", "text": content})
+        if parts:
+            input_items.append({"type": "message", "role": role, "content": parts})
+    return instructions, input_items
 
 
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
@@ -25,15 +57,28 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
         logging.info("OpenAI prompt: %s", system_msg)
     except Exception:
         pass
+    instructions, input_items = _prepare_input(messages)
     for attempt in range(retries):
         try:
-            resp = await client.chat.completions.create(
+            resp = await client.responses.create(
                 model=MODEL_NAME,
-                messages=messages,
-                max_tokens=200,
+                instructions=instructions,
+                input=input_items,
+                text={"format": {"type": "text"}},
+                reasoning={},
+                tools=[
+                    {
+                        "type": "web_search_preview",
+                        "user_location": {"type": "approximate"},
+                        "search_context_size": "low",
+                    }
+                ],
                 temperature=0.2,
+                max_output_tokens=525,
+                top_p=0.9,
+                store=True,
             )
-            content = resp.choices[0].message.content
+            content = resp.output_text
             logging.info("OpenAI response: %s", content)
             return content
         except RateLimitError:
@@ -66,13 +111,18 @@ async def analyze_photo(photo_path: str) -> Dict[str, Any]:
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     prompt = (
-        "Ты — профессиональный диетолог/нутрициолог с большим опытом. Тебе придёт изображение, и твоя задача:\n\n"
-        "Определи, есть ли на фото готовая еда или напиток.\n"
-        "• Если нет — верни {\"is_food\": false}.\n\n"
-        "Если на фото товар в заводской упаковке (банка, бутылка, контейнер и т. п.) — найди этот продукт в русскоязычной базе FatSecret (site:fatsecret.ru) и возьми оттуда массу нетто и КБЖУ на всю порцию.\n\n"
-        "Если на фото напиток или приготовленное блюдо — оцени визуально примерный вес порции в граммах и рассчитай КБЖУ.\n\n"
-        "Оцени уверенность распознавания от 0.0 до 1.0. Тип определи drink (напитки, жидкости) это или meal (еда, блюда). Название пиши на русском языке с большой буквы\n\n"
-        "Ответь только одним JSON:\n"
+        "Ты — профессиональный диетолог/нутрициолог с большим опытом.\n"
+        "Тебе придёт фото, и твоя задача:\n\n"
+        "1. Определи, есть ли на фото готовая еда, напиток или продукт питания:\n"
+        "   • Если еды или напитка нет — верни {\"is_food\": false}.\n\n"
+        "2. Если на фото товар в заводской упаковке (банка, бутылка, упаковка, контейнер с этикеткой и т.п.):\n"
+        "   Найди этот конкретный продукт в русскоязычной базе FatSecret (site:fatsecret.ru), обязательно используя точное название бренда и продукта, указанные на упаковке.\n"
+        "   • Используй КБЖУ и массу нетто порции из FatSecret строго для этого бренда и названия.\n\n"
+        "3. Если на фото напиток в стакане или приготовленное блюдо на тарелке (без заводской упаковки):\n"
+        "   Визуально определи примерный вес полной порции в граммах и максимально точно рассчитай КБЖУ. При необходимости найди похожие блюда в интернете (в том числе FatSecret), чтобы уточнить расчёт.\n\n"
+        "4. Всегда указывай уверенность распознавания от 0.0 до 1.0, тип — drink (напитки, жидкости) или meal (еда, блюда). Название пиши на русском языке с большой буквы.\n\n"
+        "5. Старайся давать схожие результаты при повторном анализе одного и того же блюда.\n\n"
+        "Ответь строго в JSON без дополнительного текста:\n"
         '{"is_food":, "confidence":, "type":, "name": "", "serving":, "calories":, "protein":, "fat":, "carbs":}'
     )
     content = await _chat(
