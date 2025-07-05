@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from ..services import analyze_text, analyze_text_with_hint
 from ..utils import format_meal_message, parse_serving, to_float
-from ..keyboards import meal_actions_kb, back_menu_kb, subscribe_button
+from ..keyboards import meal_actions_kb, back_menu_kb, back_inline_kb, subscribe_button
 from ..subscriptions import consume_request, ensure_user
 from ..database import SessionLocal
 from ..states import ManualMeal, EditMeal
@@ -25,7 +25,7 @@ from ..texts import (
 
 async def manual_start(query: types.CallbackQuery, state: FSMContext):
     await query.message.edit_text(MANUAL_PROMPT)
-    await query.message.edit_reply_markup(reply_markup=back_menu_kb())
+    await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await state.set_state(ManualMeal.waiting_text)
     await query.answer()
 
