@@ -48,37 +48,6 @@ def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
     return instructions, input_items
 
 
-def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
-    """Convert chat messages to the format expected by the Responses API."""
-    instructions = None
-    input_items: List[Dict] = []
-    for msg in messages:
-        role = msg.get("role")
-        content = msg.get("content")
-        if role == "system" and isinstance(content, str):
-            # Treat the system prompt as instructions for the model
-            instructions = content
-            continue
-        parts: List[Dict] = []
-        if isinstance(content, list):
-            for part in content:
-                if part.get("type") == "image_url":
-                    parts.append(
-                        {
-                            "type": "input_image",
-                            "image_url": part["image_url"]["url"],
-                            "detail": "auto",
-                        }
-                    )
-                elif part.get("type") == "text":
-                    parts.append({"type": "input_text", "text": part["text"]})
-        elif isinstance(content, str):
-            parts.append({"type": "input_text", "text": content})
-        if parts:
-            input_items.append({"type": "message", "role": role, "content": parts})
-    return instructions, input_items
-
-
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
     if not client.api_key:
         return ""

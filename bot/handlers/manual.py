@@ -15,7 +15,8 @@ from ..texts import (
     LIMIT_REACHED_TEXT,
     format_date_ru,
     CLARIFY_PROMPT,
-    DEV_FEATURE,
+    MANUAL_PROMPT,
+    MANUAL_ERROR,
     BTN_EDIT,
     BTN_DELETE,
     BTN_REMOVE_LIMITS,
@@ -23,7 +24,7 @@ from ..texts import (
 
 
 async def manual_start(query: types.CallbackQuery, state: FSMContext):
-    await query.message.edit_text("Введите описание блюда или напитка")
+    await query.message.edit_text(MANUAL_PROMPT)
     await query.message.edit_reply_markup(reply_markup=back_menu_kb())
     await state.set_state(ManualMeal.waiting_text)
     await query.answer()
@@ -51,7 +52,7 @@ async def process_manual(message: types.Message, state: FSMContext):
 
     result = await analyze_text(message.text)
     if result.get("error") or not result.get("is_food"):
-        await message.answer("Не удалось распознать описание")
+        await message.answer(MANUAL_ERROR)
         return
     name = result.get("name")
     serving = parse_serving(result.get("serving", 0))

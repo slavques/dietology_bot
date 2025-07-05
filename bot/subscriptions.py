@@ -74,7 +74,7 @@ def update_limits(user: User) -> None:
             user.period_start = now
             user.period_end = now + timedelta(days=30)
             user.requests_used = 0
-            user.notified_free = prev > 0
+            user.notified_free = prev == 0
 
 
 def has_request_quota(session: SessionLocal, user: User) -> bool:
