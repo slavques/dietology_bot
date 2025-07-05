@@ -1,4 +1,4 @@
-from . import start, photo, history, stats, callbacks, faq, admin, subscription
+from . import start, photo, history, stats, callbacks, faq, admin, subscription, manual
 
 __all__ = [
     'start',
@@ -9,4 +9,5 @@ __all__ = [
     'faq',
     'admin',
     'subscription',
+    'manual',
 ]

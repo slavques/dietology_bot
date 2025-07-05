@@ -38,17 +38,13 @@ from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-def meal_actions_kb(meal_id: str, clarifications: int = 0) -> InlineKeyboardMarkup:
-    """Inline keyboard for meal actions. Hide refine after two clarifications."""
+def meal_actions_kb(meal_id: str) -> InlineKeyboardMarkup:
+    """Inline keyboard for meal actions."""
     builder = InlineKeyboardBuilder()
-    if clarifications < 2:
-        builder.button(text=BTN_EDIT, callback_data=f"edit:{meal_id}")
+    builder.button(text=BTN_EDIT, callback_data=f"edit:{meal_id}")
     builder.button(text=BTN_DELETE, callback_data=f"delete:{meal_id}")
     builder.button(text=BTN_SAVE, callback_data=f"save:{meal_id}")
-    if clarifications < 2:
-        builder.adjust(3)
-    else:
-        builder.adjust(2)
+    builder.adjust(3)
     return builder.as_markup()
 
 
@@ -80,11 +76,7 @@ def history_nav_kb(offset: int, include_back: bool = False) -> InlineKeyboardMar
     if offset > 0:
         builder.button(text=BTN_RIGHT_HISTORY, callback_data=f"hist:{offset-1}")
     count = 2 if offset > 0 else 1
-    if include_back:
-        builder.button(text=BTN_BACK, callback_data="stats_menu")
-        builder.adjust(count, 1)
-    else:
-        builder.adjust(count)
+    builder.adjust(count)
     if include_back:
         builder.button(text=BTN_BACK, callback_data="stats_menu")
         builder.adjust(1)

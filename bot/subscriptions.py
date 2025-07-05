@@ -34,7 +34,9 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             period_start=now,
             period_end=now + timedelta(days=30),
             notified_1d=False,
-            notified_free=False,
+            notified_free=True,
+            daily_used=0,
+            daily_start=now,
         )
         session.add(user)
         session.commit()
@@ -45,6 +47,12 @@ def update_limits(user: User) -> None:
     now = datetime.utcnow()
     if user.period_start is None:
         user.period_start = now
+    if user.daily_start is None:
+        user.daily_start = now
+        user.daily_used = 0
+    elif now.date() != user.daily_start.date():
+        user.daily_start = now
+        user.daily_used = 0
     if user.grade == "paid":
         if user.period_end and now > user.period_end:
             # subscription expired
@@ -62,26 +70,33 @@ def update_limits(user: User) -> None:
         if user.period_end is None:
             user.period_end = user.period_start + timedelta(days=30)
         if now >= user.period_end:
+            prev = user.requests_used
             user.period_start = now
             user.period_end = now + timedelta(days=30)
             user.requests_used = 0
-            user.notified_free = False
+            user.notified_free = prev > 0
 
 
 def has_request_quota(session: SessionLocal, user: User) -> bool:
     """Check if user has remaining GPT requests without consuming one."""
     update_limits(user)
     session.commit()
+    if user.grade == "paid" and user.daily_used >= 100:
+        return False
     return user.requests_used < user.request_limit
 
 
-def consume_request(session: SessionLocal, user: User) -> bool:
+def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
     update_limits(user)
+    if user.grade == "paid" and user.daily_used >= 100:
+        return False, "daily"
     if user.requests_used >= user.request_limit:
-        return False
+        return False, "monthly"
     user.requests_used += 1
+    if user.grade == "paid":
+        user.daily_used += 1
     session.commit()
-    return True
+    return True, ""
 
 
 def days_left(user: User) -> Optional[int]:

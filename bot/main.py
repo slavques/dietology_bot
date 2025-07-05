@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from .config import API_TOKEN, SUBSCRIPTION_CHECK_INTERVAL, LOG_DIR
-from .handlers import start, photo, history, stats, callbacks, faq, admin, subscription
+from .handlers import start, photo, history, stats, callbacks, faq, admin, subscription, manual
 from .subscriptions import subscription_watcher
 from .cleanup import cleanup_watcher
 from .error_handler import handle_error
@@ -23,6 +23,7 @@ callbacks.register(dp)
 faq.register(dp)
 admin.register(dp)
 subscription.register(dp)
+manual.register(dp)
 
 dp.errors.register(handle_error)
 
