@@ -261,6 +261,7 @@ async def analyze_text_with_hint(
     )
     content = await _chat([
         {"role": "system", "content": prompt},
+        {"role": "user", "content": description},
     ])
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
