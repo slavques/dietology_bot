@@ -16,6 +16,37 @@ client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 MODEL_NAME = "gpt-4o"
 
 
+def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
+    """Convert chat messages to the format expected by the Responses API."""
+    instructions = None
+    input_items: List[Dict] = []
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content")
+        if role == "system" and isinstance(content, str):
+            # Treat the system prompt as instructions for the model
+            instructions = content
+            continue
+        parts: List[Dict] = []
+        if isinstance(content, list):
+            for part in content:
+                if part.get("type") == "image_url":
+                    parts.append(
+                        {
+                            "type": "input_image",
+                            "image_url": part["image_url"]["url"],
+                            "detail": "auto",
+                        }
+                    )
+                elif part.get("type") == "text":
+                    parts.append({"type": "input_text", "text": part["text"]})
+        elif isinstance(content, str):
+            parts.append({"type": "input_text", "text": content})
+        if parts:
+            input_items.append({"type": "message", "role": role, "content": parts})
+    return instructions, input_items
+
+
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
     if not client.api_key:
         return ""
@@ -25,15 +56,17 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
         logging.info("OpenAI prompt: %s", system_msg)
     except Exception:
         pass
+    instructions, input_items = _prepare_input(messages)
     for attempt in range(retries):
         try:
-            resp = await client.chat.completions.create(
+            resp = await client.responses.create(
                 model=MODEL_NAME,
-                messages=messages,
-                max_tokens=200,
+                instructions=instructions,
+                input=input_items,
+                max_output_tokens=200,
                 temperature=0.2,
             )
-            content = resp.choices[0].message.content
+            content = resp.output_text
             logging.info("OpenAI response: %s", content)
             return content
         except RateLimitError:
