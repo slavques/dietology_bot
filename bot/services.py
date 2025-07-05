@@ -74,7 +74,7 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
                     }
                 ],
                 temperature=0.2,
-                max_output_tokens=525,
+                max_output_tokens=350,
                 top_p=0.9,
                 store=True,
             )
