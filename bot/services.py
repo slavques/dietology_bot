@@ -48,6 +48,14 @@ def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
     return instructions, input_items
 
 
+def _format_hints(hints: Optional[List[str]]) -> str:
+    """Format clarification hints as a numbered list."""
+    if not hints:
+        return ""
+    joined = "\n".join(f"{i}) {h}" for i, h in enumerate(hints, start=1))
+    return f"Предыдущие уточнения:\n{joined}\n"
+
+
 async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
     if not client.api_key:
         return ""
@@ -239,10 +247,7 @@ async def analyze_text_with_hint(
             "carbs": 30,
         }
     prev_json = json.dumps(prev or {}, ensure_ascii=False)
-    hints_text = ""
-    if hints:
-        joined = "\n".join(f"{i+1}) {h}" for i, h in enumerate(hints, 1))
-        hints_text = f"Предыдущие уточнения:\n{joined}\n"
+    hints_text = _format_hints(hints)
     prompt = (
         "Ты — профессиональный диетолог/нутрициолог. Ранее ты проанализировал текст и вернул такой JSON:\n"
         f"{prev_json}\n"
@@ -309,10 +314,7 @@ async def analyze_photo_with_hint(
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     prev_json = json.dumps(prev or {}, ensure_ascii=False)
-    hints_text = ""
-    if hints:
-        joined = "\n".join(f"{i+1}) {h}" for i, h in enumerate(hints, 1))
-        hints_text = f"Предыдущие уточнения:\n{joined}\n"
+    hints_text = _format_hints(hints)
     prompt = (
         "Ты — профессиональный диетолог/нутрициолог. Ранее ты проанализировал изображение и вернул такой JSON:\n"
         f"{prev_json}\n"
