@@ -73,7 +73,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     telegram_id = Column(BigInteger, unique=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    grade = Column(String, default='free')  # 'free' or 'paid'
+    grade = Column(String, default='free')  # 'free', 'paid' or 'pro'
     request_limit = Column(Integer, default=20)
     requests_used = Column(Integer, default=0)
     period_start = Column(DateTime, default=datetime.utcnow)

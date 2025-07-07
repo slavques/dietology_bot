@@ -64,7 +64,7 @@ async def process_edit(message: types.Message, state: FSMContext):
         return
     meal = pending_meals[meal_id]
     session = SessionLocal()
-    ensure_user(session, message.from_user.id)
+    user = ensure_user(session, message.from_user.id)
     session.close()
     MAX_LEN = 200
     if not message.text or len(message.text) > MAX_LEN:
@@ -76,11 +76,11 @@ async def process_edit(message: types.Message, state: FSMContext):
     meal.setdefault('hints', [])
     if meal.get('photo_path'):
         result = await analyze_photo_with_hint(
-            meal['photo_path'], message.text, meal, meal['hints']
+            meal['photo_path'], message.text, meal, meal['hints'], user.grade
         )
     else:
         result = await analyze_text_with_hint(
-            meal.get('text', ''), message.text, meal, meal['hints']
+            meal.get('text', ''), message.text, meal, meal['hints'], user.grade
         )
     if result.get('error') or (
         result.get('success') is False and not any(k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs'))

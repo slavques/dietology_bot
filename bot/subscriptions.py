@@ -53,7 +53,7 @@ def update_limits(user: User) -> None:
     elif now.date() != user.daily_start.date():
         user.daily_start = now
         user.daily_used = 0
-    if user.grade == "paid":
+    if user.grade in {"paid", "pro"}:
         if user.period_end and now > user.period_end:
             # subscription expired
             user.grade = "free"
@@ -81,31 +81,33 @@ def has_request_quota(session: SessionLocal, user: User) -> bool:
     """Check if user has remaining GPT requests without consuming one."""
     update_limits(user)
     session.commit()
-    if user.grade == "paid" and user.daily_used >= 100:
+    if user.grade in {"paid", "pro"} and user.daily_used >= 100:
         return False
     return user.requests_used < user.request_limit
 
 
 def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
     update_limits(user)
-    if user.grade == "paid" and user.daily_used >= 100:
+    if user.grade in {"paid", "pro"} and user.daily_used >= 100:
         return False, "daily"
     if user.requests_used >= user.request_limit:
         return False, "monthly"
     user.requests_used += 1
-    if user.grade == "paid":
+    if user.grade in {"paid", "pro"}:
         user.daily_used += 1
     session.commit()
     return True, ""
 
 
 def days_left(user: User) -> Optional[int]:
-    if user.grade != "paid" or not user.period_end:
+    if user.grade not in {"paid", "pro"} or not user.period_end:
         return None
     return (user.period_end.date() - datetime.utcnow().date()).days
 
 
-def process_payment_success(session: SessionLocal, user: User, months: int = 1):
+def process_payment_success(
+    session: SessionLocal, user: User, months: int = 1, grade: str = "paid"
+):
     now = datetime.utcnow()
 
     def add_month(dt: datetime, count: int = 1) -> datetime:
@@ -115,11 +117,11 @@ def process_payment_success(session: SessionLocal, user: User, months: int = 1):
         day = min(dt.day, monthrange(year, month)[1])
         return dt.replace(year=year, month=month, day=day)
 
-    if user.grade == "paid" and user.period_end and user.period_end > now:
+    if user.grade in {"paid", "pro"} and user.period_end and user.period_end > now:
         user.period_end = add_month(user.period_end, months)
     else:
         user.period_end = add_month(now, months)
-    user.grade = "paid"
+    user.grade = grade
     user.request_limit = PAID_LIMIT
     user.requests_used = 0
     user.notified_7d = False
@@ -145,7 +147,7 @@ async def _daily_check(bot: Bot):
     now = datetime.utcnow()
     users = session.query(User).all()
     for user in users:
-        if user.grade == "paid" and user.period_end:
+        if user.grade in {"paid", "pro"} and user.period_end:
             days = (user.period_end.date() - now.date()).days
             text = None
             if days <= 0 and not user.notified_0d:
