@@ -73,7 +73,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         img.save(photo_path, format="JPEG", quality=95)
     except Exception:
         pass
-    result = await analyze_photo(photo_path)
+    result = await analyze_photo(photo_path, grade=user.grade)
     if result.get('error'):
         await message.answer(RECOGNITION_ERROR)
         return
