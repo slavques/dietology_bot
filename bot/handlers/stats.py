@@ -108,6 +108,10 @@ async def cb_report_day(query: types.CallbackQuery):
         new_text = REPORT_EMPTY
         if query.message.text != new_text:
             await query.message.edit_text(new_text)
+        builder = InlineKeyboardBuilder()
+        builder.button(text=BTN_BACK, callback_data="stats_menu")
+        builder.adjust(1)
+        await query.message.edit_reply_markup(reply_markup=builder.as_markup())
         await query.answer()
         return
 
@@ -180,9 +184,12 @@ async def report_day(message: types.Message):
     )
     session.close()
     if not meals:
+        builder = InlineKeyboardBuilder()
+        builder.button(text=BTN_BACK, callback_data="stats_menu")
+        builder.adjust(1)
         await message.answer(
             REPORT_EMPTY,
-            reply_markup=main_menu_kb(),
+            reply_markup=builder.as_markup(),
         )
         return
 
