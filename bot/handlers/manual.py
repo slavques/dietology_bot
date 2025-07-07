@@ -48,9 +48,10 @@ async def process_manual(message: types.Message, state: FSMContext):
             await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
         session.close()
         return
+    grade = user.grade
     session.close()
 
-    result = await analyze_text(message.text, grade=user.grade)
+    result = await analyze_text(message.text, grade=grade)
     if result.get("error") or not result.get("is_food"):
         await message.answer(MANUAL_ERROR)
         return

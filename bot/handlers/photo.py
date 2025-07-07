@@ -58,6 +58,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
             await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
         session.close()
         return
+    grade = user.grade
     session.close()
 
     await message.reply(PHOTO_ANALYZING)
@@ -73,7 +74,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         img.save(photo_path, format="JPEG", quality=95)
     except Exception:
         pass
-    result = await analyze_photo(photo_path, grade=user.grade)
+    result = await analyze_photo(photo_path, grade=grade)
     if result.get('error'):
         await message.answer(RECOGNITION_ERROR)
         return

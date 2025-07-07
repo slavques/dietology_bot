@@ -1,6 +1,5 @@
 from __future__ import annotations
 from datetime import datetime, timedelta
-from calendar import monthrange
 from typing import Optional
 
 import asyncio
@@ -110,17 +109,14 @@ def process_payment_success(
 ):
     now = datetime.utcnow()
 
-    def add_month(dt: datetime, count: int = 1) -> datetime:
-        month = dt.month + count
-        year = dt.year + (month - 1) // 12
-        month = (month - 1) % 12 + 1
-        day = min(dt.day, monthrange(year, month)[1])
-        return dt.replace(year=year, month=month, day=day)
+    def add_period(dt: datetime, count: int = 1) -> datetime:
+        """Add count * 30 days to dt."""
+        return dt + timedelta(days=30 * count)
 
     if user.grade in {"paid", "pro"} and user.period_end and user.period_end > now:
-        user.period_end = add_month(user.period_end, months)
+        user.period_end = add_period(user.period_end, months)
     else:
-        user.period_end = add_month(now, months)
+        user.period_end = add_period(now, months)
     user.grade = grade
     user.request_limit = PAID_LIMIT
     user.requests_used = 0
