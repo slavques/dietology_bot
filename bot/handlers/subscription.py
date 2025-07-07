@@ -11,6 +11,7 @@ from ..keyboards import (
     back_menu_kb,
     payment_method_inline,
     subscription_plans_inline_kb,
+    subscription_grades_inline_kb,
     menu_inline_kb,
 )
 from ..config import YOOKASSA_TOKEN
