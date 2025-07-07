@@ -50,7 +50,7 @@ async def process_manual(message: types.Message, state: FSMContext):
         return
     session.close()
 
-    result = await analyze_text(message.text)
+    result = await analyze_text(message.text, grade=user.grade)
     if result.get("error") or not result.get("is_food"):
         await message.answer(MANUAL_ERROR)
         return
