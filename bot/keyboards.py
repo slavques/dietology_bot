@@ -3,7 +3,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
-from .settings import PLAN_PRICES
+from .settings import PLAN_PRICES, PRO_PLAN_PRICES
 from .texts import (
     BTN_EDIT,
     BTN_DELETE,
@@ -31,6 +31,8 @@ from .texts import (
     BTN_PLAN_1M,
     BTN_PLAN_3M,
     BTN_PLAN_6M,
+    BTN_PRO_MODE,
+    BTN_LIGHT_MODE,
     BTN_MANUAL,
     BTN_SETTINGS,
 )
@@ -119,13 +121,13 @@ def back_menu_kb() -> ReplyKeyboardMarkup:
     """Same as main_menu_kb for backward compatibility."""
     return main_menu_kb()
 
-def pay_kb(code: Optional[str] = None, include_back: bool = False) -> InlineKeyboardMarkup:
+def pay_kb(code: Optional[str] = None, tier: str = "light", include_back: bool = False) -> InlineKeyboardMarkup:
     """Inline keyboard with a payment button and optional back."""
     builder = InlineKeyboardBuilder()
-    cb = f"pay:{code}" if code else "pay"
+    cb = f"pay:{tier}:{code}" if code else "pay"
     builder.button(text=BTN_PAY, callback_data=cb)
     if include_back:
-        builder.button(text=BTN_BACK, callback_data=f"method_back:{code}")
+        builder.button(text=BTN_BACK_TEXT, callback_data=f"method_back:{tier}:{code}")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -153,12 +155,12 @@ def payment_methods_kb() -> ReplyKeyboardMarkup:
     )
 
 
-def payment_method_inline(code: str, include_back: bool = False) -> InlineKeyboardMarkup:
+def payment_method_inline(code: str, tier: str, include_back: bool = False) -> InlineKeyboardMarkup:
     """Inline keyboard with a payment method and optional back button."""
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_BANK_CARD, callback_data=f"method:{code}")
+    builder.button(text=BTN_BANK_CARD, callback_data=f"method:{tier}:{code}")
     if include_back:
-        builder.button(text=BTN_BACK, callback_data="sub_plans")
+        builder.button(text=BTN_BACK_TEXT, callback_data=f"plan_back:{tier}")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -167,6 +169,16 @@ def subscribe_button(text: str) -> InlineKeyboardMarkup:
     """Inline keyboard leading to the subscription menu."""
     builder = InlineKeyboardBuilder()
     builder.button(text=text, callback_data="subscribe")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def subscription_grades_inline_kb() -> InlineKeyboardMarkup:
+    """Choose between PRO and light plans."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_PRO_MODE, callback_data="grade:pro")
+    builder.button(text=BTN_LIGHT_MODE, callback_data="grade:light")
+    builder.button(text=BTN_BACK_TEXT, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -199,11 +211,12 @@ def back_inline_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def subscription_plans_inline_kb() -> InlineKeyboardMarkup:
+def subscription_plans_inline_kb(tier: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_PLAN_1M.format(price=PLAN_PRICES['1m']), callback_data="plan:1m")
-    builder.button(text=BTN_PLAN_3M.format(price=PLAN_PRICES['3m']), callback_data="plan:3m")
-    builder.button(text=BTN_PLAN_6M.format(price=PLAN_PRICES['6m']), callback_data="plan:6m")
-    builder.button(text=BTN_BACK, callback_data="menu")
+    prices = PLAN_PRICES if tier == "light" else PRO_PLAN_PRICES
+    builder.button(text=BTN_PLAN_1M.format(price=prices['1m']), callback_data=f"plan:{tier}:1m")
+    builder.button(text=BTN_PLAN_3M.format(price=prices['3m']), callback_data=f"plan:{tier}:3m")
+    builder.button(text=BTN_PLAN_6M.format(price=prices['6m']), callback_data=f"plan:{tier}:6m")
+    builder.button(text=BTN_BACK_TEXT, callback_data="sub_grades")
     builder.adjust(1)
     return builder.as_markup()
