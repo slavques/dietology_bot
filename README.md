@@ -64,8 +64,8 @@ sqlite3 bot.db
 ```
 
 Within the shell you can list tables with `.tables`, show table schemas with
-`.schema users` or `.schema meals` and execute regular SQL statements. For
-example, granting a user paid status:
+`.schema users`, `.schema meals` or `.schema payments` and execute regular SQL
+statements. For example, granting a user paid status:
 
 ```sql
 UPDATE users SET grade='paid' WHERE telegram_id = 12345;

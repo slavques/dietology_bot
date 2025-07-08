@@ -2,8 +2,8 @@ import json
 import base64
 import re
 import asyncio
-import logging
 from typing import Dict, List, Any, Optional
+from .logger import log
 
 import openai
 from openai import RateLimitError, BadRequestError
@@ -111,7 +111,7 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
     # Log the prompt being sent to OpenAI for easier debugging
     try:
         system_msg = next(m["content"] for m in messages if m.get("role") == "system")
-        logging.info("OpenAI prompt: %s", system_msg)
+        log("prompt", "%s", system_msg)
     except Exception:
         pass
     instructions, input_items = _prepare_input(messages)
@@ -136,7 +136,7 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
                 store=False,
             )
             content = resp.output_text
-            logging.info("OpenAI response: %s", content)
+            log("response", "%s", content)
             return content
         except RateLimitError:
             if attempt < retries - 1:
@@ -157,7 +157,7 @@ async def _completion(
         return ""
     try:
         system_msg = next(m["content"] for m in messages if m.get("role") == "system")
-        logging.info("OpenAI prompt: %s", system_msg)
+        log("prompt", "%s", system_msg)
     except Exception:
         system_msg = None
     prompt_parts = []
@@ -180,7 +180,7 @@ async def _completion(
                 top_p=0.9,
             )
             content = resp.choices[0].text
-            logging.info("OpenAI response: %s", content)
+            log("response", "%s", content)
             return content
         except RateLimitError:
             if attempt < retries - 1:
@@ -212,7 +212,9 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     prompt = PRO_PHOTO_PROMPT
-    sender = _chat if grade == "pro" else _completion
+    # The Completions API does not support images, so we always use
+    # the Responses API for photo analysis regardless of user tier.
+    sender = _chat
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -385,7 +387,9 @@ async def analyze_photo_with_hint(
         hints=hints_text,
         hint=hint,
     )
-    sender = _chat if grade == "pro" else _completion
+    # As with the initial photo analysis, hints with photos must always use
+    # the Responses API since the Completions endpoint cannot process images.
+    sender = _chat
     content = await sender(
         [
             {"role": "system", "content": prompt},

@@ -15,7 +15,8 @@ from .texts import (
     BTN_REMOVE_LIMIT,
 )
 
-from .database import SessionLocal, User
+from .database import SessionLocal, User, Payment
+from .logger import log
 
 FREE_LIMIT = 20
 PAID_LIMIT = 800
@@ -65,6 +66,7 @@ def update_limits(user: User) -> None:
             user.notified_1d = False
             user.notified_0d = False
             user.notified_free = True
+            log("notification", "subscription expired for %s", user.telegram_id)
     else:
         if user.period_end is None:
             user.period_end = user.period_start + timedelta(days=30)
@@ -74,6 +76,7 @@ def update_limits(user: User) -> None:
             user.period_end = now + timedelta(days=30)
             user.requests_used = 0
             user.notified_free = prev == 0
+            log("limit", "free requests renewed for %s", user.telegram_id)
 
 
 def has_request_quota(session: SessionLocal, user: User) -> bool:
@@ -88,13 +91,16 @@ def has_request_quota(session: SessionLocal, user: User) -> bool:
 def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
     update_limits(user)
     if user.grade in {"paid", "pro"} and user.daily_used >= 100:
+        log("limit", "daily limit reached for %s", user.telegram_id)
         return False, "daily"
     if user.requests_used >= user.request_limit:
+        log("limit", "monthly limit reached for %s", user.telegram_id)
         return False, "monthly"
     user.requests_used += 1
     if user.grade in {"paid", "pro"}:
         user.daily_used += 1
     session.commit()
+    log("limit", "request consumed by %s", user.telegram_id)
     return True, ""
 
 
@@ -124,7 +130,10 @@ def process_payment_success(
     user.notified_3d = False
     user.notified_1d = False
     user.notified_0d = False
+    payment = Payment(user_id=user.id, months=months, tier=grade)
+    session.add(payment)
     session.commit()
+    log("payment", "subscription purchased: %s for %s months", user.telegram_id, months)
 
 
 def subscription_watcher(bot: Bot, check_interval: int = 3600):
@@ -162,6 +171,7 @@ async def _daily_check(bot: Bot):
                 kb = subscribe_button(BTN_RENEW_SUB)
                 try:
                     await bot.send_message(user.telegram_id, text, reply_markup=kb)
+                    log("notification", "sent subscription notice to %s", user.telegram_id)
                 except Exception:
                     pass
         update_limits(user)
@@ -173,6 +183,7 @@ async def _daily_check(bot: Bot):
                     reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
                 )
                 user.notified_free = True
+                log("notification", "sent free quota notice to %s", user.telegram_id)
             except Exception:
                 pass
     session.commit()
