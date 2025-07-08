@@ -15,7 +15,8 @@ from .texts import (
     BTN_REMOVE_LIMIT,
 )
 
-from .database import SessionLocal, User
+from .database import SessionLocal, User, Payment
+
 from .logger import log
 
 FREE_LIMIT = 20
@@ -130,6 +131,8 @@ def process_payment_success(
     user.notified_3d = False
     user.notified_1d = False
     user.notified_0d = False
+    payment = Payment(user_id=user.id, months=months, tier=grade)
+    session.add(payment)
     session.commit()
     log("payment", "subscription purchased: %s for %s months", user.telegram_id, months)
 

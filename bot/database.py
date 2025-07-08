@@ -102,5 +102,18 @@ class Meal(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     user = relationship('User', back_populates='meals')
 
+
+class Payment(Base):
+    """Record of a successful subscription purchase."""
+
+    __tablename__ = 'payments'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    tier = Column(String)
+    months = Column(Integer, default=1)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    user = relationship('User')
+
 Base.metadata.create_all(engine)
 _ensure_columns()
