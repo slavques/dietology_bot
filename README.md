@@ -53,6 +53,20 @@ python scripts/prompt_sandbox.py "описание блюда" --text
 Add `--hint "ваше уточнение"` to simulate clarification requests. The script
 prints the JSON response from the OpenAI API.
 
+### Custom prompts
+
+All GPT prompts are stored in `bot/prompts.py`. There are separate constants
+for PRO and free tiers, currently containing the same text. Edit these strings
+manually to tweak recognition behavior.
+
+The hint prompts use placeholders:
+
+- `{context}` — previous JSON response if available.
+- `{hints}` — numbered list of earlier clarifications.
+- `{hint}` — the latest user clarification.
+
+These placeholders are filled automatically when the bot calls the OpenAI API.
+
 ### Manual database access
 
 The default SQLite database can be inspected and edited directly. Install the
