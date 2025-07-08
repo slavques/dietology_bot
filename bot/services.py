@@ -212,7 +212,9 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     prompt = PRO_PHOTO_PROMPT
-    sender = _chat if grade == "pro" else _completion
+    # The Completions API does not support images, so we always use
+    # the Responses API for photo analysis regardless of user tier.
+    sender = _chat
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -385,7 +387,9 @@ async def analyze_photo_with_hint(
         hints=hints_text,
         hint=hint,
     )
-    sender = _chat if grade == "pro" else _completion
+    # As with the initial photo analysis, hints with photos must always use
+    # the Responses API since the Completions endpoint cannot process images.
+    sender = _chat
     content = await sender(
         [
             {"role": "system", "content": prompt},
