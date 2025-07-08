@@ -2,8 +2,8 @@ import json
 import base64
 import re
 import asyncio
-import logging
 from typing import Dict, List, Any, Optional
+from .logger import log
 
 import openai
 from openai import RateLimitError, BadRequestError
@@ -111,7 +111,7 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
     # Log the prompt being sent to OpenAI for easier debugging
     try:
         system_msg = next(m["content"] for m in messages if m.get("role") == "system")
-        logging.info("OpenAI prompt: %s", system_msg)
+        log("prompt", "%s", system_msg)
     except Exception:
         pass
     instructions, input_items = _prepare_input(messages)
@@ -136,7 +136,7 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
                 store=False,
             )
             content = resp.output_text
-            logging.info("OpenAI response: %s", content)
+            log("response", "%s", content)
             return content
         except RateLimitError:
             if attempt < retries - 1:
@@ -157,7 +157,7 @@ async def _completion(
         return ""
     try:
         system_msg = next(m["content"] for m in messages if m.get("role") == "system")
-        logging.info("OpenAI prompt: %s", system_msg)
+        log("prompt", "%s", system_msg)
     except Exception:
         system_msg = None
     prompt_parts = []
@@ -180,7 +180,7 @@ async def _completion(
                 top_p=0.9,
             )
             content = resp.choices[0].text
-            logging.info("OpenAI response: %s", content)
+            log("response", "%s", content)
             return content
         except RateLimitError:
             if attempt < retries - 1:

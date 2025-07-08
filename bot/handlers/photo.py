@@ -24,6 +24,7 @@ from ..texts import (
     BTN_DELETE,
     BTN_REMOVE_LIMITS,
 )
+from ..logger import log
 
 async def request_photo(message: types.Message):
     session = SessionLocal()
@@ -32,10 +33,12 @@ async def request_photo(message: types.Message):
         reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
         text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
         await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
+        log("notification", "limit reached message sent to %s", message.from_user.id)
         session.close()
         return
     session.close()
     await message.answer(REQUEST_PHOTO, reply_markup=back_menu_kb())
+    log("notification", "photo request prompt sent to %s", message.from_user.id)
 
 async def handle_photo(message: types.Message, state: FSMContext):
     if message.media_group_id:
@@ -52,10 +55,12 @@ async def handle_photo(message: types.Message, state: FSMContext):
                 PAID_DAILY_LIMIT_TEXT.format(support=SUPPORT_HANDLE),
                 reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
             )
+            log("notification", "daily limit message sent to %s", message.from_user.id)
         else:
             reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
             text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
             await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
+            log("notification", "monthly limit message sent to %s", message.from_user.id)
         session.close()
         return
     grade = user.grade
@@ -75,6 +80,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
     except Exception:
         pass
     result = await analyze_photo(photo_path, grade=grade)
+    log("prompt", "photo analyzed for %s", message.from_user.id)
     if result.get('error'):
         await message.answer(RECOGNITION_ERROR)
         return
