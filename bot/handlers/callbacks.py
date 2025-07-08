@@ -21,6 +21,7 @@ from ..texts import (
     SESSION_EXPIRED_RETRY,
     PORTION_PREFIXES,
 )
+from ..logger import log
 
 
 async def cb_refine(query: types.CallbackQuery, state: FSMContext):
@@ -83,6 +84,7 @@ async def process_edit(message: types.Message, state: FSMContext):
         result = await analyze_text_with_hint(
             meal.get('text', ''), message.text, meal, meal['hints'], grade
         )
+    log("prompt", "clarification analyzed for %s", message.from_user.id)
     if result.get('error') or (
         result.get('success') is False and not any(k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs'))
     ):
@@ -96,6 +98,7 @@ async def process_edit(message: types.Message, state: FSMContext):
         meal['error_msg'] = err.message_id
         meal.setdefault('clarifications', 0)
         meal['clarifications'] += 1
+        log("prompt", "clarification failed for %s", message.from_user.id)
         return
     serving = parse_serving(result.get('serving', meal['serving']))
     macros = {
@@ -180,6 +183,7 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     )
     session.add(new_meal)
     session.commit()
+    log("meal_save", "meal saved for %s: %s %s g", query.from_user.id, name, serving)
     session.close()
     await query.message.edit_reply_markup(reply_markup=None)
     await query.answer()

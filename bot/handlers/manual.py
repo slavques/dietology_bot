@@ -21,6 +21,7 @@ from ..texts import (
     BTN_DELETE,
     BTN_REMOVE_LIMITS,
 )
+from ..logger import log
 
 
 async def manual_start(query: types.CallbackQuery, state: FSMContext):
@@ -28,6 +29,7 @@ async def manual_start(query: types.CallbackQuery, state: FSMContext):
     await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await state.set_state(ManualMeal.waiting_text)
     await query.answer()
+    log("notification", "manual input prompt sent to %s", query.from_user.id)
 
 
 async def process_manual(message: types.Message, state: FSMContext):
@@ -42,18 +44,22 @@ async def process_manual(message: types.Message, state: FSMContext):
                 PAID_DAILY_LIMIT_TEXT.format(support=SUPPORT_HANDLE),
                 reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
             )
+            log("notification", "daily limit message sent to %s", message.from_user.id)
         else:
             reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
             text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
             await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
+            log("notification", "monthly limit message sent to %s", message.from_user.id)
         session.close()
         return
     grade = user.grade
     session.close()
 
     result = await analyze_text(message.text, grade=grade)
+    log("prompt", "text analyzed for %s", message.from_user.id)
     if result.get("error") or not result.get("is_food"):
         await message.answer(MANUAL_ERROR)
+        log("prompt", "manual text not recognized for %s", message.from_user.id)
         return
     name = result.get("name")
     serving = parse_serving(result.get("serving", 0))

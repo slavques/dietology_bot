@@ -37,6 +37,7 @@ from ..texts import (
     INVOICE_LABEL,
     INVOICE_TITLE,
 )
+from ..logger import log
 
 SUCCESS_CMD = "success1467"
 REFUSED_CMD = "refused1467"
@@ -77,6 +78,7 @@ async def cb_pay(query: types.CallbackQuery):
         currency="RUB",
         prices=[price],
     )
+    log("payment", "invoice sent to %s for %s", query.from_user.id, payload)
     try:
         await query.message.delete()
     except Exception:
@@ -157,11 +159,13 @@ async def cmd_success(message: types.Message):
     process_payment_success(session, user)
     session.close()
     await message.answer(SUB_SUCCESS)
+    log("payment", "manual success command by %s", message.from_user.id)
 
 async def cmd_refused(message: types.Message):
     if not message.text.startswith(f"/{REFUSED_CMD}"):
         return
     await message.answer(SUB_CANCELLED)
+    log("payment", "payment refused by %s", message.from_user.id)
 
 
 async def handle_pre_checkout(query: types.PreCheckoutQuery, bot: Bot):
@@ -183,6 +187,7 @@ async def handle_successful_payment(message: types.Message):
         SUB_SUCCESS,
         reply_markup=back_menu_kb(),
     )
+    log("payment", "successful payment from %s", message.from_user.id)
 
 
 async def cmd_notify(message: types.Message):
@@ -190,6 +195,7 @@ async def cmd_notify(message: types.Message):
         return
     await _daily_check(message.bot)
     await message.answer(NOTIFY_SENT)
+    log("notification", "manual notify triggered by %s", message.from_user.id)
 
 
 def register(dp: Dispatcher):
