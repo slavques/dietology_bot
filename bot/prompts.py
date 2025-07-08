@@ -13,7 +13,7 @@ PRO_PHOTO_PROMPT = (
     "• type: \"drink\" или \"meal\"\n"
     "• name: по-русски с заглавной буквы\n\n"
     "Ответь строго одним JSON без пояснений:\n"
-    '{"is_food":…, "confidence":…, "type":"…", "name":"…", "serving":…, "calories":…, "protein":…, "fat":…, "carbs":…}'
+    '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
 )
 
 FREE_PHOTO_PROMPT = PRO_PHOTO_PROMPT
