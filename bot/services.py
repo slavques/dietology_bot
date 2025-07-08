@@ -10,60 +10,20 @@ from openai import RateLimitError, BadRequestError
 
 from .config import OPENAI_API_KEY
 from .utils import parse_serving, to_float
+from .prompts import (
+    PRO_PHOTO_PROMPT,
+    FREE_PHOTO_PROMPT,
+    PRO_TEXT_PROMPT,
+    FREE_TEXT_PROMPT,
+    PRO_HINT_PROMPT_BASE,
+    FREE_HINT_PROMPT_BASE,
+)
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Model names for different API methods
 MODEL_NAME = "gpt-4o-mini"  # used with the Responses API
 COMPLETION_MODEL = "gpt-3.5-turbo-instruct"  # weaker model for Completions
-
-# Full prompts used for all tiers (PRO, paid, free)
-PRO_PHOTO_PROMPT = (
-    "Ты — профессиональный диетолог/нутрициолог с большим опытом.\n"
-    "Тебе придёт фото, и твоя задача:\n\n"
-    "1. Определи, есть ли на фото готовая еда, напиток или продукт питания:\n"
-    "   • Если еды или напитка нет — верни {\"is_food\": false}.\n\n"
-    "2. Если на фото товар в заводской упаковке (банка, бутылка, упаковка, контейнер с этикеткой и т.п.):\n"
-    "   Найди этот конкретный продукт в русскоязычной базе FatSecret (site:fatsecret.ru), обязательно используя точное название бренда и продукта, указанные на упаковке.\n"
-    "   • Используй КБЖУ и массу нетто порции из FatSecret строго для этого бренда и названия.\n\n"
-    "3. Если на фото напиток в стакане или приготовленное блюдо на тарелке (без заводской упаковки):\n"
-    "   Визуально определи примерный вес полной порции в граммах и максимально точно рассчитай КБЖУ. При необходимости найди похожие блюда в интернете (в том числе FatSecret), чтобы уточнить расчёт.\n\n"
-    "4. Всегда указывай уверенность распознавания от 0.0 до 1.0, тип — drink (напитки, жидкости) или meal (еда, блюда). Название пиши на русском языке с большой буквы.\n\n"
-    "5. Старайся давать схожие результаты при повторном анализе одного и того же блюда.\n\n"
-    "Ответь строго в JSON без дополнительного текста:\n"
-    '{"is_food":, "confidence":, "type":, "name": "", "serving":, "calories":, "protein":, "fat":, "carbs":}'
-)
-
-PRO_TEXT_PROMPT = (
-    "Ты — профессиональный диетолог/нутрициолог с большим опытом.\n"
-    "Тебе придёт текстовое описание, и твоя задача:\n\n"
-    "1. Определи, относится ли описание к готовой еде, напитку или продукту питания:\n"
-    "   • Если нет — верни {\"is_food\": false}.\n\n"
-    "2. Если в тексте упоминается товар с брендом или названием магазина:\n"
-    "   Найди этот конкретный продукт в русскоязычной базе FatSecret (site:fatsecret.ru), обязательно используя точное название бренда и продукта.\n"
-    "   • Используй КБЖУ и массу нетто порции из FatSecret строго для этого бренда и названия.\n\n"
-    "3. Если в тексте описано приготовленное блюдо или напиток без упаковки:\n"
-    "   Визуально (по описанию ингредиентов и объёмов) определи примерный вес порции и максимально точно рассчитай КБЖУ. При необходимости найди похожие блюда в интернете, в том числе на FatSecret.\n\n"
-    "4. Всегда указывай уверенность распознавания от 0.0 до 1.0, тип — drink или meal, название по-русски с заглавной буквы.\n\n"
-    "5. Старайся давать схожие результаты при повторном анализе одинаковых описаний.\n\n"
-    "Ответь строго в JSON без лишнего текста:\n"
-    '{"is_food":, "confidence":, "type":, "name":"", "serving":, "calories":, "protein":, "fat":, "carbs":}'
-)
-
-PRO_HINT_PROMPT_BASE = (
-    "Ты — профессиональный диетолог/нутрициолог. {context}\n"
-    "{hints}Теперь пользователь прислал уточнение: «{hint}».\n\n"
-    "Твоя задача:\n"
-    "1. Обнови информацию, если уточнение касается ингредиентов, состава, бренда, упаковки, веса или типа блюда/напитка.\n"
-    "2. Если уточнение касается бренда или продукта в упаковке — найди соответствующий товар в русскоязычной базе FatSecret (site:fatsecret.ru) и обнови `serving`, `calories`, `protein`, `fat`, `carbs` по данным именно для этого бренда.\n"
-    "3. Если уточнение касается состава блюда/напитка (например, \"творог 2%\", \"без сахара\", \"без масла\") — пересчитай КБЖУ, исключив или заменив указанные компоненты.\n"
-    "4. Если уточнение касается веса:\n   • Если явно просят пересчитать КБЖУ — сделай это.\n   • Если сказано «измени только вес» — обнови только `serving`, КБЖУ оставь как есть.\n"
-    "5. Если пользователь указывает сохранить конкретные параметры — обязательно зафиксируй их значение из предыдущего JSON.\n"
-    "6. Всегда обновляй `confidence`, `name` и `type`.\n"
-    "7. Если в уточнении нет новой информации — верни: {\"success\": false}\n"
-    "8. Верни только один JSON строго по шаблону:\n"
-    '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
-)
 
 
 def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
@@ -137,6 +97,11 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
             )
             content = resp.output_text
             log("response", "%s", content)
+            usage = getattr(resp, "usage", None)
+            if usage:
+                tokens_in = getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", None))
+                tokens_out = getattr(usage, "completion_tokens", getattr(usage, "output_tokens", None))
+                log("tokens", "in=%s out=%s total=%s", tokens_in, tokens_out, usage.total_tokens)
             return content
         except RateLimitError:
             if attempt < retries - 1:
@@ -181,6 +146,11 @@ async def _completion(
             )
             content = resp.choices[0].text
             log("response", "%s", content)
+            usage = getattr(resp, "usage", None)
+            if usage:
+                tokens_in = getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", None))
+                tokens_out = getattr(usage, "completion_tokens", getattr(usage, "output_tokens", None))
+                log("tokens", "in=%s out=%s total=%s", tokens_in, tokens_out, usage.total_tokens)
             return content
         except RateLimitError:
             if attempt < retries - 1:
@@ -211,7 +181,7 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
         }
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    prompt = PRO_PHOTO_PROMPT
+    prompt = PRO_PHOTO_PROMPT if grade == "pro" else FREE_PHOTO_PROMPT
     # The Completions API does not support images, so we always use
     # the Responses API for photo analysis regardless of user tier.
     sender = _chat
@@ -267,7 +237,7 @@ async def analyze_text(description: str, grade: str = "pro") -> Dict[str, Any]:
             "fat": 10,
             "carbs": 30,
         }
-    prompt = PRO_TEXT_PROMPT
+    prompt = PRO_TEXT_PROMPT if grade == "pro" else FREE_TEXT_PROMPT
     sender = _chat if grade == "pro" else _completion
     content = await sender([
         {"role": "system", "content": prompt},
@@ -321,7 +291,8 @@ async def analyze_text_with_hint(
         context = f"Ранее ты проанализировал текст и вернул такой JSON:\n{json.dumps(prev, ensure_ascii=False)}"
     else:
         context = "Предыдущего JSON нет."
-    prompt = PRO_HINT_PROMPT_BASE.format(
+    base = PRO_HINT_PROMPT_BASE if grade == "pro" else FREE_HINT_PROMPT_BASE
+    prompt = base.format(
         context=context,
         hints=hints_text,
         hint=hint,
@@ -382,7 +353,8 @@ async def analyze_photo_with_hint(
         context = f"Ранее ты проанализировал изображение и вернул такой JSON:\n{json.dumps(prev, ensure_ascii=False)}"
     else:
         context = "Предыдущего JSON нет."
-    prompt = PRO_HINT_PROMPT_BASE.format(
+    base = PRO_HINT_PROMPT_BASE if grade == "pro" else FREE_HINT_PROMPT_BASE
+    prompt = base.format(
         context=context,
         hints=hints_text,
         hint=hint,

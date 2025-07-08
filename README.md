@@ -39,7 +39,9 @@ so upgrades work without manual migrations on both SQLite and PostgreSQL.
 
 Log files are written to `logs/bot.log` by default (configurable via `LOG_DIR`).
 Each entry starts with the timestamp `YYYY-MM-DD HH:MM:SS`. The handler rotates
-daily and keeps the three most recent log files.
+daily and keeps the three most recent log files. Token usage for each OpenAI
+request is logged under the `tokens` category, showing input, output and total
+token counts.
 
 ### Prompt sandbox
 
@@ -52,6 +54,20 @@ python scripts/prompt_sandbox.py "описание блюда" --text
 
 Add `--hint "ваше уточнение"` to simulate clarification requests. The script
 prints the JSON response from the OpenAI API.
+
+### Custom prompts
+
+All GPT prompts are stored in `bot/prompts.py`. There are separate constants
+for PRO and free tiers, currently containing the same text. Edit these strings
+manually to tweak recognition behavior.
+
+The hint prompts use placeholders:
+
+- `{context}` — previous JSON response if available.
+- `{hints}` — numbered list of earlier clarifications.
+- `{hint}` — the latest user clarification.
+
+These placeholders are filled automatically when the bot calls the OpenAI API.
 
 ### Manual database access
 

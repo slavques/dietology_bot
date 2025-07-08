@@ -11,4 +11,6 @@ LOG_FLAGS = {
     'limit': True,
     # Saving meals to the database
     'meal_save': True,
+    # Token usage statistics from OpenAI responses
+    'tokens': True,
 }
