@@ -39,7 +39,9 @@ so upgrades work without manual migrations on both SQLite and PostgreSQL.
 
 Log files are written to `logs/bot.log` by default (configurable via `LOG_DIR`).
 Each entry starts with the timestamp `YYYY-MM-DD HH:MM:SS`. The handler rotates
-daily and keeps the three most recent log files.
+daily and keeps the three most recent log files. Token usage for each OpenAI
+request is logged under the `tokens` category, showing input, output and total
+token counts.
 
 ### Prompt sandbox
 

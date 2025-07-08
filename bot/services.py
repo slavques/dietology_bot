@@ -97,6 +97,11 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
             )
             content = resp.output_text
             log("response", "%s", content)
+            usage = getattr(resp, "usage", None)
+            if usage:
+                tokens_in = getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", None))
+                tokens_out = getattr(usage, "completion_tokens", getattr(usage, "output_tokens", None))
+                log("tokens", "in=%s out=%s total=%s", tokens_in, tokens_out, usage.total_tokens)
             return content
         except RateLimitError:
             if attempt < retries - 1:
@@ -141,6 +146,11 @@ async def _completion(
             )
             content = resp.choices[0].text
             log("response", "%s", content)
+            usage = getattr(resp, "usage", None)
+            if usage:
+                tokens_in = getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", None))
+                tokens_out = getattr(usage, "completion_tokens", getattr(usage, "output_tokens", None))
+                log("tokens", "in=%s out=%s total=%s", tokens_in, tokens_out, usage.total_tokens)
             return content
         except RateLimitError:
             if attempt < retries - 1:
