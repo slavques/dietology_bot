@@ -99,6 +99,17 @@ async def process_edit(message: types.Message, state: FSMContext):
         meal.setdefault('clarifications', 0)
         meal['clarifications'] += 1
         log("prompt", "clarification failed for %s", message.from_user.id)
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        await message.bot.edit_message_text(
+            text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
+            chat_id=meal['chat_id'],
+            message_id=meal['message_id'],
+            reply_markup=meal_actions_kb(meal_id)
+        )
+        await state.clear()
         return
     serving = parse_serving(result.get('serving', meal['serving']))
     macros = {
