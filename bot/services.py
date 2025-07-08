@@ -23,7 +23,7 @@ client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Model names for different API methods
 MODEL_NAME = "gpt-4o-mini"  # used with the Responses API
-COMPLETION_MODEL = "gpt-3.5-turbo-instruct"  # weaker model for Completions
+COMPLETION_MODEL = "gpt-4o-mini"  # weaker model for Completions
 
 
 def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
