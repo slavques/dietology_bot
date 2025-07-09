@@ -139,6 +139,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         "orig_serving": serving,
         "macros": macros,
         "orig_macros": macros.copy(),
+        "initial_json": result,
         "photo_path": photo_path,
         "chat_id": message.chat.id,
         "message_id": None,
