@@ -63,7 +63,7 @@ manually to tweak recognition behavior.
 
 The hint prompts use placeholders:
 
-- `{context}` — previous JSON response if available.
+- `{context}` — the photo or text from the initial request.
 - `{hint}` — the latest user clarification.
 
 These placeholders are filled automatically when the bot calls the OpenAI API.
