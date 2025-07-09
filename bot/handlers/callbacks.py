@@ -12,7 +12,6 @@ from ..keyboards import (
     save_options_kb,
     confirm_save_kb,
     main_menu_kb,
-    refine_back_kb,
 )
 from ..states import EditMeal
 from ..storage import pending_meals
@@ -81,14 +80,13 @@ async def process_edit(message: types.Message, state: FSMContext):
         )
         return
 
-    meal.setdefault('hints', [])
     if meal.get('photo_path'):
         result = await analyze_photo_with_hint(
-            meal['photo_path'], message.text, meal, meal['hints'], grade
+            meal['photo_path'], message.text, meal, grade
         )
     else:
         result = await analyze_text_with_hint(
-            meal.get('text', ''), message.text, meal, meal['hints'], grade
+            meal.get('text', ''), message.text, meal, grade
         )
     log("prompt", "clarification analyzed for %s", message.from_user.id)
     if result.get('error') or (
@@ -102,8 +100,6 @@ async def process_edit(message: types.Message, state: FSMContext):
             meal.pop('error_msg', None)
         err = await message.answer(REFINE_BAD_ATTEMPT)
         meal['error_msg'] = err.message_id
-        meal.setdefault('clarifications', 0)
-        meal['clarifications'] += 1
         log("prompt", "clarification failed for %s", message.from_user.id)
         try:
             await message.delete()
@@ -138,9 +134,6 @@ async def process_edit(message: types.Message, state: FSMContext):
         except Exception:
             pass
         meal.pop('error_msg', None)
-    meal.setdefault('clarifications', 0)
-    meal['clarifications'] += 1
-    meal['hints'].append(message.text)
     await message.delete()
     await message.bot.edit_message_text(
         text=format_meal_message(meal['name'], meal['serving'], meal['macros']),

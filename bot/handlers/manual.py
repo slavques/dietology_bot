@@ -4,9 +4,14 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import StateFilter
 from datetime import timedelta
 
-from ..services import analyze_text, analyze_text_with_hint
+from ..services import analyze_text
 from ..utils import format_meal_message, parse_serving, to_float
-from ..keyboards import meal_actions_kb, back_menu_kb, back_inline_kb, subscribe_button
+from ..keyboards import (
+    meal_actions_kb,
+    back_menu_kb,
+    back_inline_kb,
+    subscribe_button,
+)
 from ..subscriptions import consume_request, ensure_user
 from ..database import SessionLocal
 from ..states import ManualMeal, EditMeal
@@ -40,16 +45,31 @@ async def process_manual(message: types.Message, state: FSMContext):
         if reason == "daily":
             from ..settings import SUPPORT_HANDLE
             from ..texts import PAID_DAILY_LIMIT_TEXT
+
             await message.answer(
                 PAID_DAILY_LIMIT_TEXT.format(support=SUPPORT_HANDLE),
                 reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
             )
-            log("notification", "daily limit message sent to %s", message.from_user.id)
+            log(
+                "notification",
+                "daily limit message sent to %s",
+                message.from_user.id,
+            )
         else:
-            reset = user.period_end.date() if user.period_end else (user.period_start + timedelta(days=30)).date()
+            reset = (
+                user.period_end.date()
+                if user.period_end
+                else (user.period_start + timedelta(days=30)).date()
+            )
             text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
-            await message.answer(text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS))
-            log("notification", "monthly limit message sent to %s", message.from_user.id)
+            await message.answer(
+                text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS)
+            )
+            log(
+                "notification",
+                "monthly limit message sent to %s",
+                message.from_user.id,
+            )
         session.close()
         return
     grade = user.grade
@@ -59,7 +79,9 @@ async def process_manual(message: types.Message, state: FSMContext):
     log("prompt", "text analyzed for %s", message.from_user.id)
     if result.get("error") or not result.get("is_food"):
         await message.answer(MANUAL_ERROR)
-        log("prompt", "manual text not recognized for %s", message.from_user.id)
+        log(
+            "prompt", "manual text not recognized for %s", message.from_user.id
+        )
         return
     name = result.get("name")
     serving = parse_serving(result.get("serving", 0))
@@ -79,8 +101,6 @@ async def process_manual(message: types.Message, state: FSMContext):
         "macros": macros,
         "orig_macros": macros.copy(),
         "text": message.text,
-        "clarifications": 0,
-        "hints": [],
         "chat_id": message.chat.id,
         "message_id": None,
     }
@@ -109,4 +129,6 @@ async def process_manual(message: types.Message, state: FSMContext):
 
 def register(dp: Dispatcher):
     dp.callback_query.register(manual_start, F.data == "manual")
-    dp.message.register(process_manual, StateFilter(ManualMeal.waiting_text), F.text)
+    dp.message.register(
+        process_manual, StateFilter(ManualMeal.waiting_text), F.text
+    )
