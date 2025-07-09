@@ -53,24 +53,22 @@ def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
         elif isinstance(content, str):
             parts.append({"type": "input_text", "text": content})
         if parts:
-            input_items.append({"type": "message", "role": role, "content": parts})
+            input_items.append(
+                {"type": "message", "role": role, "content": parts}
+            )
     return instructions, input_items
 
 
-def _format_hints(hints: Optional[List[str]]) -> str:
-    """Format clarification hints as a numbered list."""
-    if not hints:
-        return ""
-    joined = "\n".join(f"{i}) {h}" for i, h in enumerate(hints, start=1))
-    return f"Предыдущие уточнения:\n{joined}\n"
-
-
-async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) -> str:
+async def _chat(
+    messages: List[Dict], retries: int = 3, backoff: float = 0.5
+) -> str:
     if not client.api_key:
         return ""
     # Log the prompt being sent to OpenAI for easier debugging
     try:
-        system_msg = next(m["content"] for m in messages if m.get("role") == "system")
+        system_msg = next(
+            m["content"] for m in messages if m.get("role") == "system"
+        )
         log("prompt", "%s", system_msg)
     except Exception:
         pass
@@ -99,13 +97,27 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
             log("response", "%s", content)
             usage = getattr(resp, "usage", None)
             if usage:
-                tokens_in = getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", None))
-                tokens_out = getattr(usage, "completion_tokens", getattr(usage, "output_tokens", None))
-                log("tokens", "in=%s out=%s total=%s", tokens_in, tokens_out, usage.total_tokens)
+                tokens_in = getattr(
+                    usage,
+                    "prompt_tokens",
+                    getattr(usage, "input_tokens", None),
+                )
+                tokens_out = getattr(
+                    usage,
+                    "completion_tokens",
+                    getattr(usage, "output_tokens", None),
+                )
+                log(
+                    "tokens",
+                    "in=%s out=%s total=%s",
+                    tokens_in,
+                    tokens_out,
+                    usage.total_tokens,
+                )
             return content
         except RateLimitError:
             if attempt < retries - 1:
-                await asyncio.sleep(backoff * (2 ** attempt))
+                await asyncio.sleep(backoff * (2**attempt))
                 continue
             return "__RATE_LIMIT__"
         except BadRequestError:
@@ -115,13 +127,18 @@ async def _chat(messages: List[Dict], retries: int = 3, backoff: float = 0.5) ->
 
 
 async def _completion(
-    messages: List[Dict], model: str = COMPLETION_MODEL, retries: int = 3, backoff: float = 0.5
+    messages: List[Dict],
+    model: str = COMPLETION_MODEL,
+    retries: int = 3,
+    backoff: float = 0.5,
 ) -> str:
     """Call the legacy Completions API for non‑PRO tiers."""
     if not client.api_key:
         return ""
     try:
-        system_msg = next(m["content"] for m in messages if m.get("role") == "system")
+        system_msg = next(
+            m["content"] for m in messages if m.get("role") == "system"
+        )
         log("prompt", "%s", system_msg)
     except Exception:
         system_msg = None
@@ -148,21 +165,33 @@ async def _completion(
             log("response", "%s", content)
             usage = getattr(resp, "usage", None)
             if usage:
-                tokens_in = getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", None))
-                tokens_out = getattr(usage, "completion_tokens", getattr(usage, "output_tokens", None))
-                log("tokens", "in=%s out=%s total=%s", tokens_in, tokens_out, usage.total_tokens)
+                tokens_in = getattr(
+                    usage,
+                    "prompt_tokens",
+                    getattr(usage, "input_tokens", None),
+                )
+                tokens_out = getattr(
+                    usage,
+                    "completion_tokens",
+                    getattr(usage, "output_tokens", None),
+                )
+                log(
+                    "tokens",
+                    "in=%s out=%s total=%s",
+                    tokens_in,
+                    tokens_out,
+                    usage.total_tokens,
+                )
             return content
         except RateLimitError:
             if attempt < retries - 1:
-                await asyncio.sleep(backoff * (2 ** attempt))
+                await asyncio.sleep(backoff * (2**attempt))
                 continue
             return "__RATE_LIMIT__"
         except BadRequestError:
             return "__BAD_REQUEST__"
         except Exception:
             return "__ERROR__"
-
-
 
 
 async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
@@ -203,15 +232,15 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
         return {"error": content.strip("_").lower()}
     try:
         data = json.loads(content)
-        if 'serving' in data:
-            data['serving'] = parse_serving(data['serving'])
-        for k in ('calories', 'protein', 'fat', 'carbs'):
+        if "serving" in data:
+            data["serving"] = parse_serving(data["serving"])
+        for k in ("calories", "protein", "fat", "carbs"):
             if k in data:
                 data[k] = to_float(data[k])
-        if 'name' in data and isinstance(data['name'], str):
-            data['name'] = data['name'].strip().capitalize()
-        if 'type' in data and isinstance(data['type'], str):
-            data['type'] = data['type'].lower()
+        if "name" in data and isinstance(data["name"], str):
+            data["name"] = data["name"].strip().capitalize()
+        if "type" in data and isinstance(data["type"], str):
+            data["type"] = data["type"].lower()
         return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
@@ -239,23 +268,25 @@ async def analyze_text(description: str, grade: str = "pro") -> Dict[str, Any]:
         }
     prompt = PRO_TEXT_PROMPT if grade == "pro" else FREE_TEXT_PROMPT
     sender = _chat if grade == "pro" else _completion
-    content = await sender([
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": description},
-    ])
+    content = await sender(
+        [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": description},
+        ]
+    )
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
         data = json.loads(content)
-        if 'serving' in data:
-            data['serving'] = parse_serving(data['serving'])
-        for k in ('calories', 'protein', 'fat', 'carbs'):
+        if "serving" in data:
+            data["serving"] = parse_serving(data["serving"])
+        for k in ("calories", "protein", "fat", "carbs"):
             if k in data:
                 data[k] = to_float(data[k])
-        if 'name' in data and isinstance(data['name'], str):
-            data['name'] = data['name'].strip().capitalize()
-        if 'type' in data and isinstance(data['type'], str):
-            data['type'] = data['type'].lower()
+        if "name" in data and isinstance(data["name"], str):
+            data["name"] = data["name"].strip().capitalize()
+        if "type" in data and isinstance(data["type"], str):
+            data["type"] = data["type"].lower()
         return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
@@ -271,7 +302,6 @@ async def analyze_text_with_hint(
     description: str,
     hint: str,
     prev: Optional[Dict[str, Any]] = None,
-    hints: Optional[list[str]] = None,
     grade: str = "pro",
 ) -> Dict[str, Any]:
     """Clarify text description with additional hint."""
@@ -286,7 +316,6 @@ async def analyze_text_with_hint(
             "fat": 10,
             "carbs": 30,
         }
-    hints_text = _format_hints(hints)
     if prev:
         context = f"Ранее ты проанализировал текст и вернул такой JSON:\n{json.dumps(prev, ensure_ascii=False)}"
     else:
@@ -294,27 +323,28 @@ async def analyze_text_with_hint(
     base = PRO_HINT_PROMPT_BASE if grade == "pro" else FREE_HINT_PROMPT_BASE
     prompt = base.format(
         context=context,
-        hints=hints_text,
         hint=hint,
     )
     sender = _chat if grade == "pro" else _completion
-    content = await sender([
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": description},
-    ])
+    content = await sender(
+        [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": description},
+        ]
+    )
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
         data = json.loads(content)
-        if 'serving' in data:
-            data['serving'] = parse_serving(data['serving'])
-        for k in ('calories', 'protein', 'fat', 'carbs'):
+        if "serving" in data:
+            data["serving"] = parse_serving(data["serving"])
+        for k in ("calories", "protein", "fat", "carbs"):
             if k in data:
                 data[k] = to_float(data[k])
-        if 'name' in data and isinstance(data['name'], str):
-            data['name'] = data['name'].strip().capitalize()
-        if 'type' in data and isinstance(data['type'], str):
-            data['type'] = data['type'].lower()
+        if "name" in data and isinstance(data["name"], str):
+            data["name"] = data["name"].strip().capitalize()
+        if "type" in data and isinstance(data["type"], str):
+            data["type"] = data["type"].lower()
         return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
@@ -330,7 +360,6 @@ async def analyze_photo_with_hint(
     photo_path: str,
     hint: str,
     prev: Optional[Dict[str, Any]] = None,
-    hints: Optional[list[str]] = None,
     grade: str = "pro",
 ) -> Dict[str, Any]:
     """Re-analyze a photo using user clarification about the dish or beverage."""
@@ -348,7 +377,6 @@ async def analyze_photo_with_hint(
         }
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    hints_text = _format_hints(hints)
     if prev:
         context = f"Ранее ты проанализировал изображение и вернул такой JSON:\n{json.dumps(prev, ensure_ascii=False)}"
     else:
@@ -356,10 +384,9 @@ async def analyze_photo_with_hint(
     base = PRO_HINT_PROMPT_BASE if grade == "pro" else FREE_HINT_PROMPT_BASE
     prompt = base.format(
         context=context,
-        hints=hints_text,
         hint=hint,
     )
-    # As with the initial photo analysis, hints with photos must always use
+    # As with the initial photo analysis, clarifications with photos must always use
     # the Responses API since the Completions endpoint cannot process images.
     sender = _chat
     content = await sender(
@@ -380,15 +407,15 @@ async def analyze_photo_with_hint(
         return {"error": content.strip("_").lower()}
     try:
         data = json.loads(content)
-        if 'serving' in data:
-            data['serving'] = parse_serving(data['serving'])
-        for k in ('calories', 'protein', 'fat', 'carbs'):
+        if "serving" in data:
+            data["serving"] = parse_serving(data["serving"])
+        for k in ("calories", "protein", "fat", "carbs"):
             if k in data:
                 data[k] = to_float(data[k])
-        if 'name' in data and isinstance(data['name'], str):
-            data['name'] = data['name'].strip().capitalize()
-        if 'type' in data and isinstance(data['type'], str):
-            data['type'] = data['type'].lower()
+        if "name" in data and isinstance(data["name"], str):
+            data["name"] = data["name"].strip().capitalize()
+        if "type" in data and isinstance(data["type"], str):
+            data["type"] = data["type"].lower()
         return data
     except Exception:
         match = re.search(r"\{.*\}", content, re.S)
@@ -398,7 +425,3 @@ async def analyze_photo_with_hint(
             except Exception:
                 pass
         return {"error": "parse"}
-
-
-
-

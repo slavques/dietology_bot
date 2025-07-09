@@ -7,7 +7,13 @@ from ..services import analyze_photo_with_hint, analyze_text_with_hint
 from ..subscriptions import ensure_user
 
 from ..utils import format_meal_message, parse_serving, to_float
-from ..keyboards import meal_actions_kb, save_options_kb, confirm_save_kb, main_menu_kb
+from ..keyboards import (
+    meal_actions_kb,
+    save_options_kb,
+    confirm_save_kb,
+    main_menu_kb,
+    refine_back_kb,
+)
 from ..states import EditMeal
 from ..storage import pending_meals
 from ..texts import (
@@ -29,7 +35,7 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     meal_id = data.get("meal_id")
     text = REFINE_BASE
-    await query.message.edit_text(text, reply_markup=None)
+    await query.message.edit_text(text, reply_markup=refine_back_kb(meal_id))
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
@@ -52,7 +58,7 @@ async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
     text = REFINE_BASE
-    await query.message.edit_text(text, reply_markup=None)
+    await query.message.edit_text(text, reply_markup=refine_back_kb(meal_id))
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
@@ -75,14 +81,13 @@ async def process_edit(message: types.Message, state: FSMContext):
         )
         return
 
-    meal.setdefault('hints', [])
     if meal.get('photo_path'):
         result = await analyze_photo_with_hint(
-            meal['photo_path'], message.text, meal, meal['hints'], grade
+            meal['photo_path'], message.text, meal, grade
         )
     else:
         result = await analyze_text_with_hint(
-            meal.get('text', ''), message.text, meal, meal['hints'], grade
+            meal.get('text', ''), message.text, meal, grade
         )
     log("prompt", "clarification analyzed for %s", message.from_user.id)
     if result.get('error') or (
@@ -96,8 +101,6 @@ async def process_edit(message: types.Message, state: FSMContext):
             meal.pop('error_msg', None)
         err = await message.answer(REFINE_BAD_ATTEMPT)
         meal['error_msg'] = err.message_id
-        meal.setdefault('clarifications', 0)
-        meal['clarifications'] += 1
         log("prompt", "clarification failed for %s", message.from_user.id)
         try:
             await message.delete()
@@ -132,9 +135,6 @@ async def process_edit(message: types.Message, state: FSMContext):
         except Exception:
             pass
         meal.pop('error_msg', None)
-    meal.setdefault('clarifications', 0)
-    meal['clarifications'] += 1
-    meal['hints'].append(message.text)
     await message.delete()
     await message.bot.edit_message_text(
         text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
