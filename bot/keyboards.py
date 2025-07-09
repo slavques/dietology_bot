@@ -85,11 +85,13 @@ def history_nav_kb(offset: int, include_back: bool = False) -> InlineKeyboardMar
     builder.button(text=BTN_LEFT_HISTORY, callback_data=f"hist:{offset+1}")
     if offset > 0:
         builder.button(text=BTN_RIGHT_HISTORY, callback_data=f"hist:{offset-1}")
-    count = 2 if offset > 0 else 1
-    builder.adjust(count)
     if include_back:
         builder.button(text=BTN_BACK, callback_data="stats_menu")
-        builder.adjust(1)
+    count = 2 if offset > 0 else 1
+    if include_back:
+        builder.adjust(count, 1)
+    else:
+        builder.adjust(count)
     return builder.as_markup()
 
 
