@@ -64,7 +64,6 @@ manually to tweak recognition behavior.
 The hint prompts use placeholders:
 
 - `{context}` — previous JSON response if available.
-- `{hints}` — numbered list of earlier clarifications.
 - `{hint}` — the latest user clarification.
 
 These placeholders are filled automatically when the bot calls the OpenAI API.
