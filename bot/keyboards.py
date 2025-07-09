@@ -50,6 +50,14 @@ def meal_actions_kb(meal_id: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def refine_back_kb(meal_id: str) -> InlineKeyboardMarkup:
+    """Inline keyboard with a back button leading to calculations."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data=f"back:{meal_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def save_options_kb(meal_id: str) -> InlineKeyboardMarkup:
     """Keyboard with portion save options."""
     builder = InlineKeyboardBuilder()

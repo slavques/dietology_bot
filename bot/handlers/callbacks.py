@@ -34,7 +34,7 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     meal_id = data.get("meal_id")
     text = REFINE_BASE
-    await query.message.edit_text(text, reply_markup=None)
+    await query.message.edit_text(text, reply_markup=refine_back_kb(meal_id))
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
@@ -57,7 +57,7 @@ async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
     await state.update_data(meal_id=meal_id)
     text = REFINE_BASE
-    await query.message.edit_text(text, reply_markup=None)
+    await query.message.edit_text(text, reply_markup=refine_back_kb(meal_id))
     await state.set_state(EditMeal.waiting_input)
     await query.answer()
 
