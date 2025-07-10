@@ -14,6 +14,14 @@ from ..texts import (
     BTN_ALL,
     BTN_BLOCK,
     BTN_BLOCKED_USERS,
+    BTN_FEATURES,
+    BTN_METHODS,
+    BTN_GRADES,
+    BTN_BANK_CARD,
+    BTN_TELEGRAM_STARS,
+    BTN_CRYPTO,
+    BTN_GRADE_START,
+    BTN_GRADE_PRO,
     BTN_STATS_ADMIN,
     ADMIN_MODE,
     ADMIN_UNAVAILABLE,
@@ -28,6 +36,8 @@ from ..texts import (
     ADMIN_UNBLOCK_DONE,
     ADMIN_BLOCKED_TITLE,
     ADMIN_BLOCKED_EMPTY,
+    ADMIN_METHODS_TITLE,
+    ADMIN_GRADES_TITLE,
     ADMIN_STATS,
 )
 
@@ -38,6 +48,7 @@ def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_BROADCAST, callback_data="admin:broadcast")
     builder.button(text=BTN_DAYS, callback_data="admin:days")
+    builder.button(text=BTN_FEATURES, callback_data="admin:features")
     builder.button(text=BTN_BLOCK, callback_data="admin:block")
     builder.button(text=BTN_BLOCKED_USERS, callback_data="admin:blocked")
     builder.button(text=BTN_STATS_ADMIN, callback_data="admin:stats")
@@ -197,12 +208,11 @@ async def process_days_all(message: types.Message, state: FSMContext):
         await message.answer(ADMIN_ENTER_DAYS)
         return
     session = SessionLocal()
-    now = datetime.utcnow()
     from ..subscriptions import add_subscription_days
 
     users = (
         session.query(User)
-        .filter(User.grade.in_(["paid", "pro"]), User.period_end > now)
+        .filter(User.grade.in_(["paid", "pro"]))
         .all()
     )
     for u in users:
@@ -266,6 +276,86 @@ async def admin_unblock(query: types.CallbackQuery):
     await admin_blocked_list(query)
 
 
+def features_menu_kb() -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_METHODS, callback_data="admin:methods")
+    builder.button(text=BTN_GRADES, callback_data="admin:grades")
+    builder.button(text=BTN_BACK, callback_data="admin:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def methods_kb() -> types.InlineKeyboardMarkup:
+    from ..database import get_option_bool
+
+    builder = InlineKeyboardBuilder()
+    bank = "🟢" if get_option_bool("pay_card") else "🔴"
+    stars = "🟢" if get_option_bool("pay_stars") else "🔴"
+    crypto = "🟢" if get_option_bool("pay_crypto") else "🔴"
+    builder.button(text=f"{BTN_BANK_CARD} {bank}", callback_data="admin:toggle:pay_card")
+    builder.button(text=f"{BTN_TELEGRAM_STARS} {stars}", callback_data="admin:toggle:pay_stars")
+    builder.button(text=f"{BTN_CRYPTO} {crypto}", callback_data="admin:toggle:pay_crypto")
+    builder.button(text=BTN_BACK, callback_data="admin:features")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def grades_kb() -> types.InlineKeyboardMarkup:
+    from ..database import get_option_bool
+
+    builder = InlineKeyboardBuilder()
+    light = "🟢" if get_option_bool("grade_light") else "🔴"
+    pro = "🟢" if get_option_bool("grade_pro") else "🔴"
+    builder.button(text=f"{BTN_GRADE_PRO} {pro}", callback_data="admin:toggle:grade_pro")
+    builder.button(text=f"{BTN_GRADE_START} {light}", callback_data="admin:toggle:grade_light")
+    builder.button(text=BTN_BACK, callback_data="admin:features")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+async def admin_features(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await query.message.edit_text(ADMIN_CHOOSE_ACTION, reply_markup=features_menu_kb())
+    await query.answer()
+
+
+async def admin_methods(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await query.message.edit_text(ADMIN_METHODS_TITLE, reply_markup=methods_kb())
+    await query.answer()
+
+
+async def admin_grades(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await query.message.edit_text(ADMIN_GRADES_TITLE, reply_markup=grades_kb())
+    await query.answer()
+
+
+async def admin_toggle(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    try:
+        key = query.data.split(":", 2)[2]
+    except IndexError:
+        await query.answer()
+        return
+    from ..database import get_option_bool, set_option
+
+    enabled = get_option_bool(key)
+    set_option(key, "0" if enabled else "1")
+    if key.startswith("pay_"):
+        await admin_methods(query)
+    else:
+        await admin_grades(query)
+
+
 def register(dp: Dispatcher):
     dp.message.register(admin_login, F.text.startswith(f"/{ADMIN_COMMAND}"))
     dp.callback_query.register(admin_broadcast_prompt, F.data == "admin:broadcast")
@@ -273,6 +363,10 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_days_one, F.data == "admin:days_one")
     dp.callback_query.register(admin_days_all, F.data == "admin:days_all")
     dp.callback_query.register(admin_block_prompt, F.data == "admin:block")
+    dp.callback_query.register(admin_features, F.data == "admin:features")
+    dp.callback_query.register(admin_methods, F.data == "admin:methods")
+    dp.callback_query.register(admin_grades, F.data == "admin:grades")
+    dp.callback_query.register(admin_toggle, F.data.startswith("admin:toggle:"))
     dp.callback_query.register(admin_blocked_list, F.data == "admin:blocked")
     dp.callback_query.register(admin_unblock, F.data.startswith("admin:unblock:"))
     dp.callback_query.register(admin_stats, F.data == "admin:stats")

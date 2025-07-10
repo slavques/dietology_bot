@@ -111,6 +111,8 @@ BTN_MAIN_MENU = "🥑 Главное меню"
 BTN_PAY = "🪙Оплатить"
 BTN_BACK_TEXT = "🔙 Назад"
 BTN_BANK_CARD = "💳 Банковская карта"
+BTN_TELEGRAM_STARS = "Telegram Stars"
+BTN_CRYPTO = "Crypto"
 BTN_BROADCAST = "Рассылка"
 BTN_PRO_MODE = "⚡ Pro-режим"
 BTN_LIGHT_MODE = "🔸 Старт"
@@ -195,6 +197,13 @@ ADMIN_STATS = (
     "PRO: {pro}\n"
     "Free с запросами: {used}"
 )
+BTN_FEATURES = "Функционал"
+BTN_METHODS = "Методы оплаты"
+BTN_GRADES = "Грейды"
+BTN_GRADE_START = "Старт"
+BTN_GRADE_PRO = "PRO"
+ADMIN_METHODS_TITLE = "Методы оплаты"
+ADMIN_GRADES_TITLE = "Грейды"
 BLOCKED_TEXT = "Вы заблокированы, для решения проблемы обратитесь в поддержку {support}"
 
 # Edit/refine texts

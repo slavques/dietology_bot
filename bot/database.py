@@ -119,5 +119,54 @@ class Payment(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     user = relationship('User')
 
+
+class Option(Base):
+    __tablename__ = 'options'
+
+    key = Column(String, primary_key=True)
+    value = Column(String)
+
+
+def get_option(key: str, default: str | None = None) -> str | None:
+    session = SessionLocal()
+    row = session.query(Option).filter_by(key=key).first()
+    result = row.value if row else default
+    session.close()
+    return result
+
+
+def get_option_bool(key: str, default: bool = True) -> bool:
+    val = get_option(key, "1" if default else "0")
+    return str(val) == "1"
+
+
+def set_option(key: str, value: str) -> None:
+    session = SessionLocal()
+    row = session.query(Option).filter_by(key=key).first()
+    if row:
+        row.value = value
+    else:
+        row = Option(key=key, value=value)
+        session.add(row)
+    session.commit()
+    session.close()
+
+
+def _ensure_options():
+    defaults = {
+        "pay_card": "1",
+        "pay_stars": "1",
+        "pay_crypto": "1",
+        "grade_light": "1",
+        "grade_pro": "1",
+    }
+    session = SessionLocal()
+    for k, v in defaults.items():
+        if not session.query(Option).filter_by(key=k).first():
+            session.add(Option(key=k, value=v))
+    session.commit()
+    session.close()
+
 Base.metadata.create_all(engine)
 _ensure_columns()
+_ensure_options()
