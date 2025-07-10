@@ -301,10 +301,9 @@ async def analyze_text(description: str, grade: str = "pro") -> Dict[str, Any]:
 async def analyze_text_with_hint(
     description: str,
     hint: str,
-    prev: Optional[Dict[str, Any]] = None,
     grade: str = "pro",
 ) -> Dict[str, Any]:
-    """Clarify text description with additional hint."""
+    """Clarify text description with additional hint using the original text."""
     if not client.api_key:
         return {
             "success": True,
@@ -316,10 +315,7 @@ async def analyze_text_with_hint(
             "fat": 10,
             "carbs": 30,
         }
-    if prev:
-        context = f"Ранее ты проанализировал текст и вернул такой JSON:\n{json.dumps(prev, ensure_ascii=False)}"
-    else:
-        context = "Предыдущего JSON нет."
+    context = f"Текст из первого запроса: {description}"
     base = PRO_HINT_PROMPT_BASE if grade == "pro" else FREE_HINT_PROMPT_BASE
     prompt = base.format(
         context=context,
@@ -359,7 +355,6 @@ async def analyze_text_with_hint(
 async def analyze_photo_with_hint(
     photo_path: str,
     hint: str,
-    prev: Optional[Dict[str, Any]] = None,
     grade: str = "pro",
 ) -> Dict[str, Any]:
     """Re-analyze a photo using user clarification about the dish or beverage."""
@@ -377,10 +372,7 @@ async def analyze_photo_with_hint(
         }
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    if prev:
-        context = f"Ранее ты проанализировал изображение и вернул такой JSON:\n{json.dumps(prev, ensure_ascii=False)}"
-    else:
-        context = "Предыдущего JSON нет."
+    context = "Фото из первого запроса"
     base = PRO_HINT_PROMPT_BASE if grade == "pro" else FREE_HINT_PROMPT_BASE
     prompt = base.format(
         context=context,

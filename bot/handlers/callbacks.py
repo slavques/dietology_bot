@@ -84,11 +84,11 @@ async def process_edit(message: types.Message, state: FSMContext):
     prev_json = meal.get('initial_json', meal)
     if meal.get('photo_path'):
         result = await analyze_photo_with_hint(
-            meal['photo_path'], message.text, prev_json, grade
+            meal['photo_path'], message.text, grade
         )
     else:
         result = await analyze_text_with_hint(
-            meal.get('text', ''), message.text, prev_json, grade
+            meal.get('text', ''), message.text, grade
         )
     log("prompt", "clarification analyzed for %s", message.from_user.id)
     if result.get('error') or (
