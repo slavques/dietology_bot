@@ -100,6 +100,7 @@ async def process_manual(message: types.Message, state: FSMContext):
         "orig_serving": serving,
         "macros": macros,
         "orig_macros": macros.copy(),
+        "initial_json": result,
         "text": message.text,
         "chat_id": message.chat.id,
         "message_id": None,

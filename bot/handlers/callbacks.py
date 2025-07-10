@@ -81,6 +81,7 @@ async def process_edit(message: types.Message, state: FSMContext):
         )
         return
 
+    prev_json = meal.get('initial_json', meal)
     if meal.get('photo_path'):
         result = await analyze_photo_with_hint(
             meal['photo_path'], message.text, grade
