@@ -14,5 +14,8 @@ class AdminState(StatesGroup):
     waiting_days = State()
     waiting_days_all = State()
     waiting_block_id = State()
+    waiting_trial_days = State()
+    waiting_trial_user_id = State()
+    waiting_trial_start_days = State()
 
 
