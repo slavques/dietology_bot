@@ -30,6 +30,13 @@ from ..logger import log
 
 
 async def manual_start(query: types.CallbackQuery, state: FSMContext):
+    from ..database import get_option_bool
+    from ..texts import FEATURE_DISABLED
+
+    if not get_option_bool("feat_manual"):
+        await query.answer(FEATURE_DISABLED, show_alert=True)
+        return
+
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
     if user.blocked:
@@ -49,6 +56,14 @@ async def manual_start(query: types.CallbackQuery, state: FSMContext):
 
 
 async def process_manual(message: types.Message, state: FSMContext):
+    from ..database import get_option_bool
+    from ..texts import FEATURE_DISABLED
+
+    if not get_option_bool("feat_manual"):
+        await message.answer(FEATURE_DISABLED)
+        await state.clear()
+        return
+
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
     if user.blocked:

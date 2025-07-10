@@ -85,6 +85,13 @@ async def cb_menu(query: types.CallbackQuery):
 
 
 async def cb_settings(query: types.CallbackQuery):
+    from ..database import get_option_bool
+    from ..texts import FEATURE_DISABLED
+
+    if not get_option_bool("feat_settings"):
+        await query.answer(FEATURE_DISABLED, show_alert=True)
+        return
+
     await query.message.edit_text(DEV_FEATURE)
     await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await query.answer()
