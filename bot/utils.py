@@ -37,3 +37,16 @@ def make_bar_chart(totals: Dict[str, float]) -> str:
         chart += f"{key[:1].upper()}: {bar} {val}\n"
     return chart
 
+
+def plural_ru_day(days: int) -> str:
+    """Return correct Russian declension for "день"."""
+    days = abs(int(days))
+    if 11 <= days % 100 <= 14:
+        return "дней"
+    last = days % 10
+    if last == 1:
+        return "день"
+    if 2 <= last <= 4:
+        return "дня"
+    return "дней"
+
