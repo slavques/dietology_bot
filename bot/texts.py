@@ -205,6 +205,16 @@ BTN_GRADE_START = "Старт"
 BTN_GRADE_PRO = "PRO"
 ADMIN_METHODS_TITLE = "Методы оплаты"
 ADMIN_GRADES_TITLE = "Грейды"
+BTN_TRIAL = "Пробный период"
+BTN_TRIAL_START = "Стартовый режим"
+BTN_STATUS = "Состояние"
+BTN_TRIAL_DAYS = "Дни: {days}"
+TRIAL_STARTED = "Тебе подключён тариф {grade} на {days} дней бесплатно!"
+TRIAL_ENDED = (
+    "Твой пробный период закончился, но ты можешь приобрести подписку. "
+    "А пока у тебя есть 20 бесплатных запросов ежемесячно."
+)
+ADMIN_TRIAL_DONE = "Пробный период активирован"
 BLOCKED_TEXT = "Вы заблокированы, для решения проблемы обратитесь в поддержку {support}"
 
 # Edit/refine texts

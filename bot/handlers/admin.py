@@ -25,6 +25,10 @@ from ..texts import (
     BTN_GRADE_START,
     BTN_GRADE_PRO,
     BTN_STATS_ADMIN,
+    BTN_TRIAL,
+    BTN_TRIAL_START,
+    BTN_STATUS,
+    BTN_TRIAL_DAYS,
     ADMIN_MODE,
     ADMIN_UNAVAILABLE,
     BROADCAST_PROMPT,
@@ -40,6 +44,7 @@ from ..texts import (
     ADMIN_BLOCKED_EMPTY,
     ADMIN_METHODS_TITLE,
     ADMIN_GRADES_TITLE,
+    ADMIN_TRIAL_DONE,
     ADMIN_STATS,
 )
 
@@ -51,6 +56,7 @@ def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_BROADCAST, callback_data="admin:broadcast")
     builder.button(text=BTN_DAYS, callback_data="admin:days")
     builder.button(text=BTN_FEATURES, callback_data="admin:features")
+    builder.button(text=BTN_TRIAL, callback_data="admin:trial")
     builder.button(text=BTN_BLOCK, callback_data="admin:block")
     builder.button(text=BTN_BLOCKED_USERS, callback_data="admin:blocked")
     builder.button(text=BTN_STATS_ADMIN, callback_data="admin:stats")
@@ -70,6 +76,47 @@ def days_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_ONE, callback_data="admin:days_one")
     builder.button(text=BTN_ALL, callback_data="admin:days_all")
     builder.button(text=BTN_BACK, callback_data="admin:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def trial_menu_kb() -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_ONE, callback_data="admin:trial_one")
+    builder.button(text=BTN_ALL, callback_data="admin:trial_all")
+    builder.button(text=BTN_TRIAL_START, callback_data="admin:trial_start")
+    builder.button(text=BTN_BACK, callback_data="admin:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def trial_grade_kb(prefix: str) -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_GRADE_PRO, callback_data=f"admin:{prefix}:pro")
+    builder.button(text=BTN_GRADE_START, callback_data=f"admin:{prefix}:paid")
+    builder.button(text=BTN_BACK, callback_data="admin:trial")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def trial_start_menu_kb() -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_GRADE_PRO, callback_data="admin:trial_start:pro")
+    builder.button(text=BTN_GRADE_START, callback_data="admin:trial_start:paid")
+    builder.button(text=BTN_BACK, callback_data="admin:trial")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def trial_start_grade_kb(grade: str) -> types.InlineKeyboardMarkup:
+    from ..database import get_option_bool, get_option_int
+
+    builder = InlineKeyboardBuilder()
+    status = "🟢" if get_option_bool(f"trial_{grade}_enabled", False) else "🔴"
+    days = get_option_int(f"trial_{grade}_days", 0)
+    builder.button(text=f"{BTN_STATUS} {status}", callback_data=f"admin:trial_toggle:{grade}")
+    builder.button(text=BTN_TRIAL_DAYS.format(days=days), callback_data=f"admin:trial_days_set:{grade}")
+    builder.button(text=BTN_BACK, callback_data="admin:trial_start")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -242,6 +289,153 @@ async def process_block(message: types.Message, state: FSMContext):
     await state.clear()
 
 
+async def admin_trial_menu(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await query.message.edit_text(ADMIN_CHOOSE_ACTION, reply_markup=trial_menu_kb())
+    await query.answer()
+
+
+async def admin_trial_one(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await state.update_data(trial_mode="one")
+    await query.message.edit_text(ADMIN_CHOOSE_ACTION, reply_markup=trial_grade_kb("trial_one"))
+    await query.answer()
+
+
+async def admin_trial_all(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await state.update_data(trial_mode="all")
+    await query.message.edit_text(ADMIN_CHOOSE_ACTION, reply_markup=trial_grade_kb("trial_all"))
+    await query.answer()
+
+
+async def admin_trial_grade(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    try:
+        _, action, grade = query.data.split(":", 2)
+    except ValueError:
+        await query.answer()
+        return
+    mode = action.split("_")[1]
+    await state.update_data(trial_grade=grade, trial_mode=mode)
+    await state.set_state(AdminState.waiting_trial_days)
+    await query.message.edit_text(ADMIN_ENTER_DAYS, reply_markup=admin_back_kb())
+    await query.answer()
+
+
+async def process_trial_days(message: types.Message, state: FSMContext):
+    if message.from_user.id not in admins:
+        return
+    try:
+        days = int(message.text.strip())
+    except ValueError:
+        await message.answer(ADMIN_ENTER_DAYS)
+        return
+    data = await state.get_data()
+    grade = data.get("trial_grade")
+    mode = data.get("trial_mode")
+    if mode == "all":
+        session = SessionLocal()
+        users = session.query(User).all()
+        from ..subscriptions import start_trial
+        for u in users:
+            start_trial(session, u, days, grade)
+        session.close()
+        await message.answer(ADMIN_TRIAL_DONE, reply_markup=admin_menu_kb())
+        await state.clear()
+    else:
+        await state.update_data(trial_days=days)
+        await state.set_state(AdminState.waiting_trial_user_id)
+        await message.answer(ADMIN_ENTER_ID, reply_markup=admin_back_kb())
+
+
+async def process_trial_user_id(message: types.Message, state: FSMContext):
+    if message.from_user.id not in admins:
+        return
+    data = await state.get_data()
+    try:
+        telegram_id = int(message.text.strip())
+    except ValueError:
+        await message.answer(ADMIN_ENTER_ID)
+        return
+    days = int(data.get("trial_days", 0))
+    grade = data.get("trial_grade")
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=telegram_id).first()
+    if user:
+        from ..subscriptions import start_trial
+        start_trial(session, user, days, grade)
+    session.close()
+    await message.answer(ADMIN_TRIAL_DONE, reply_markup=admin_menu_kb())
+    await state.clear()
+
+
+async def admin_trial_start(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await query.message.edit_text(ADMIN_CHOOSE_ACTION, reply_markup=trial_start_menu_kb())
+    await query.answer()
+
+
+async def admin_trial_start_grade(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    grade = query.data.split(":")[2]
+    await query.message.edit_text(ADMIN_CHOOSE_ACTION, reply_markup=trial_start_grade_kb(grade))
+    await query.answer()
+
+
+async def admin_trial_toggle(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    grade = query.data.split(":")[2]
+    from ..database import get_option_bool, set_option
+
+    key = f"trial_{grade}_enabled"
+    enabled = get_option_bool(key, False)
+    set_option(key, "0" if enabled else "1")
+    await admin_trial_start_grade(query)
+
+
+async def admin_trial_days_set(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    grade = query.data.split(":")[2]
+    await state.update_data(trial_grade=grade)
+    await state.set_state(AdminState.waiting_trial_start_days)
+    await query.message.edit_text(ADMIN_ENTER_DAYS, reply_markup=admin_back_kb())
+    await query.answer()
+
+
+async def process_trial_start_days(message: types.Message, state: FSMContext):
+    if message.from_user.id not in admins:
+        return
+    try:
+        days = int(message.text.strip())
+    except ValueError:
+        await message.answer(ADMIN_ENTER_DAYS)
+        return
+    data = await state.get_data()
+    grade = data.get("trial_grade")
+    from ..database import set_option
+
+    set_option(f"trial_{grade}_days", str(days))
+    await message.answer(ADMIN_DAYS_DONE, reply_markup=admin_menu_kb())
+    await state.clear()
+
+
 async def admin_blocked_list(query: types.CallbackQuery):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
@@ -377,6 +571,15 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_days_one, F.data == "admin:days_one")
     dp.callback_query.register(admin_days_all, F.data == "admin:days_all")
     dp.callback_query.register(admin_block_prompt, F.data == "admin:block")
+    dp.callback_query.register(admin_trial_menu, F.data == "admin:trial")
+    dp.callback_query.register(admin_trial_one, F.data == "admin:trial_one")
+    dp.callback_query.register(admin_trial_all, F.data == "admin:trial_all")
+    dp.callback_query.register(admin_trial_grade, F.data.startswith("admin:trial_one"))
+    dp.callback_query.register(admin_trial_grade, F.data.startswith("admin:trial_all"))
+    dp.callback_query.register(admin_trial_start, F.data == "admin:trial_start")
+    dp.callback_query.register(admin_trial_start_grade, F.data.startswith("admin:trial_start:"))
+    dp.callback_query.register(admin_trial_toggle, F.data.startswith("admin:trial_toggle:"))
+    dp.callback_query.register(admin_trial_days_set, F.data.startswith("admin:trial_days_set:"))
     dp.callback_query.register(admin_features, F.data == "admin:features")
     dp.callback_query.register(admin_methods, F.data == "admin:methods")
     dp.callback_query.register(admin_grades, F.data == "admin:grades")
@@ -390,3 +593,6 @@ def register(dp: Dispatcher):
     dp.message.register(process_days, AdminState.waiting_days, F.text)
     dp.message.register(process_days_all, AdminState.waiting_days_all, F.text)
     dp.message.register(process_block, AdminState.waiting_block_id, F.text)
+    dp.message.register(process_trial_days, AdminState.waiting_trial_days, F.text)
+    dp.message.register(process_trial_user_id, AdminState.waiting_trial_user_id, F.text)
+    dp.message.register(process_trial_start_days, AdminState.waiting_trial_start_days, F.text)

@@ -13,6 +13,7 @@ from .texts import (
     FREE_DAY_TEXT,
     BTN_RENEW_SUB,
     BTN_REMOVE_LIMIT,
+    TRIAL_ENDED,
 )
 
 from .database import SessionLocal, User, Payment
@@ -56,12 +57,13 @@ def update_limits(user: User) -> None:
         user.daily_used = 0
     if user.grade in {"paid", "pro"}:
         if user.period_end and now > user.period_end:
-            # subscription expired
+            # subscription or trial expired
             user.grade = "free"
             user.request_limit = FREE_LIMIT
             user.requests_used = 0
             user.period_start = now
             user.period_end = now + timedelta(days=30)
+            user.trial = False
             user.notified_7d = False
             user.notified_3d = False
             user.notified_1d = False
@@ -149,6 +151,44 @@ def add_subscription_days(session: SessionLocal, user: User, days: int) -> None:
     session.commit()
 
 
+def start_trial(session: SessionLocal, user: User, days: int, grade: str) -> None:
+    """Start a trial subscription for the user."""
+    now = datetime.utcnow()
+    user.grade = grade
+    user.period_start = now
+    user.period_end = now + timedelta(days=days)
+    user.request_limit = PAID_LIMIT
+    user.requests_used = 0
+    user.daily_used = 0
+    user.daily_start = now
+    user.trial = True
+    user.trial_used = True
+    user.notified_7d = False
+    user.notified_3d = False
+    user.notified_1d = False
+    user.notified_0d = False
+    session.commit()
+
+
+def check_start_trial(session: SessionLocal, user: User) -> Optional[tuple[str, int]]:
+    """Apply start trial to new users if enabled. Returns grade and days."""
+    from .database import get_option_bool, get_option_int
+
+    if user.trial_used:
+        return None
+    if get_option_bool("trial_pro_enabled", False):
+        days = get_option_int("trial_pro_days", 0)
+        if days > 0:
+            start_trial(session, user, days, "pro")
+            return "pro", days
+    if get_option_bool("trial_light_enabled", False):
+        days = get_option_int("trial_light_days", 0)
+        if days > 0:
+            start_trial(session, user, days, "paid")
+            return "paid", days
+    return None
+
+
 def subscription_watcher(bot: Bot, check_interval: int = 3600):
     """Check subscriptions periodically and notify users."""
 
@@ -165,7 +205,27 @@ async def _daily_check(bot: Bot):
     now = datetime.utcnow()
     users = session.query(User).all()
     for user in users:
-        if user.grade in {"paid", "pro"} and user.period_end:
+        if user.trial and user.period_end:
+            t_days = (user.period_end.date() - now.date()).days
+            if t_days <= 0 and not user.notified_0d:
+                try:
+                    await bot.send_message(
+                        user.telegram_id,
+                        TRIAL_ENDED,
+                        reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
+                    )
+                    log("notification", "trial ended notice to %s", user.telegram_id)
+                except Exception:
+                    pass
+                user.trial = False
+                user.grade = "free"
+                user.request_limit = FREE_LIMIT
+                user.requests_used = 0
+                user.period_start = now
+                user.period_end = now + timedelta(days=30)
+                user.notified_0d = True
+                user.notified_free = True
+        elif user.grade in {"paid", "pro"} and user.period_end and not user.trial:
             days = (user.period_end.date() - now.date()).days
             text = None
             if days <= 0 and not user.notified_0d:

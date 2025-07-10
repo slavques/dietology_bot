@@ -65,6 +65,10 @@ def _ensure_columns():
             conn.execute(text(f"ALTER TABLE users ADD COLUMN daily_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
         if "blocked" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT {bool_default}"))
+        if "trial" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN trial BOOLEAN DEFAULT {bool_default}"))
+        if "trial_used" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN trial_used BOOLEAN DEFAULT {bool_default}"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
@@ -90,6 +94,8 @@ class User(Base):
     daily_used = Column(Integer, default=0)
     daily_start = Column(DateTime, default=datetime.utcnow)
     blocked = Column(Boolean, default=False)
+    trial = Column(Boolean, default=False)
+    trial_used = Column(Boolean, default=False)
     meals = relationship('Meal', back_populates='user')
 
 class Meal(Base):
@@ -141,6 +147,14 @@ def get_option_bool(key: str, default: bool = True) -> bool:
     return str(val) == "1"
 
 
+def get_option_int(key: str, default: int = 0) -> int:
+    val = get_option(key)
+    try:
+        return int(val) if val is not None else default
+    except ValueError:
+        return default
+
+
 def set_option(key: str, value: str) -> None:
     session = SessionLocal()
     row = session.query(Option).filter_by(key=key).first()
@@ -162,6 +176,10 @@ def _ensure_options():
         "grade_pro": "1",
         "feat_manual": "1",
         "feat_settings": "1",
+        "trial_pro_enabled": "0",
+        "trial_pro_days": "0",
+        "trial_light_enabled": "0",
+        "trial_light_days": "0",
     }
     session = SessionLocal()
     for k, v in defaults.items():
