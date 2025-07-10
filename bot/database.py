@@ -61,6 +61,8 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE users ADD COLUMN daily_used INTEGER DEFAULT 0"))
         if "daily_start" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN daily_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
+        if "blocked" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT 0"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
@@ -85,6 +87,7 @@ class User(Base):
     notified_free = Column(Boolean, default=False)
     daily_used = Column(Integer, default=0)
     daily_start = Column(DateTime, default=datetime.utcnow)
+    blocked = Column(Boolean, default=False)
     meals = relationship('Meal', back_populates='user')
 
 class Meal(Base):

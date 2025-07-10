@@ -11,7 +11,7 @@ The bot relies on OpenAI's `gpt-4o` model for food recognition.
    ```
 2. Create a `.env` file with `BOT_TOKEN` (Telegram token) and optionally
    `OPENAI_API_KEY` for OpenAI integration. These values are loaded in
-   `bot/config.py`. You can also set `ADMIN_COMMAND` (default `admin1467`),
+   `bot/config.py`. Set `ADMIN_PASSWORD` for admin access,
    `DATABASE_URL` (defaults to `sqlite:///bot.db`), and `YOOKASSA_TOKEN` for payments here. For testing, the
    `SUBSCRIPTION_CHECK_INTERVAL` (in seconds) controls how often subscription
    statuses are checked (default `3600`).
@@ -63,10 +63,19 @@ manually to tweak recognition behavior.
 
 The hint prompts use placeholders:
 
-- `{context}` — previous JSON response if available.
+- `{context}` — the photo or text from the initial request.
 - `{hint}` — the latest user clarification.
 
 These placeholders are filled automatically when the bot calls the OpenAI API.
+
+### Data retention
+
+Uploaded photos are stored in the operating system's temporary directory with
+the prefix `diet_photo_`. The background task in `bot/cleanup.py` deletes any
+such file older than seven days. The bot keeps them only to allow clarification
+requests to reuse the original image. When a meal is entered manually, the
+initial text is stored in memory and included again whenever the user asks to
+refine the result.
 
 ### Manual database access
 

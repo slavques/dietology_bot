@@ -30,6 +30,13 @@ from ..logger import log
 async def request_photo(message: types.Message):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
     if not has_request_quota(session, user):
         reset = (
             user.period_end.date()
@@ -60,6 +67,13 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
     ok, reason = consume_request(session, user)
     if not ok:
         if reason == "daily":

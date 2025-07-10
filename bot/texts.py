@@ -175,6 +175,23 @@ ADMIN_UNAVAILABLE = "Недоступно"
 BROADCAST_PROMPT = "Введите сообщение"
 BROADCAST_ERROR = "Ошибка при отправке сообщения"
 BROADCAST_DONE = "Рассылка отправлена"
+BTN_DAYS = "Дни"
+BTN_ONE = "Одному"
+BTN_ALL = "Всем"
+BTN_BLOCK = "Блокировка"
+BTN_STATS_ADMIN = "Статистика"
+ADMIN_CHOOSE_ACTION = "Выберите действие"
+ADMIN_ENTER_ID = "Введите telegram_id"
+ADMIN_ENTER_DAYS = "Введите количество дней"
+ADMIN_DAYS_DONE = "Дни начислены"
+ADMIN_BLOCK_DONE = "Пользователь заблокирован"
+ADMIN_STATS = (
+    "Всего пользователей: {total}\n"
+    "Старт: {paid}\n"
+    "PRO: {pro}\n"
+    "Free с запросами: {used}"
+)
+BLOCKED_TEXT = "Вы заблокированы, для решения проблемы обратитесь в поддержку {support}"
 
 # Edit/refine texts
 REFINE_BASE = (

@@ -36,27 +36,66 @@ from ..texts import (
 )
 
 async def show_stats_menu(message: types.Message):
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=message.from_user.id).first()
+    if user and user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
+    session.close()
     await message.answer(STATS_MENU_TEXT, reply_markup=stats_menu_kb())
 
 
 async def cb_stats_menu(query: types.CallbackQuery):
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=query.from_user.id).first()
+    if user and user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        await query.answer()
+        return
+    session.close()
     await query.message.edit_text(STATS_MENU_SHORT)
     await query.message.edit_reply_markup(reply_markup=stats_menu_inline_kb())
     await query.answer()
 
 async def cmd_stats(message: types.Message):
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=message.from_user.id).first()
+    if user and user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
+    session.close()
     await message.answer(
         STATS_CHOOSE_PERIOD, reply_markup=stats_period_kb()
     )
 
 async def cb_stats(query: types.CallbackQuery):
-    period = query.data.split(':', 1)[1]
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=query.from_user.id).first()
     if not user:
         await query.answer(STATS_NO_DATA, show_alert=True)
         session.close()
         return
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        await query.answer()
+        return
+    period = query.data.split(':', 1)[1]
     now = datetime.utcnow()
     if period == 'day':
         start = now - timedelta(days=1)
@@ -94,6 +133,14 @@ async def cb_report_day(query: types.CallbackQuery):
         await query.message.edit_text(STATS_NO_DATA)
         await query.answer()
         session.close()
+        return
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        await query.answer()
         return
     start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
@@ -174,6 +221,13 @@ async def report_day(message: types.Message):
         await message.answer(STATS_NO_DATA, reply_markup=main_menu_kb())
         session.close()
         return
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
     start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
     meals = (
@@ -240,6 +294,17 @@ async def report_day(message: types.Message):
 
 
 async def cb_my_meals(query: types.CallbackQuery):
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=query.from_user.id).first()
+    if user and user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        await query.answer()
+        return
+    session.close()
     text, markup = build_history_text(query.from_user.id, 0, header=True)
     await query.message.edit_text(text)
     await query.message.edit_reply_markup(reply_markup=markup)

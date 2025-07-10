@@ -10,5 +10,9 @@ class ManualMeal(StatesGroup):
 
 class AdminState(StatesGroup):
     waiting_broadcast = State()
+    waiting_user_id = State()
+    waiting_days = State()
+    waiting_days_all = State()
+    waiting_block_id = State()
 
 

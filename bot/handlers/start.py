@@ -30,6 +30,13 @@ def get_welcome_text(user: User) -> str:
 async def cmd_start(message: types.Message):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
     text = get_welcome_text(user)
     session.commit()
     session.close()
@@ -44,6 +51,13 @@ async def back_to_menu(message: types.Message):
     """Return user to the main menu."""
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
     text = get_welcome_text(user)
     session.commit()
     session.close()
@@ -54,6 +68,14 @@ async def back_to_menu(message: types.Message):
 async def cb_menu(query: types.CallbackQuery):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        await query.answer()
+        return
     text = get_welcome_text(user)
     session.commit()
     session.close()
