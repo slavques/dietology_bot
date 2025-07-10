@@ -417,6 +417,10 @@ async def admin_trial_toggle(query: types.CallbackQuery):
     key = f"trial_{grade}_enabled"
     enabled = get_option_bool(key, False)
     set_option(key, "0" if enabled else "1")
+    if not enabled:
+        # disable the other start mode if enabling this one
+        other = "pro" if grade == "light" else "light"
+        set_option(f"trial_{other}_enabled", "0")
     from ..logger import log
     log("trial", "%s toggled to %s", key, not enabled)
     await admin_trial_start_grade(query)
