@@ -190,11 +190,15 @@ async def admin_stats(query: types.CallbackQuery):
     session = SessionLocal()
     now = datetime.utcnow()
     total = session.query(User).count()
-    paid = session.query(User).filter(User.grade == "light", User.period_end > now).count()
+    light = (
+        session.query(User)
+        .filter(User.grade == "light", User.period_end > now)
+        .count()
+    )
     pro = session.query(User).filter(User.grade == "pro", User.period_end > now).count()
     used = session.query(User).filter(User.grade == "free", User.requests_used > 0).count()
     session.close()
-    text = ADMIN_STATS.format(total=total, paid=paid, pro=pro, used=used)
+    text = ADMIN_STATS.format(total=total, light=light, pro=pro, used=used)
     await query.message.edit_text(text, reply_markup=admin_menu_kb())
     await query.answer()
 
