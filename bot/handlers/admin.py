@@ -277,9 +277,19 @@ async def admin_unblock(query: types.CallbackQuery):
 
 
 def features_menu_kb() -> types.InlineKeyboardMarkup:
+    from ..database import get_option_bool
+
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_METHODS, callback_data="admin:methods")
     builder.button(text=BTN_GRADES, callback_data="admin:grades")
+    settings = "🟢" if get_option_bool("feat_settings") else "🔴"
+    manual = "🟢" if get_option_bool("feat_manual") else "🔴"
+    builder.button(
+        text=f"{BTN_SETTINGS} {settings}", callback_data="admin:toggle:feat_settings"
+    )
+    builder.button(
+        text=f"{BTN_MANUAL} {manual}", callback_data="admin:toggle:feat_manual"
+    )
     builder.button(text=BTN_BACK, callback_data="admin:menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -352,8 +362,10 @@ async def admin_toggle(query: types.CallbackQuery):
     set_option(key, "0" if enabled else "1")
     if key.startswith("pay_"):
         await admin_methods(query)
-    else:
+    elif key.startswith("grade_"):
         await admin_grades(query)
+    else:
+        await admin_features(query)
 
 
 def register(dp: Dispatcher):

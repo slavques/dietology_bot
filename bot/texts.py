@@ -120,6 +120,7 @@ BTN_MANUAL = "✏️ Ручной ввод"
 BTN_SETTINGS = "⚙️ Настройки"
 
 DEV_FEATURE = "Функционал в разработке"
+FEATURE_DISABLED = "Функционал временно недоступен"
 STATS_MENU_SHORT = "Выберите раздел:"
 
 # Portion prefixes used when saving partial servings

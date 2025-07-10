@@ -208,11 +208,15 @@ def subscription_grades_inline_kb() -> InlineKeyboardMarkup:
 
 def menu_inline_kb() -> InlineKeyboardMarkup:
     """Main inline menu under the welcome message."""
+    from .database import get_option_bool
+
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_MANUAL, callback_data="manual")
+    if get_option_bool("feat_manual"):
+        builder.button(text=BTN_MANUAL, callback_data="manual")
     builder.button(text=BTN_STATS, callback_data="stats_menu")
     builder.button(text=BTN_SUBSCRIPTION, callback_data="subscribe")
-    builder.button(text=BTN_SETTINGS, callback_data="settings")
+    if get_option_bool("feat_settings"):
+        builder.button(text=BTN_SETTINGS, callback_data="settings")
     builder.adjust(1)
     return builder.as_markup()
 

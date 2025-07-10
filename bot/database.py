@@ -159,6 +159,8 @@ def _ensure_options():
         "pay_crypto": "1",
         "grade_light": "1",
         "grade_pro": "1",
+        "feat_manual": "1",
+        "feat_settings": "1",
     }
     session = SessionLocal()
     for k, v in defaults.items():
