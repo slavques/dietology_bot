@@ -43,17 +43,6 @@ daily and keeps the three most recent log files. Token usage for each OpenAI
 request is logged under the `tokens` category, showing input, output and total
 token counts.
 
-### Prompt sandbox
-
-To quickly test how the recognition prompts behave, run the helper script:
-
-```bash
-python scripts/prompt_sandbox.py path/to/photo.jpg
-python scripts/prompt_sandbox.py "описание блюда" --text
-```
-
-Add `--hint "ваше уточнение"` to simulate clarification requests. The script
-prints the JSON response from the OpenAI API.
 
 ### Custom prompts
 
@@ -97,16 +86,6 @@ UPDATE users SET grade='light' WHERE telegram_id = 12345;
 
 Exit the shell with `.quit` once your changes are complete. If you configured a
 different `DATABASE_URL`, open that file instead.
-
-### Subscription testing
-
-Two helper commands imitate payment results:
-
-```
-/success1467  # activate or extend light plan
-/refused1467  # simulate payment refusal
-/notify1467  # force sending pending subscription reminders
-```
 
 Paid users receive 800 GPT requests per month. Free users get 20 requests that renew every month from the account start date. Daily checks send reminders 7 and 3 days before expiry and on the last day.
 
