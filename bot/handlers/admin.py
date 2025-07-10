@@ -13,6 +13,7 @@ from ..texts import (
     BTN_ONE,
     BTN_ALL,
     BTN_BLOCK,
+    BTN_BLOCKED_USERS,
     BTN_STATS_ADMIN,
     ADMIN_MODE,
     ADMIN_UNAVAILABLE,
@@ -24,6 +25,9 @@ from ..texts import (
     ADMIN_ENTER_DAYS,
     ADMIN_DAYS_DONE,
     ADMIN_BLOCK_DONE,
+    ADMIN_UNBLOCK_DONE,
+    ADMIN_BLOCKED_TITLE,
+    ADMIN_BLOCKED_EMPTY,
     ADMIN_STATS,
 )
 
@@ -35,6 +39,7 @@ def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_BROADCAST, callback_data="admin:broadcast")
     builder.button(text=BTN_DAYS, callback_data="admin:days")
     builder.button(text=BTN_BLOCK, callback_data="admin:block")
+    builder.button(text=BTN_BLOCKED_USERS, callback_data="admin:blocked")
     builder.button(text=BTN_STATS_ADMIN, callback_data="admin:stats")
     builder.adjust(1)
     return builder.as_markup()
@@ -174,7 +179,7 @@ async def process_days(message: types.Message, state: FSMContext):
         return
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=int(target)).first()
-    if user:
+    if user and user.grade in {"paid", "pro"}:
         from ..subscriptions import add_subscription_days
 
         add_subscription_days(session, user, days)
@@ -225,6 +230,42 @@ async def process_block(message: types.Message, state: FSMContext):
     await state.clear()
 
 
+async def admin_blocked_list(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    session = SessionLocal()
+    users = session.query(User).filter_by(blocked=True).all()
+    builder = InlineKeyboardBuilder()
+    for u in users:
+        builder.button(text=str(u.telegram_id), callback_data=f"admin:unblock:{u.telegram_id}")
+    builder.button(text=BTN_BACK, callback_data="admin:menu")
+    builder.adjust(1)
+    text = ADMIN_BLOCKED_TITLE if users else ADMIN_BLOCKED_EMPTY
+    await query.message.edit_text(text, reply_markup=builder.as_markup())
+    session.close()
+    await query.answer()
+
+
+async def admin_unblock(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    try:
+        telegram_id = int(query.data.split(":")[2])
+    except (IndexError, ValueError):
+        await query.answer()
+        return
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=telegram_id).first()
+    if user:
+        user.blocked = False
+        session.commit()
+    session.close()
+    await query.answer(ADMIN_UNBLOCK_DONE)
+    await admin_blocked_list(query)
+
+
 def register(dp: Dispatcher):
     dp.message.register(admin_login, F.text.startswith(f"/{ADMIN_COMMAND}"))
     dp.callback_query.register(admin_broadcast_prompt, F.data == "admin:broadcast")
@@ -232,6 +273,8 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_days_one, F.data == "admin:days_one")
     dp.callback_query.register(admin_days_all, F.data == "admin:days_all")
     dp.callback_query.register(admin_block_prompt, F.data == "admin:block")
+    dp.callback_query.register(admin_blocked_list, F.data == "admin:blocked")
+    dp.callback_query.register(admin_unblock, F.data.startswith("admin:unblock:"))
     dp.callback_query.register(admin_stats, F.data == "admin:stats")
     dp.callback_query.register(admin_menu, F.data == "admin:menu")
     dp.message.register(process_broadcast, AdminState.waiting_broadcast, F.text)
