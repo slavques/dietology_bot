@@ -28,6 +28,8 @@ from .texts import (
     BTN_PAY,
     BTN_BACK_TEXT,
     BTN_BANK_CARD,
+    BTN_TELEGRAM_STARS,
+    BTN_CRYPTO,
     BTN_PLAN_1M,
     BTN_PLAN_3M,
     BTN_PLAN_6M,
@@ -166,9 +168,16 @@ def payment_methods_kb() -> ReplyKeyboardMarkup:
 
 
 def payment_method_inline(code: str, tier: str, include_back: bool = False) -> InlineKeyboardMarkup:
-    """Inline keyboard with a payment method and optional back button."""
+    """Inline keyboard with payment methods, filtered by admin settings."""
+    from .database import get_option_bool
+
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_BANK_CARD, callback_data=f"method:{tier}:{code}")
+    if get_option_bool("pay_card"):
+        builder.button(text=BTN_BANK_CARD, callback_data=f"method:{tier}:{code}")
+    if get_option_bool("pay_stars"):
+        builder.button(text=BTN_TELEGRAM_STARS, callback_data=f"method:{tier}:{code}")
+    if get_option_bool("pay_crypto"):
+        builder.button(text=BTN_CRYPTO, callback_data=f"method:{tier}:{code}")
     if include_back:
         builder.button(text=BTN_BACK_TEXT, callback_data=f"plan_back:{tier}")
     builder.adjust(1)
@@ -184,10 +193,14 @@ def subscribe_button(text: str) -> InlineKeyboardMarkup:
 
 
 def subscription_grades_inline_kb() -> InlineKeyboardMarkup:
-    """Choose between PRO and light plans."""
+    """Choose between PRO and light plans based on admin settings."""
+    from .database import get_option_bool
+
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_PRO_MODE, callback_data="grade:pro")
-    builder.button(text=BTN_LIGHT_MODE, callback_data="grade:light")
+    if get_option_bool("grade_pro"):
+        builder.button(text=BTN_PRO_MODE, callback_data="grade:pro")
+    if get_option_bool("grade_light"):
+        builder.button(text=BTN_LIGHT_MODE, callback_data="grade:light")
     builder.button(text=BTN_BACK_TEXT, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()

@@ -139,6 +139,8 @@ def process_payment_success(
 
 def add_subscription_days(session: SessionLocal, user: User, days: int) -> None:
     """Extend user's subscription by given number of days."""
+    if user.grade not in {"paid", "pro"}:
+        return
     now = datetime.utcnow()
     if user.period_end and user.period_end > now:
         user.period_end += timedelta(days=days)
