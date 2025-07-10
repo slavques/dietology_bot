@@ -30,6 +30,17 @@ from ..logger import log
 
 
 async def manual_start(query: types.CallbackQuery, state: FSMContext):
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        await query.answer()
+        return
+    session.close()
     await query.message.edit_text(MANUAL_PROMPT)
     await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await state.set_state(ManualMeal.waiting_text)
@@ -40,6 +51,13 @@ async def manual_start(query: types.CallbackQuery, state: FSMContext):
 async def process_manual(message: types.Message, state: FSMContext):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
     ok, reason = consume_request(session, user)
     if not ok:
         if reason == "daily":

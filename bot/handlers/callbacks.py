@@ -72,6 +72,14 @@ async def process_edit(message: types.Message, state: FSMContext):
     meal = pending_meals[meal_id]
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        await state.clear()
+        return
     grade = user.grade
     session.close()
     MAX_LEN = 200
@@ -176,6 +184,13 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         user = User(telegram_id=query.from_user.id)
         session.add(user)
         session.commit()
+    if user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
     serving = parse_serving(meal.get('orig_serving', meal['serving'])) * fraction
     macros = {
         k: to_float(v) * fraction

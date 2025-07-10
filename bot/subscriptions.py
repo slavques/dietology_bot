@@ -137,6 +137,16 @@ def process_payment_success(
     log("payment", "subscription purchased: %s for %s months", user.telegram_id, months)
 
 
+def add_subscription_days(session: SessionLocal, user: User, days: int) -> None:
+    """Extend user's subscription by given number of days."""
+    now = datetime.utcnow()
+    if user.period_end and user.period_end > now:
+        user.period_end += timedelta(days=days)
+    else:
+        user.period_end = now + timedelta(days=days)
+    session.commit()
+
+
 def subscription_watcher(bot: Bot, check_interval: int = 3600):
     """Check subscriptions periodically and notify users."""
 

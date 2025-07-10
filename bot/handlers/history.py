@@ -79,6 +79,16 @@ async def send_history(bot: Bot, user_id: int, chat_id: int, offset: int, header
     await bot.send_message(chat_id, text, reply_markup=markup)
 
 async def cmd_history(message: types.Message):
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=message.from_user.id).first()
+    if user and user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
+    session.close()
     await send_history(
         message.bot,
         message.from_user.id,
@@ -88,6 +98,17 @@ async def cmd_history(message: types.Message):
     )
 
 async def cb_history(query: types.CallbackQuery):
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=query.from_user.id).first()
+    if user and user.blocked:
+        from ..settings import SUPPORT_HANDLE
+        from ..texts import BLOCKED_TEXT
+
+        await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        await query.answer()
+        return
+    session.close()
     offset = int(query.data.split(':', 1)[1])
     text, markup = build_history_text(query.from_user.id, offset, header=True)
     await query.message.edit_text(text)

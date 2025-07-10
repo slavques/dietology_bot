@@ -11,7 +11,7 @@ The bot relies on OpenAI's `gpt-4o` model for food recognition.
    ```
 2. Create a `.env` file with `BOT_TOKEN` (Telegram token) and optionally
    `OPENAI_API_KEY` for OpenAI integration. These values are loaded in
-   `bot/config.py`. You can also set `ADMIN_COMMAND` (default `admin1467`),
+   `bot/config.py`. Set `ADMIN_PASSWORD` for admin access,
    `DATABASE_URL` (defaults to `sqlite:///bot.db`), and `YOOKASSA_TOKEN` for payments here. For testing, the
    `SUBSCRIPTION_CHECK_INTERVAL` (in seconds) controls how often subscription
    statuses are checked (default `3600`).
