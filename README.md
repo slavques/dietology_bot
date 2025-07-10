@@ -68,6 +68,15 @@ The hint prompts use placeholders:
 
 These placeholders are filled automatically when the bot calls the OpenAI API.
 
+### Data retention
+
+Uploaded photos are stored in the operating system's temporary directory with
+the prefix `diet_photo_`. The background task in `bot/cleanup.py` deletes any
+such file older than seven days. The bot keeps them only to allow clarification
+requests to reuse the original image. When a meal is entered manually, the
+initial text is stored in memory and included again whenever the user asks to
+refine the result.
+
 ### Manual database access
 
 The default SQLite database can be inspected and edited directly. Install the
