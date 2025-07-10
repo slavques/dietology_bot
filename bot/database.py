@@ -13,6 +13,7 @@ from sqlalchemy import (
     inspect,
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+from typing import Optional
 
 from .config import DATABASE_URL
 
@@ -127,7 +128,7 @@ class Option(Base):
     value = Column(String)
 
 
-def get_option(key: str, default: str | None = None) -> str | None:
+def get_option(key: str, default: Optional[str] = None) -> Optional[str]:
     session = SessionLocal()
     row = session.query(Option).filter_by(key=key).first()
     result = row.value if row else default
