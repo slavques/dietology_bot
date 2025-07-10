@@ -13,6 +13,7 @@ from sqlalchemy import (
     inspect,
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+from typing import Optional
 
 from .config import DATABASE_URL
 
@@ -35,6 +36,7 @@ def _ensure_columns():
     """Add new columns to old databases if they are missing."""
     existing = _column_names("users")
     dt_type = "DATETIME" if engine.dialect.name == "sqlite" else "TIMESTAMP"
+    bool_default = "0" if engine.dialect.name == "sqlite" else "FALSE"
     with engine.begin() as conn:
         if "grade" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN grade TEXT DEFAULT 'free'"))
@@ -48,21 +50,25 @@ def _ensure_columns():
         if "period_end" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN period_end {dt_type}"))
         if "notified_7d" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_7d BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_7d BOOLEAN DEFAULT {bool_default}"))
         if "notified_3d" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_3d BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_3d BOOLEAN DEFAULT {bool_default}"))
         if "notified_0d" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_0d BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_0d BOOLEAN DEFAULT {bool_default}"))
         if "notified_1d" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_1d BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_1d BOOLEAN DEFAULT {bool_default}"))
         if "notified_free" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT {bool_default}"))
         if "daily_used" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN daily_used INTEGER DEFAULT 0"))
         if "daily_start" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN daily_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
         if "blocked" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT {bool_default}"))
+        if "trial" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN trial BOOLEAN DEFAULT {bool_default}"))
+        if "trial_used" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN trial_used BOOLEAN DEFAULT {bool_default}"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
@@ -88,6 +94,8 @@ class User(Base):
     daily_used = Column(Integer, default=0)
     daily_start = Column(DateTime, default=datetime.utcnow)
     blocked = Column(Boolean, default=False)
+    trial = Column(Boolean, default=False)
+    trial_used = Column(Boolean, default=False)
     meals = relationship('Meal', back_populates='user')
 
 class Meal(Base):
@@ -118,5 +126,68 @@ class Payment(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     user = relationship('User')
 
+
+class Option(Base):
+    __tablename__ = 'options'
+
+    key = Column(String, primary_key=True)
+    value = Column(String)
+
+
+def get_option(key: str, default: Optional[str] = None) -> Optional[str]:
+    session = SessionLocal()
+    row = session.query(Option).filter_by(key=key).first()
+    result = row.value if row else default
+    session.close()
+    return result
+
+
+def get_option_bool(key: str, default: bool = True) -> bool:
+    val = get_option(key, "1" if default else "0")
+    return str(val) == "1"
+
+
+def get_option_int(key: str, default: int = 0) -> int:
+    val = get_option(key)
+    try:
+        return int(val) if val is not None else default
+    except ValueError:
+        return default
+
+
+def set_option(key: str, value: str) -> None:
+    session = SessionLocal()
+    row = session.query(Option).filter_by(key=key).first()
+    if row:
+        row.value = value
+    else:
+        row = Option(key=key, value=value)
+        session.add(row)
+    session.commit()
+    session.close()
+
+
+def _ensure_options():
+    defaults = {
+        "pay_card": "1",
+        "pay_stars": "1",
+        "pay_crypto": "1",
+        "grade_light": "1",
+        "grade_pro": "1",
+        "feat_manual": "1",
+        "feat_settings": "1",
+        "trial_pro_enabled": "0",
+        "trial_pro_days": "0",
+        "trial_light_enabled": "0",
+        "trial_light_days": "0",
+    }
+    session = SessionLocal()
+    for k, v in defaults.items():
+        if not session.query(Option).filter_by(key=k).first():
+            session.add(Option(key=k, value=v))
+    session.commit()
+    session.close()
+
 Base.metadata.create_all(engine)
 _ensure_columns()
+_ensure_options()
