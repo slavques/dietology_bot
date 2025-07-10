@@ -190,11 +190,15 @@ async def admin_stats(query: types.CallbackQuery):
     session = SessionLocal()
     now = datetime.utcnow()
     total = session.query(User).count()
-    paid = session.query(User).filter(User.grade == "light", User.period_end > now).count()
+    light = (
+        session.query(User)
+        .filter(User.grade == "light", User.period_end > now)
+        .count()
+    )
     pro = session.query(User).filter(User.grade == "pro", User.period_end > now).count()
     used = session.query(User).filter(User.grade == "free", User.requests_used > 0).count()
     session.close()
-    text = ADMIN_STATS.format(total=total, paid=paid, pro=pro, used=used)
+    text = ADMIN_STATS.format(total=total, light=light, pro=pro, used=used)
     await query.message.edit_text(text, reply_markup=admin_menu_kb())
     await query.answer()
 
@@ -417,6 +421,10 @@ async def admin_trial_toggle(query: types.CallbackQuery):
     key = f"trial_{grade}_enabled"
     enabled = get_option_bool(key, False)
     set_option(key, "0" if enabled else "1")
+    if not enabled:
+        # disable the other start mode if enabling this one
+        other = "pro" if grade == "light" else "light"
+        set_option(f"trial_{other}_enabled", "0")
     from ..logger import log
     log("trial", "%s toggled to %s", key, not enabled)
     await admin_trial_start_grade(query)
