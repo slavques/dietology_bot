@@ -93,7 +93,7 @@ def trial_menu_kb() -> types.InlineKeyboardMarkup:
 def trial_grade_kb(prefix: str) -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_GRADE_PRO, callback_data=f"admin:{prefix}:pro")
-    builder.button(text=BTN_GRADE_START, callback_data=f"admin:{prefix}:paid")
+    builder.button(text=BTN_GRADE_START, callback_data=f"admin:{prefix}:light")
     builder.button(text=BTN_BACK, callback_data="admin:trial")
     builder.adjust(1)
     return builder.as_markup()
@@ -102,7 +102,7 @@ def trial_grade_kb(prefix: str) -> types.InlineKeyboardMarkup:
 def trial_start_menu_kb() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_GRADE_PRO, callback_data="admin:trial_start:pro")
-    builder.button(text=BTN_GRADE_START, callback_data="admin:trial_start:paid")
+    builder.button(text=BTN_GRADE_START, callback_data="admin:trial_start:light")
     builder.button(text=BTN_BACK, callback_data="admin:trial")
     builder.adjust(1)
     return builder.as_markup()
