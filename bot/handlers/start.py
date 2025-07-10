@@ -13,6 +13,7 @@ from ..texts import (
     DEV_FEATURE,
     TRIAL_STARTED,
 )
+from ..utils import plural_ru_day
 
 
 BASE_TEXT = WELCOME_BASE
@@ -52,7 +53,11 @@ async def cmd_start(message: types.Message):
     if trial:
         grade, days = trial
         grade_name = "PRO" if grade == "pro" else "Старт"
-        await message.answer(TRIAL_STARTED.format(grade=grade_name, days=days))
+        await message.answer(
+            TRIAL_STARTED.format(
+                grade=grade_name, days=days, day_word=plural_ru_day(days)
+            )
+        )
     await message.answer(text, reply_markup=menu_inline_kb())
 
 
