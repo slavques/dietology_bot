@@ -190,7 +190,7 @@ async def admin_stats(query: types.CallbackQuery):
     session = SessionLocal()
     now = datetime.utcnow()
     total = session.query(User).count()
-    paid = session.query(User).filter(User.grade == "paid", User.period_end > now).count()
+    paid = session.query(User).filter(User.grade == "light", User.period_end > now).count()
     pro = session.query(User).filter(User.grade == "pro", User.period_end > now).count()
     used = session.query(User).filter(User.grade == "free", User.requests_used > 0).count()
     session.close()
@@ -239,7 +239,7 @@ async def process_days(message: types.Message, state: FSMContext):
         return
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=int(target)).first()
-    if user and user.grade in {"paid", "pro"}:
+    if user and user.grade in {"light", "pro"} and not user.trial:
         from ..subscriptions import add_subscription_days
 
         add_subscription_days(session, user, days)
@@ -261,7 +261,7 @@ async def process_days_all(message: types.Message, state: FSMContext):
 
     users = (
         session.query(User)
-        .filter(User.grade.in_(["paid", "pro"]))
+        .filter(User.grade.in_(["light", "pro"]))
         .all()
     )
     for u in users:

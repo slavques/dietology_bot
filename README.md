@@ -89,10 +89,10 @@ sqlite3 bot.db
 
 Within the shell you can list tables with `.tables`, show table schemas with
 `.schema users`, `.schema meals` or `.schema payments` and execute regular SQL
-statements. For example, granting a user paid status:
+statements. For example, granting a user light status:
 
 ```sql
-UPDATE users SET grade='paid' WHERE telegram_id = 12345;
+UPDATE users SET grade='light' WHERE telegram_id = 12345;
 ```
 
 Exit the shell with `.quit` once your changes are complete. If you configured a
@@ -103,7 +103,7 @@ different `DATABASE_URL`, open that file instead.
 Two helper commands imitate payment results:
 
 ```
-/success1467  # activate or extend paid plan
+/success1467  # activate or extend light plan
 /refused1467  # simulate payment refusal
 /notify1467  # force sending pending subscription reminders
 ```

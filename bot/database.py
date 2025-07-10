@@ -40,6 +40,8 @@ def _ensure_columns():
     with engine.begin() as conn:
         if "grade" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN grade TEXT DEFAULT 'free'"))
+        else:
+            conn.execute(text("UPDATE users SET grade='light' WHERE grade='paid'"))
         if "request_limit" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN request_limit INTEGER DEFAULT 20"))
         if "requests_used" not in existing:
@@ -69,6 +71,12 @@ def _ensure_columns():
             conn.execute(text(f"ALTER TABLE users ADD COLUMN trial BOOLEAN DEFAULT {bool_default}"))
         if "trial_used" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN trial_used BOOLEAN DEFAULT {bool_default}"))
+        if "trial_end" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN trial_end {dt_type}"))
+        if "resume_grade" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN resume_grade TEXT"))
+        if "resume_period_end" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN resume_period_end {dt_type}"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
@@ -81,11 +89,14 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     telegram_id = Column(BigInteger, unique=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    grade = Column(String, default='free')  # 'free', 'paid' or 'pro'
+    grade = Column(String, default='free')  # 'free', 'light', 'pro', etc.
     request_limit = Column(Integer, default=20)
     requests_used = Column(Integer, default=0)
     period_start = Column(DateTime, default=datetime.utcnow)
     period_end = Column(DateTime, nullable=True)
+    trial_end = Column(DateTime, nullable=True)
+    resume_grade = Column(String, nullable=True)
+    resume_period_end = Column(DateTime, nullable=True)
     notified_7d = Column(Boolean, default=False)
     notified_3d = Column(Boolean, default=False)
     notified_1d = Column(Boolean, default=False)

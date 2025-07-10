@@ -210,7 +210,7 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
         }
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    prompt = PRO_PHOTO_PROMPT if grade == "pro" else FREE_PHOTO_PROMPT
+    prompt = PRO_PHOTO_PROMPT if grade.startswith("pro") or grade.startswith("light") else FREE_PHOTO_PROMPT
     # The Completions API does not support images, so we always use
     # the Responses API for photo analysis regardless of user tier.
     sender = _chat
@@ -266,8 +266,8 @@ async def analyze_text(description: str, grade: str = "pro") -> Dict[str, Any]:
             "fat": 10,
             "carbs": 30,
         }
-    prompt = PRO_TEXT_PROMPT if grade == "pro" else FREE_TEXT_PROMPT
-    sender = _chat if grade == "pro" else _completion
+    prompt = PRO_TEXT_PROMPT if grade.startswith("pro") or grade.startswith("light") else FREE_TEXT_PROMPT
+    sender = _chat if grade.startswith("pro") or grade.startswith("light") else _completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -316,12 +316,12 @@ async def analyze_text_with_hint(
             "carbs": 30,
         }
     context = f"Текст из первого запроса: {description}"
-    base = PRO_HINT_PROMPT_BASE if grade == "pro" else FREE_HINT_PROMPT_BASE
+    base = PRO_HINT_PROMPT_BASE if grade.startswith("pro") or grade.startswith("light") else FREE_HINT_PROMPT_BASE
     prompt = base.format(
         context=context,
         hint=hint,
     )
-    sender = _chat if grade == "pro" else _completion
+    sender = _chat if grade.startswith("pro") or grade.startswith("light") else _completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -373,7 +373,7 @@ async def analyze_photo_with_hint(
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     context = "Фото из первого запроса"
-    base = PRO_HINT_PROMPT_BASE if grade == "pro" else FREE_HINT_PROMPT_BASE
+    base = PRO_HINT_PROMPT_BASE if grade.startswith("pro") or grade.startswith("light") else FREE_HINT_PROMPT_BASE
     prompt = base.format(
         context=context,
         hint=hint,
