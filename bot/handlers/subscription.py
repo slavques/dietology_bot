@@ -1,10 +1,9 @@
 from ..settings import PLAN_PRICES, PRO_PLAN_PRICES
 from aiogram import types, Dispatcher, F, Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.filters import Command
 
 from ..database import SessionLocal
-from ..subscriptions import ensure_user, process_payment_success, _daily_check
+from ..subscriptions import ensure_user, process_payment_success
 from ..keyboards import (
     subscription_plans_kb,
     pay_kb,
@@ -23,7 +22,6 @@ from ..texts import (
     SUB_METHOD_TEXT,
     SUB_SUCCESS,
     SUB_CANCELLED,
-    NOTIFY_SENT,
     BTN_SUBSCRIPTION,
     BTN_BACK_TEXT,
     BTN_PLAN_1M,
@@ -38,10 +36,6 @@ from ..texts import (
     INVOICE_TITLE,
 )
 from ..logger import log
-
-SUCCESS_CMD = "success1467"
-REFUSED_CMD = "refused1467"
-NOTIFY_CMD = "notify1467"
 
 # map subscription plans to invoice details
 LIGHT_PLAN_MAP = {
@@ -151,23 +145,6 @@ async def cb_sub_plans(query: types.CallbackQuery):
     await query.message.edit_reply_markup(reply_markup=subscription_grades_inline_kb())
     await query.answer()
 
-async def cmd_success(message: types.Message):
-    if not message.text.startswith(f"/{SUCCESS_CMD}"):
-        return
-    session = SessionLocal()
-    user = ensure_user(session, message.from_user.id)
-    process_payment_success(session, user)
-    session.close()
-    await message.answer(SUB_SUCCESS)
-    log("payment", "manual success command by %s", message.from_user.id)
-
-async def cmd_refused(message: types.Message):
-    if not message.text.startswith(f"/{REFUSED_CMD}"):
-        return
-    await message.answer(SUB_CANCELLED)
-    log("payment", "payment refused by %s", message.from_user.id)
-
-
 async def handle_pre_checkout(query: types.PreCheckoutQuery, bot: Bot):
     """Confirm pre-checkout query from Telegram."""
     await bot.answer_pre_checkout_query(query.id, ok=True)
@@ -190,18 +167,7 @@ async def handle_successful_payment(message: types.Message):
     log("payment", "successful payment from %s", message.from_user.id)
 
 
-async def cmd_notify(message: types.Message):
-    if not message.text.startswith(f"/{NOTIFY_CMD}"):
-        return
-    await _daily_check(message.bot)
-    await message.answer(NOTIFY_SENT)
-    log("notification", "manual notify triggered by %s", message.from_user.id)
-
-
 def register(dp: Dispatcher):
-    dp.message.register(cmd_success, Command(SUCCESS_CMD))
-    dp.message.register(cmd_refused, Command(REFUSED_CMD))
-    dp.message.register(cmd_notify, Command(NOTIFY_CMD))
     dp.message.register(show_subscription_menu, F.text == BTN_SUBSCRIPTION)
     dp.callback_query.register(cb_subscribe, F.data == "subscribe")
     dp.callback_query.register(cb_grade, F.data.startswith("grade:"))
