@@ -196,6 +196,8 @@ ADMIN_STATS = (
     "Всего пользователей: {total}\n"
     "Старт: {light}\n"
     "PRO: {pro}\n"
+    "Пробная PRO: {trial_pro}\n"
+    "Пробная Старт: {trial_light}\n"
     "Free с запросами: {used}"
 )
 BTN_FEATURES = "Функционал"
