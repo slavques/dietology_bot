@@ -196,9 +196,26 @@ async def admin_stats(query: types.CallbackQuery):
         .count()
     )
     pro = session.query(User).filter(User.grade == "pro", User.period_end > now).count()
+    trial_pro = (
+        session.query(User)
+        .filter(User.grade == "pro_promo", User.trial_end > now)
+        .count()
+    )
+    trial_light = (
+        session.query(User)
+        .filter(User.grade == "light_promo", User.trial_end > now)
+        .count()
+    )
     used = session.query(User).filter(User.grade == "free", User.requests_used > 0).count()
     session.close()
-    text = ADMIN_STATS.format(total=total, light=light, pro=pro, used=used)
+    text = ADMIN_STATS.format(
+        total=total,
+        light=light,
+        pro=pro,
+        trial_pro=trial_pro,
+        trial_light=trial_light,
+        used=used,
+    )
     await query.message.edit_text(text, reply_markup=admin_menu_kb())
     await query.answer()
 
