@@ -13,4 +13,14 @@ LOG_FLAGS = {
     'meal_save': True,
     # Token usage statistics from OpenAI responses
     'tokens': True,
+    # Mass messaging events
+    'broadcast': True,
+    # Admin actions to extend subscriptions
+    'days': True,
+    # Enabling or disabling features
+    'feature': True,
+    # Trial period management
+    'trial': True,
+    # User blocking or unblocking
+    'block': True,
 }

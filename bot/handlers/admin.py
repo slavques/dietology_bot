@@ -212,6 +212,8 @@ async def process_broadcast(message: types.Message, state: FSMContext):
         except Exception:
             error = True
     session.close()
+    from ..logger import log
+    log("broadcast", "sent broadcast from %s to %s users", message.from_user.id, len(users))
     await message.answer(
         BROADCAST_ERROR if error else BROADCAST_DONE,
         reply_markup=admin_menu_kb(),
@@ -243,6 +245,8 @@ async def process_days(message: types.Message, state: FSMContext):
         from ..subscriptions import add_subscription_days
 
         add_subscription_days(session, user, days)
+        from ..logger import log
+        log("days", "added %s days to %s", days, user.telegram_id)
     session.close()
     await message.answer(ADMIN_DAYS_DONE, reply_markup=admin_menu_kb())
     await state.clear()
@@ -266,6 +270,8 @@ async def process_days_all(message: types.Message, state: FSMContext):
     )
     for u in users:
         add_subscription_days(session, u, days)
+    from ..logger import log
+    log("days", "added %s days to all %s users", days, len(users))
     session.close()
     await message.answer(ADMIN_DAYS_DONE, reply_markup=admin_menu_kb())
     await state.clear()
@@ -284,6 +290,8 @@ async def process_block(message: types.Message, state: FSMContext):
     if user:
         user.blocked = True
         session.commit()
+        from ..logger import log
+        log("block", "blocked %s", user.telegram_id)
     session.close()
     await message.answer(ADMIN_BLOCK_DONE, reply_markup=admin_menu_kb())
     await state.clear()
@@ -348,6 +356,8 @@ async def process_trial_days(message: types.Message, state: FSMContext):
         from ..subscriptions import start_trial
         for u in users:
             start_trial(session, u, days, grade)
+        from ..logger import log
+        log("trial", "started %s-day %s trial for all %s users", days, grade, len(users))
         session.close()
         await message.answer(ADMIN_TRIAL_DONE, reply_markup=admin_menu_kb())
         await state.clear()
@@ -373,6 +383,8 @@ async def process_trial_user_id(message: types.Message, state: FSMContext):
     if user:
         from ..subscriptions import start_trial
         start_trial(session, user, days, grade)
+        from ..logger import log
+        log("trial", "started %s-day %s trial for %s", days, grade, telegram_id)
     session.close()
     await message.answer(ADMIN_TRIAL_DONE, reply_markup=admin_menu_kb())
     await state.clear()
@@ -405,6 +417,8 @@ async def admin_trial_toggle(query: types.CallbackQuery):
     key = f"trial_{grade}_enabled"
     enabled = get_option_bool(key, False)
     set_option(key, "0" if enabled else "1")
+    from ..logger import log
+    log("trial", "%s toggled to %s", key, not enabled)
     await admin_trial_start_grade(query)
 
 
@@ -467,6 +481,8 @@ async def admin_unblock(query: types.CallbackQuery):
     if user:
         user.blocked = False
         session.commit()
+    from ..logger import log
+    log("block", "unblocked %s", telegram_id)
     session.close()
     await query.answer(ADMIN_UNBLOCK_DONE)
     await admin_blocked_list(query)
@@ -556,6 +572,8 @@ async def admin_toggle(query: types.CallbackQuery):
 
     enabled = get_option_bool(key)
     set_option(key, "0" if enabled else "1")
+    from ..logger import log
+    log("feature", "%s set to %s", key, not enabled)
     if key.startswith("pay_"):
         await admin_methods(query)
     elif key.startswith("grade_"):
