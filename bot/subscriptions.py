@@ -55,15 +55,33 @@ def update_limits(user: User) -> None:
     elif now.date() != user.daily_start.date():
         user.daily_start = now
         user.daily_used = 0
-    if user.grade in {"paid", "pro"}:
-        if user.period_end and now > user.period_end:
-            # subscription or trial expired
+    if user.trial and user.trial_end and now > user.trial_end:
+        if user.resume_grade:
+            user.grade = user.resume_grade
+            user.period_end = user.resume_period_end
+        else:
             user.grade = "free"
             user.request_limit = FREE_LIMIT
             user.requests_used = 0
             user.period_start = now
             user.period_end = now + timedelta(days=30)
-            user.trial = False
+            user.notified_free = True
+        user.trial = False
+        user.trial_end = None
+        user.resume_grade = None
+        user.resume_period_end = None
+        user.notified_7d = False
+        user.notified_3d = False
+        user.notified_1d = False
+        user.notified_0d = False
+        log("notification", "subscription expired for %s", user.telegram_id)
+    elif user.grade in {"light", "pro"} and not user.trial:
+        if user.period_end and now > user.period_end:
+            user.grade = "free"
+            user.request_limit = FREE_LIMIT
+            user.requests_used = 0
+            user.period_start = now
+            user.period_end = now + timedelta(days=30)
             user.notified_7d = False
             user.notified_3d = False
             user.notified_1d = False
@@ -86,21 +104,21 @@ def has_request_quota(session: SessionLocal, user: User) -> bool:
     """Check if user has remaining GPT requests without consuming one."""
     update_limits(user)
     session.commit()
-    if user.grade in {"paid", "pro"} and user.daily_used >= 100:
+    if user.grade in {"light", "pro"} and user.daily_used >= 100:
         return False
     return user.requests_used < user.request_limit
 
 
 def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
     update_limits(user)
-    if user.grade in {"paid", "pro"} and user.daily_used >= 100:
+    if user.grade in {"light", "pro"} and user.daily_used >= 100:
         log("limit", "daily limit reached for %s", user.telegram_id)
         return False, "daily"
     if user.requests_used >= user.request_limit:
         log("limit", "monthly limit reached for %s", user.telegram_id)
         return False, "monthly"
     user.requests_used += 1
-    if user.grade in {"paid", "pro"}:
+    if user.grade in {"light", "pro"}:
         user.daily_used += 1
     session.commit()
     log("limit", "request consumed by %s", user.telegram_id)
@@ -108,13 +126,15 @@ def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
 
 
 def days_left(user: User) -> Optional[int]:
-    if user.grade not in {"paid", "pro"} or not user.period_end:
+    if user.trial and user.trial_end:
+        return (user.trial_end.date() - datetime.utcnow().date()).days
+    if user.grade not in {"light", "pro"} or not user.period_end:
         return None
     return (user.period_end.date() - datetime.utcnow().date()).days
 
 
 def process_payment_success(
-    session: SessionLocal, user: User, months: int = 1, grade: str = "paid"
+    session: SessionLocal, user: User, months: int = 1, grade: str = "light"
 ):
     now = datetime.utcnow()
 
@@ -122,7 +142,7 @@ def process_payment_success(
         """Add count * 30 days to dt."""
         return dt + timedelta(days=30 * count)
 
-    if user.grade in {"paid", "pro"} and user.period_end and user.period_end > now:
+    if user.grade in {"light", "pro"} and user.period_end and user.period_end > now:
         user.period_end = add_period(user.period_end, months)
     else:
         user.period_end = add_period(now, months)
@@ -141,7 +161,7 @@ def process_payment_success(
 
 def add_subscription_days(session: SessionLocal, user: User, days: int) -> None:
     """Extend user's subscription by given number of days."""
-    if user.grade not in {"paid", "pro"}:
+    if user.grade not in {"light", "pro"} or user.trial:
         return
     now = datetime.utcnow()
     if user.period_end and user.period_end > now:
@@ -154,9 +174,17 @@ def add_subscription_days(session: SessionLocal, user: User, days: int) -> None:
 def start_trial(session: SessionLocal, user: User, days: int, grade: str) -> None:
     """Start a trial subscription for the user."""
     now = datetime.utcnow()
-    user.grade = grade
+    # Save current paid subscription if any
+    if user.grade in {"light", "pro"} and not user.trial:
+        user.resume_grade = user.grade
+        user.resume_period_end = (user.period_end or now) + timedelta(days=days)
+    else:
+        user.resume_grade = None
+        user.resume_period_end = None
+    trial_grade = f"{grade}_promo"
+    user.grade = trial_grade
     user.period_start = now
-    user.period_end = now + timedelta(days=days)
+    user.trial_end = now + timedelta(days=days)
     user.request_limit = PAID_LIMIT
     user.requests_used = 0
     user.daily_used = 0
@@ -188,10 +216,8 @@ def check_start_trial(session: SessionLocal, user: User) -> Optional[tuple[str, 
     if get_option_bool("trial_light_enabled", False):
         days = get_option_int("trial_light_days", 0)
         if days > 0:
-            start_trial(session, user, days, "paid")
-            from .logger import log
-            log("trial", "auto start trial paid for %s", user.telegram_id)
-            return "paid", days
+            start_trial(session, user, days, "light")
+            return "light", days
     return None
 
 
@@ -211,8 +237,8 @@ async def _daily_check(bot: Bot):
     now = datetime.utcnow()
     users = session.query(User).all()
     for user in users:
-        if user.trial and user.period_end:
-            t_days = (user.period_end.date() - now.date()).days
+        if user.trial and user.trial_end:
+            t_days = (user.trial_end.date() - now.date()).days
             if t_days <= 0 and not user.notified_0d:
                 try:
                     await bot.send_message(
@@ -223,15 +249,22 @@ async def _daily_check(bot: Bot):
                     log("notification", "trial ended notice to %s", user.telegram_id)
                 except Exception:
                     pass
+                if user.resume_grade:
+                    user.grade = user.resume_grade
+                    user.period_end = user.resume_period_end
+                else:
+                    user.grade = "free"
+                    user.request_limit = FREE_LIMIT
+                    user.requests_used = 0
+                    user.period_start = now
+                    user.period_end = now + timedelta(days=30)
+                    user.notified_free = True
                 user.trial = False
-                user.grade = "free"
-                user.request_limit = FREE_LIMIT
-                user.requests_used = 0
-                user.period_start = now
-                user.period_end = now + timedelta(days=30)
+                user.trial_end = None
+                user.resume_grade = None
+                user.resume_period_end = None
                 user.notified_0d = True
-                user.notified_free = True
-        elif user.grade in {"paid", "pro"} and user.period_end and not user.trial:
+        elif user.grade in {"light", "pro"} and user.period_end and not user.trial:
             days = (user.period_end.date() - now.date()).days
             text = None
             if days <= 0 and not user.notified_0d:

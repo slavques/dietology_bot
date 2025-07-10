@@ -194,7 +194,7 @@ ADMIN_BLOCKED_TITLE = "Заблокированные пользователи:"
 ADMIN_BLOCKED_EMPTY = "Нет заблокированных пользователей"
 ADMIN_STATS = (
     "Всего пользователей: {total}\n"
-    "Старт: {paid}\n"
+    "Старт: {light}\n"
     "PRO: {pro}\n"
     "Free с запросами: {used}"
 )
