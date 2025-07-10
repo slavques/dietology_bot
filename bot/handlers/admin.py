@@ -20,6 +20,8 @@ from ..texts import (
     BTN_BANK_CARD,
     BTN_TELEGRAM_STARS,
     BTN_CRYPTO,
+    BTN_SETTINGS,
+    BTN_MANUAL,
     BTN_GRADE_START,
     BTN_GRADE_PRO,
     BTN_STATS_ADMIN,
