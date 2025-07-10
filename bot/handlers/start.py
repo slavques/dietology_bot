@@ -11,6 +11,7 @@ from ..texts import (
     REMAINING_FREE,
     REMAINING_DAYS,
     DEV_FEATURE,
+    TRIAL_STARTED,
 )
 
 
@@ -30,6 +31,10 @@ def get_welcome_text(user: User) -> str:
 async def cmd_start(message: types.Message):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    from ..subscriptions import check_start_trial
+    from ..texts import TRIAL_STARTED
+
+    trial = check_start_trial(session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT
@@ -44,6 +49,10 @@ async def cmd_start(message: types.Message):
     # Send a helper message with the reply keyboard and keep it so the
     # "Меню" and "ЧаВО" buttons remain persistent for the user.
     await message.answer("🥑", reply_markup=main_menu_kb())
+    if trial:
+        grade, days = trial
+        grade_name = "PRO" if grade == "pro" else "Старт"
+        await message.answer(TRIAL_STARTED.format(grade=grade_name, days=days))
     await message.answer(text, reply_markup=menu_inline_kb())
 
 
@@ -85,6 +94,13 @@ async def cb_menu(query: types.CallbackQuery):
 
 
 async def cb_settings(query: types.CallbackQuery):
+    from ..database import get_option_bool
+    from ..texts import FEATURE_DISABLED
+
+    if not get_option_bool("feat_settings"):
+        await query.answer(FEATURE_DISABLED, show_alert=True)
+        return
+
     await query.message.edit_text(DEV_FEATURE)
     await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await query.answer()
