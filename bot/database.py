@@ -35,6 +35,7 @@ def _ensure_columns():
     """Add new columns to old databases if they are missing."""
     existing = _column_names("users")
     dt_type = "DATETIME" if engine.dialect.name == "sqlite" else "TIMESTAMP"
+    bool_default = "0" if engine.dialect.name == "sqlite" else "FALSE"
     with engine.begin() as conn:
         if "grade" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN grade TEXT DEFAULT 'free'"))
@@ -48,21 +49,21 @@ def _ensure_columns():
         if "period_end" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN period_end {dt_type}"))
         if "notified_7d" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_7d BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_7d BOOLEAN DEFAULT {bool_default}"))
         if "notified_3d" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_3d BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_3d BOOLEAN DEFAULT {bool_default}"))
         if "notified_0d" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_0d BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_0d BOOLEAN DEFAULT {bool_default}"))
         if "notified_1d" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_1d BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_1d BOOLEAN DEFAULT {bool_default}"))
         if "notified_free" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT {bool_default}"))
         if "daily_used" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN daily_used INTEGER DEFAULT 0"))
         if "daily_start" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN daily_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
         if "blocked" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT 0"))
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT {bool_default}"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
