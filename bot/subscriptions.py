@@ -196,6 +196,8 @@ def start_trial(session: SessionLocal, user: User, days: int, grade: str) -> Non
     user.notified_1d = False
     user.notified_0d = False
     session.commit()
+    from .logger import log
+    log("trial", "trial started for %s: %s days %s", user.telegram_id, days, grade)
 
 
 def check_start_trial(session: SessionLocal, user: User) -> Optional[tuple[str, int]]:
@@ -208,6 +210,8 @@ def check_start_trial(session: SessionLocal, user: User) -> Optional[tuple[str, 
         days = get_option_int("trial_pro_days", 0)
         if days > 0:
             start_trial(session, user, days, "pro")
+            from .logger import log
+            log("trial", "auto start trial pro for %s", user.telegram_id)
             return "pro", days
     if get_option_bool("trial_light_enabled", False):
         days = get_option_int("trial_light_days", 0)
