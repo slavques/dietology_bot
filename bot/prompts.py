@@ -16,7 +16,20 @@ PRO_PHOTO_PROMPT = (
     '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
 )
 
-FREE_PHOTO_PROMPT = PRO_PHOTO_PROMPT
+LIGHT_PHOTO_PROMPT = (
+    "Ты — профессиональный диетолог/нутрициолог. Анализируй фото:\n\n"
+    "Если на фото нет еды или напитка — верни\n"
+    '{"is_food": false}\n\n'
+    "Иначе (напиток в стакане или готовое блюдо) — оцени визуально вес порции в граммах и рассчитай КБЖУ (до десятых), при необходимости уточни поиск в интернете (включая FatSecret).\n\n"
+    "Всегда указывай:\n"
+    "• confidence 0.0–1.0\n"
+    '• type: "drink" или "meal"\n'
+    "• name: по-русски с заглавной буквы\n\n"
+    "Ответь строго одним JSON без пояснений:\n"
+    '{"is_food":…, "confidence":…, "type":"…", "name":"…", "serving":…, "calories":…, "protein":…, "fat":…, "carbs":…}'
+)
+
+FREE_PHOTO_PROMPT = LIGHT_PHOTO_PROMPT
 
 PRO_TEXT_PROMPT = (
     "Ты — диетолог/нутрициолог. Анализируй текст:\n\n"
@@ -30,7 +43,18 @@ PRO_TEXT_PROMPT = (
     '"calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
 )
 
-FREE_TEXT_PROMPT = PRO_TEXT_PROMPT
+LIGHT_TEXT_PROMPT = (
+    "Ты — диетолог/нутрициолог. Анализируй текст:\n\n"
+    "Если это не еда и не напиток — верни\n"
+    '{"is_food": false}\n\n'
+    "По ингредиентам и объёмам оцени вес порции и рассчитай КБЖУ (до десятых).\n\n"
+    "Ответь строго JSON:\n"
+    '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", '
+    '"name": "<Название на русском с заглавной буквы>", "serving": <граммы>, '
+    '"calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
+)
+
+FREE_TEXT_PROMPT = LIGHT_TEXT_PROMPT
 
 PRO_HINT_PROMPT_BASE = (
     "Ты — диетолог. Пользователь пишет уточнение по фото или тексту — {context}\n"
@@ -42,4 +66,13 @@ PRO_HINT_PROMPT_BASE = (
     '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
 )
 
-FREE_HINT_PROMPT_BASE = PRO_HINT_PROMPT_BASE
+LIGHT_HINT_PROMPT_BASE = (
+    "Ты — диетолог. Пользователь пишет уточнение по фото или тексту — {context}\n"
+    "Уточнение пользователя: «{hint}».\n\n"
+    "Если уточнение относится к еде — проанализируй уточнение, сравни с фото или текстом, рассчитай примерный вес и КБЖУ(до десятых).\n"
+    'Если уточнение не касается еды или продуктов — верни {"success": false}.\n\n'
+    "Ответь строго одним JSON по шаблону:\n"
+    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
+)
+
+FREE_HINT_PROMPT_BASE = LIGHT_HINT_PROMPT_BASE
