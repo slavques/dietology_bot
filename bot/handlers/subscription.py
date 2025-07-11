@@ -16,7 +16,7 @@ from ..keyboards import (
 from ..config import YOOKASSA_TOKEN
 from aiogram.types import LabeledPrice
 from ..texts import (
-    INTRO_TEXT,
+    INTRO_BASE,
     PLAN_TEXT,
     SUB_INVALID_PLAN,
     SUB_METHOD_TEXT,
@@ -50,6 +50,24 @@ PRO_PLAN_MAP = {
 }
 
 
+def build_intro_text(user) -> str:
+    from ..database import get_option_bool
+
+    if user.grade == "pro":
+        plan = "PRO"
+    elif user.grade == "light":
+        plan = "Старт"
+    else:
+        plan = "Не подключено"
+
+    lines = [INTRO_BASE.format(plan=plan)]
+    if get_option_bool("grade_light"):
+        lines.append("\n<b>🔸 Старт</b>\nБазовый анализ, примерная \nточность, минимум усилий")
+    if get_option_bool("grade_pro"):
+        lines.append("<b>⚡ Pro-режим</b>\nУлучшенная модель, высокая точность, \nумный расчёт")
+    return "\n".join(lines)
+
+
 async def cb_pay(query: types.CallbackQuery):
     """Send an invoice via YooKassa when the user presses the pay button."""
     _, tier, code = query.data.split(":", 2)
@@ -81,11 +99,19 @@ async def cb_pay(query: types.CallbackQuery):
 
 
 async def show_subscription_menu(message: types.Message):
-    await message.answer(INTRO_TEXT, reply_markup=subscription_grades_inline_kb())
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    text = build_intro_text(user)
+    session.close()
+    await message.answer(text, reply_markup=subscription_grades_inline_kb(), parse_mode="HTML")
 
 
 async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
-    await query.message.edit_text(INTRO_TEXT)
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    text = build_intro_text(user)
+    session.close()
+    await query.message.edit_text(text, parse_mode="HTML")
     await query.message.edit_reply_markup(reply_markup=subscription_grades_inline_kb())
     await state.clear()
     await query.answer()
@@ -93,9 +119,11 @@ async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
 
 async def cb_grade(query: types.CallbackQuery):
     tier = query.data.split(":", 1)[1]
+    grade = "🔸 Старт" if tier == "light" else "⚡ Pro-режим"
     await query.message.edit_text(
-        PLAN_TEXT,
+        PLAN_TEXT.format(grade=grade),
         reply_markup=subscription_plans_inline_kb(tier),
+        parse_mode="HTML",
     )
     await query.answer()
 
@@ -104,9 +132,11 @@ async def cb_grade(query: types.CallbackQuery):
 
 async def cb_plan(query: types.CallbackQuery):
     _, tier, code = query.data.split(":", 2)
+    grade = "🔸 Старт" if tier == "light" else "⚡ Pro-режим"
     await query.message.edit_text(
-        PLAN_TEXT,
+        PLAN_TEXT.format(grade=grade),
         reply_markup=payment_method_inline(code, tier, include_back=True),
+        parse_mode="HTML",
     )
     await query.answer()
 
@@ -118,30 +148,39 @@ async def cb_method(query: types.CallbackQuery):
     await query.message.edit_text(
         SUB_METHOD_TEXT.format(plan=plan),
         reply_markup=pay_kb(code, tier, include_back=True),
+        parse_mode="HTML",
     )
     await query.answer()
 
 
 async def cb_method_back(query: types.CallbackQuery):
     _, tier, code = query.data.split(":", 2)
+    grade = "🔸 Старт" if tier == "light" else "⚡ Pro-режим"
     await query.message.edit_text(
-        PLAN_TEXT,
+        PLAN_TEXT.format(grade=grade),
         reply_markup=payment_method_inline(code, tier, include_back=True),
+        parse_mode="HTML",
     )
     await query.answer()
 
 
 async def cb_plan_back(query: types.CallbackQuery):
     tier = query.data.split(":", 1)[1]
+    grade = "🔸 Старт" if tier == "light" else "⚡ Pro-режим"
     await query.message.edit_text(
-        PLAN_TEXT,
+        PLAN_TEXT.format(grade=grade),
         reply_markup=subscription_plans_inline_kb(tier),
+        parse_mode="HTML",
     )
     await query.answer()
 
 
 async def cb_sub_plans(query: types.CallbackQuery):
-    await query.message.edit_text(INTRO_TEXT)
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    text = build_intro_text(user)
+    session.close()
+    await query.message.edit_text(text, parse_mode="HTML")
     await query.message.edit_reply_markup(reply_markup=subscription_grades_inline_kb())
     await query.answer()
 
