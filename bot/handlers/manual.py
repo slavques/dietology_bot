@@ -48,7 +48,7 @@ async def manual_start(query: types.CallbackQuery, state: FSMContext):
         await query.answer()
         return
     session.close()
-    await query.message.edit_text(MANUAL_PROMPT)
+    await query.message.edit_text(MANUAL_PROMPT, parse_mode="HTML")
     await query.message.edit_reply_markup(reply_markup=back_inline_kb())
     await state.set_state(ManualMeal.waiting_text)
     await query.answer()
@@ -96,7 +96,9 @@ async def process_manual(message: types.Message, state: FSMContext):
             )
             text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
             await message.answer(
-                text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS)
+                text,
+                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                parse_mode="HTML",
             )
             log(
                 "notification",
