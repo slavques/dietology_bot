@@ -45,7 +45,9 @@ async def request_photo(message: types.Message):
         )
         text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
         await message.answer(
-            text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS)
+            text,
+            reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+            parse_mode="HTML",
         )
         log(
             "notification",
@@ -97,7 +99,9 @@ async def handle_photo(message: types.Message, state: FSMContext):
             )
             text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
             await message.answer(
-                text, reply_markup=subscribe_button(BTN_REMOVE_LIMITS)
+                text,
+                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                parse_mode="HTML",
             )
             log(
                 "notification",

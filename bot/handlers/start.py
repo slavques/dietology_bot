@@ -24,10 +24,13 @@ def get_welcome_text(user: User) -> str:
     if user.grade == "free":
         remaining = max(user.request_limit - user.requests_used, 0)
         extra = REMAINING_FREE.format(remaining=remaining)
+        grade_line = ""
     else:
         days = days_left(user) or 0
         extra = REMAINING_DAYS.format(days=days)
-    return f"{BASE_TEXT}\n{extra}"
+        grade_name = "Старт" if user.grade == "light" else "PRO"
+        grade_line = f"\nТариф: <b>{grade_name}</b>"
+    return f"{BASE_TEXT}{grade_line}\n{extra}"
 
 async def cmd_start(message: types.Message):
     session = SessionLocal()
@@ -58,7 +61,7 @@ async def cmd_start(message: types.Message):
                 grade=grade_name, days=days, day_word=plural_ru_day(days)
             )
         )
-    await message.answer(text, reply_markup=menu_inline_kb())
+    await message.answer(text, reply_markup=menu_inline_kb(), parse_mode="HTML")
 
 
 async def back_to_menu(message: types.Message):
@@ -76,7 +79,7 @@ async def back_to_menu(message: types.Message):
     session.commit()
     session.close()
     await message.answer("🥑", reply_markup=main_menu_kb())
-    await message.answer(text, reply_markup=menu_inline_kb())
+    await message.answer(text, reply_markup=menu_inline_kb(), parse_mode="HTML")
 
 
 async def cb_menu(query: types.CallbackQuery):
@@ -93,7 +96,7 @@ async def cb_menu(query: types.CallbackQuery):
     text = get_welcome_text(user)
     session.commit()
     session.close()
-    await query.message.edit_text(text)
+    await query.message.edit_text(text, parse_mode="HTML")
     await query.message.edit_reply_markup(reply_markup=menu_inline_kb())
     await query.answer()
 

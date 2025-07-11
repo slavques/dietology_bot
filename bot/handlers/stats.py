@@ -46,7 +46,7 @@ async def show_stats_menu(message: types.Message):
         session.close()
         return
     session.close()
-    await message.answer(STATS_MENU_TEXT, reply_markup=stats_menu_kb())
+    await message.answer(STATS_MENU_TEXT, reply_markup=stats_menu_kb(), parse_mode="HTML")
 
 
 async def cb_stats_menu(query: types.CallbackQuery):
@@ -61,7 +61,7 @@ async def cb_stats_menu(query: types.CallbackQuery):
         await query.answer()
         return
     session.close()
-    await query.message.edit_text(STATS_MENU_SHORT)
+    await query.message.edit_text(STATS_MENU_SHORT, parse_mode="HTML")
     await query.message.edit_reply_markup(reply_markup=stats_menu_inline_kb())
     await query.answer()
 

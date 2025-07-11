@@ -267,17 +267,18 @@ async def _daily_check(bot: Bot):
         elif user.grade in {"light", "pro"} and user.period_end and not user.trial:
             days = (user.period_end.date() - now.date()).days
             text = None
+            price = PLAN_PRICES["1m"] if user.grade == "light" else PRO_PLAN_PRICES["1m"]
             if days <= 0 and not user.notified_0d:
-                text = SUB_PAUSED
+                text = SUB_PAUSED.format(price=price)
                 user.notified_0d = True
             elif days == 1 and not user.notified_1d:
-                text = SUB_END_1D
+                text = SUB_END_1D.format(price=price)
                 user.notified_1d = True
             elif days == 3 and not user.notified_3d:
-                text = SUB_END_3D
+                text = SUB_END_3D.format(price=price)
                 user.notified_3d = True
             elif days == 7 and not user.notified_7d:
-                text = SUB_END_7D
+                text = SUB_END_7D.format(price=price)
                 user.notified_7d = True
             if text:
                 kb = subscribe_button(BTN_RENEW_SUB)
