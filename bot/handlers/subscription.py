@@ -54,9 +54,9 @@ def build_intro_text(user) -> str:
     from ..database import get_option_bool
 
     if user.grade == "pro":
-        plan = "PRO"
+        plan = "<b>⚡ Pro-режим</b>"
     elif user.grade == "light":
-        plan = "Старт"
+        plan = "<b>🔸 Старт</b>"
     else:
         plan = "Не подключено"
 

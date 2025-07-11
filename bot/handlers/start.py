@@ -28,7 +28,9 @@ def get_welcome_text(user: User) -> str:
     else:
         days = days_left(user) or 0
         extra = REMAINING_DAYS.format(days=days)
-        grade_name = "Старт" if user.grade == "light" else "PRO"
+        grade_name = (
+            "🔸 Старт" if user.grade == "light" else "⚡ Pro-режим"
+        )
         grade_line = f"\nТариф: <b>{grade_name}</b>"
     return f"{BASE_TEXT}{grade_line}\n{extra}"
 
@@ -55,11 +57,12 @@ async def cmd_start(message: types.Message):
     await message.answer("🥑", reply_markup=main_menu_kb())
     if trial:
         grade, days = trial
-        grade_name = "PRO" if grade == "pro" else "Старт"
+        grade_name = "⚡ Pro-режим" if grade == "pro" else "🔸 Старт"
         await message.answer(
             TRIAL_STARTED.format(
                 grade=grade_name, days=days, day_word=plural_ru_day(days)
-            )
+            ),
+            parse_mode="HTML",
         )
     await message.answer(text, reply_markup=menu_inline_kb(), parse_mode="HTML")
 

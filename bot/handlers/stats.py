@@ -31,7 +31,6 @@ from ..texts import (
     BTN_REPORT_DAY,
     BTN_STATS,
     STATS_MENU_TEXT,
-    STATS_MENU_SHORT,
     BTN_BACK,
 )
 
@@ -61,7 +60,7 @@ async def cb_stats_menu(query: types.CallbackQuery):
         await query.answer()
         return
     session.close()
-    await query.message.edit_text(STATS_MENU_SHORT, parse_mode="HTML")
+    await query.message.edit_text(STATS_MENU_TEXT, parse_mode="HTML")
     await query.message.edit_reply_markup(reply_markup=stats_menu_inline_kb())
     await query.answer()
 
