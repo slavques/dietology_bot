@@ -67,15 +67,8 @@ def update_limits(user: User) -> None:
             user.period_start = now
             user.period_end = now + timedelta(days=30)
             user.notified_free = True
-        user.trial = False
-        user.trial_end = None
-        user.resume_grade = None
-        user.resume_period_end = None
-        user.notified_7d = False
-        user.notified_3d = False
-        user.notified_1d = False
-        user.notified_0d = False
-        log("notification", "subscription expired for %s", user.telegram_id)
+        # keep trial flags until watcher sends notification
+        log("notification", "trial expired for %s pending notice", user.telegram_id)
     elif user.grade in {"light", "pro"} and not user.trial:
         if user.period_end and now > user.period_end:
             user.grade = "free"
