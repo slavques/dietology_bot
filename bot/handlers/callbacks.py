@@ -4,7 +4,7 @@ from aiogram.filters import StateFilter
 
 from ..database import SessionLocal, User, Meal
 from ..services import analyze_photo_with_hint, analyze_text_with_hint
-from ..subscriptions import ensure_user
+from ..subscriptions import ensure_user, notify_trial_end
 
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import (
@@ -72,6 +72,7 @@ async def process_edit(message: types.Message, state: FSMContext):
     meal = pending_meals[meal_id]
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    await notify_trial_end(message.bot, session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT
