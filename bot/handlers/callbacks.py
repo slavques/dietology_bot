@@ -99,8 +99,8 @@ async def process_edit(message: types.Message, state: FSMContext):
             meal.get('text', ''), message.text, grade
         )
     log("prompt", "clarification analyzed for %s", message.from_user.id)
-    if result.get('error') or (
-        result.get('success') is False and not any(k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs'))
+    if result.get('error') or result.get('is_food') is False or not any(
+        k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs')
     ):
         if meal.get('error_msg'):
             try:

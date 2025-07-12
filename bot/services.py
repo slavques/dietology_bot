@@ -319,7 +319,7 @@ async def analyze_text_with_hint(
     """Clarify text description with additional hint using the original text."""
     if not client.api_key:
         return {
-            "success": True,
+            "is_food": True,
             "name": hint,
             "type": "meal",
             "serving": 200,
@@ -379,7 +379,7 @@ async def analyze_photo_with_hint(
     if not client.api_key:
         # simple stub when API key is missing
         return {
-            "success": True,
+            "is_food": True,
             "name": hint,
             "type": "meal",
             "serving": 200,
