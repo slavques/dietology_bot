@@ -270,7 +270,7 @@ REPORT_LINE_C = "• Углеводы: {carbs} г  "
 REPORT_MEALS_TITLE = "📂 Приёмы пищи:"
 MEAL_LINE = (
     "• {icon} {name}\n"
-    "(Белки: {protein} г / Жиры: {fat} г  / Углеводы: {carbs} г)"
+    "(Калории: {calories} ккал / Белки: {protein} г / Жиры: {fat} г  / Углеводы: {carbs} г)"
 )
 
 # History texts

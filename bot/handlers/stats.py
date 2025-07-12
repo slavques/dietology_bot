@@ -187,6 +187,7 @@ async def cb_report_day(query: types.CallbackQuery):
         line = MEAL_LINE.format(
             icon=icon,
             name=meal.name,
+            calories=int(meal.calories),
             protein=int(meal.protein),
             fat=int(meal.fat),
             carbs=int(meal.carbs),
@@ -272,6 +273,7 @@ async def report_day(message: types.Message):
         line = MEAL_LINE.format(
             icon=icon,
             name=meal.name,
+            calories=int(meal.calories),
             protein=int(meal.protein),
             fat=int(meal.fat),
             carbs=int(meal.carbs),
