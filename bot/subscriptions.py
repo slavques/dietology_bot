@@ -14,6 +14,7 @@ from .texts import (
     BTN_RENEW_SUB,
     BTN_REMOVE_LIMIT,
     TRIAL_ENDED,
+    TRIAL_PRO_ENDED_START,
 )
 
 from .database import SessionLocal, User, Payment
@@ -66,15 +67,8 @@ def update_limits(user: User) -> None:
             user.period_start = now
             user.period_end = now + timedelta(days=30)
             user.notified_free = True
-        user.trial = False
-        user.trial_end = None
-        user.resume_grade = None
-        user.resume_period_end = None
-        user.notified_7d = False
-        user.notified_3d = False
-        user.notified_1d = False
-        user.notified_0d = False
-        log("notification", "subscription expired for %s", user.telegram_id)
+        # keep trial flags until watcher sends notification
+        log("notification", "trial expired for %s pending notice", user.telegram_id)
     elif user.grade in {"light", "pro"} and not user.trial:
         if user.period_end and now > user.period_end:
             user.grade = "free"
@@ -241,9 +235,12 @@ async def _daily_check(bot: Bot):
             t_days = (user.trial_end.date() - now.date()).days
             if t_days <= 0 and not user.notified_0d:
                 try:
+                    text = TRIAL_ENDED
+                    if user.resume_grade == "light" and user.grade.startswith("pro"):
+                        text = TRIAL_PRO_ENDED_START
                     await bot.send_message(
                         user.telegram_id,
-                        TRIAL_ENDED,
+                        text,
                         reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
                     )
                     log("notification", "trial ended notice to %s", user.telegram_id)
