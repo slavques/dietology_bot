@@ -336,8 +336,8 @@ async def analyze_text_with_hint(
     else:
         base = FREE_HINT_PROMPT_BASE
     prompt = base.format(
-        context=context,
-        hint=hint,
+        context=context.replace("{", "{{").replace("}", "}}"),
+        hint=hint.replace("{", "{{").replace("}", "}}"),
     )
     sender = _chat if grade.startswith("pro") or grade.startswith("light") else _completion
     content = await sender(
@@ -398,8 +398,8 @@ async def analyze_photo_with_hint(
     else:
         base = FREE_HINT_PROMPT_BASE
     prompt = base.format(
-        context=context,
-        hint=hint,
+        context=context.replace("{", "{{").replace("}", "}}"),
+        hint=hint.replace("{", "{{").replace("}", "}}"),
     )
     # As with the initial photo analysis, clarifications with photos must always use
     # the Responses API since the Completions endpoint cannot process images.
