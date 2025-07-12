@@ -24,9 +24,9 @@ def to_float(value: Any) -> float:
     return 0.0
 
 
-def parse_serving(value: Any) -> int:
-    """Parse serving size from arbitrary value in grams."""
-    return int(round(to_float(value)))
+def parse_serving(value: Any) -> float:
+    """Parse serving size from arbitrary value in grams rounded to 0.1."""
+    return round(to_float(value), 1)
 
 def make_bar_chart(totals: Dict[str, float]) -> str:
     max_val = max(totals.values()) if totals else 1

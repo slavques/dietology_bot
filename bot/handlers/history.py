@@ -62,10 +62,10 @@ def build_history_text(user_id: int, offset: int, header: bool = False):
             totals["carbs"] += m.carbs
         text_lines.extend(
             [
-                HISTORY_LINE_CAL.format(cal=int(totals['calories'])),
-                HISTORY_LINE_P.format(protein=int(totals['protein'])),
-                HISTORY_LINE_F.format(fat=int(totals['fat'])),
-                HISTORY_LINE_C.format(carbs=int(totals['carbs'])),
+                HISTORY_LINE_CAL.format(cal=round(totals['calories'], 1)),
+                HISTORY_LINE_P.format(protein=round(totals['protein'], 1)),
+                HISTORY_LINE_F.format(fat=round(totals['fat'], 1)),
+                HISTORY_LINE_C.format(carbs=round(totals['carbs'], 1)),
                 "",
             ]
         )
