@@ -14,7 +14,8 @@ The bot relies on OpenAI's `gpt-4o` model for food recognition.
    `bot/config.py`. Set `ADMIN_PASSWORD` for admin access,
    `DATABASE_URL` (defaults to `sqlite:///bot.db`), and `YOOKASSA_TOKEN` for payments here. For testing, the
    `SUBSCRIPTION_CHECK_INTERVAL` (in seconds) controls how often subscription
-   statuses are checked (default `3600`).
+   statuses are checked. It is read from `.env` and converted to an integer
+   (default `3600`).
 
 3. Run the bot (package version):
    ```bash

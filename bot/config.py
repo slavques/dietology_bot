@@ -11,5 +11,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "DATABASE_URL")
 ADMIN_COMMAND = os.getenv("ADMIN_COMMAND", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ADMIN_PASSWORD")
 YOOKASSA_TOKEN = os.getenv("YOOKASSA_TOKEN", "YOOKASSA_TOKEN")
-SUBSCRIPTION_CHECK_INTERVAL = os.getenv("SUBSCRIPTION_CHECK_INTERVAL", "SUBSCRIPTION_CHECK_INTERVAL")
+# Interval in seconds for checking subscription status. Uses 3600 seconds by
+# default if the environment variable is not set.
+SUBSCRIPTION_CHECK_INTERVAL = int(os.getenv("SUBSCRIPTION_CHECK_INTERVAL", "3600"))
 LOG_DIR = os.getenv("LOG_DIR", "logs")
