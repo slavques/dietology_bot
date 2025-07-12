@@ -138,6 +138,12 @@ def process_payment_success(
 ):
     now = datetime.utcnow()
 
+    if user.trial:
+        user.trial = False
+        user.trial_end = None
+        user.resume_grade = None
+        user.resume_period_end = None
+
     def add_period(dt: datetime, count: int = 1) -> datetime:
         """Add count * 30 days to dt."""
         return dt + timedelta(days=30 * count)
