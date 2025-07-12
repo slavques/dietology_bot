@@ -81,7 +81,7 @@ def update_limits(user: User) -> None:
                     "subscription resumed for %s",
                     user.telegram_id,
                 )
-            else:
+            elif user.notified_0d:
                 user.grade = "free"
                 user.request_limit = FREE_LIMIT
                 user.requests_used = 0
