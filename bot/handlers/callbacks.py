@@ -191,9 +191,9 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         await query.message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
         session.close()
         return
-    serving = parse_serving(meal.get('orig_serving', meal['serving'])) * fraction
+    serving = round(parse_serving(meal.get('orig_serving', meal['serving'])) * fraction, 1)
     macros = {
-        k: to_float(v) * fraction
+        k: round(to_float(v) * fraction, 1)
         for k, v in meal.get('orig_macros', meal['macros']).items()
     }
     name = PORTION_PREFIXES.get(fraction, "") + meal['name']
@@ -227,9 +227,9 @@ async def cb_save_full(query: types.CallbackQuery):
         await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     meal['portion'] = 1.0
-    serving = int(round(meal.get('orig_serving', meal['serving']) * 1.0))
+    serving = round(meal.get('orig_serving', meal['serving']) * 1.0, 1)
     macros = {
-        k: round(v * 1.0)
+        k: round(v * 1.0, 1)
         for k, v in meal.get('orig_macros', meal['macros']).items()
     }
     meal['serving'] = serving
@@ -248,9 +248,9 @@ async def cb_save_half(query: types.CallbackQuery):
         await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     meal['portion'] = 0.5
-    serving = int(round(meal.get('orig_serving', meal['serving']) * 0.5))
+    serving = round(meal.get('orig_serving', meal['serving']) * 0.5, 1)
     macros = {
-        k: round(v * 0.5)
+        k: round(v * 0.5, 1)
         for k, v in meal.get('orig_macros', meal['macros']).items()
     }
     meal['serving'] = serving
@@ -269,9 +269,9 @@ async def cb_save_quarter(query: types.CallbackQuery):
         await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     meal['portion'] = 0.25
-    serving = int(round(meal.get('orig_serving', meal['serving']) * 0.25))
+    serving = round(meal.get('orig_serving', meal['serving']) * 0.25, 1)
     macros = {
-        k: round(v * 0.25)
+        k: round(v * 0.25, 1)
         for k, v in meal.get('orig_macros', meal['macros']).items()
     }
     meal['serving'] = serving
@@ -290,9 +290,9 @@ async def cb_save_threeq(query: types.CallbackQuery):
         await query.answer(SESSION_EXPIRED, show_alert=True)
         return
     meal['portion'] = 0.75
-    serving = int(round(meal.get('orig_serving', meal['serving']) * 0.75))
+    serving = round(meal.get('orig_serving', meal['serving']) * 0.75, 1)
     macros = {
-        k: round(v * 0.75)
+        k: round(v * 0.75, 1)
         for k, v in meal.get('orig_macros', meal['macros']).items()
     }
     meal['serving'] = serving
