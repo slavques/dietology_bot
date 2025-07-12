@@ -239,6 +239,45 @@ def check_start_trial(session: SessionLocal, user: User) -> Optional[tuple[str, 
     return None
 
 
+async def notify_trial_end(bot: Bot, session: SessionLocal, user: User) -> None:
+    """Notify user about expired trial and restore subscription if needed."""
+    now = datetime.utcnow()
+    if (
+        user.trial
+        and user.trial_end
+        and now > user.trial_end
+        and not user.notified_0d
+    ):
+        text = TRIAL_ENDED
+        if user.resume_grade == "light" and user.grade.startswith("pro"):
+            text = TRIAL_PRO_ENDED_START
+        try:
+            await bot.send_message(
+                user.telegram_id,
+                text,
+                reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
+            )
+            log("notification", "trial ended notice to %s", user.telegram_id)
+        except Exception:
+            pass
+        if user.resume_grade:
+            user.grade = user.resume_grade
+            user.period_end = user.resume_period_end
+        else:
+            user.grade = "free"
+            user.request_limit = FREE_LIMIT
+            user.requests_used = 0
+            user.period_start = now
+            user.period_end = now + timedelta(days=30)
+            user.notified_free = True
+        user.trial = False
+        user.trial_end = None
+        user.resume_grade = None
+        user.resume_period_end = None
+        user.notified_0d = True
+        session.commit()
+
+
 def subscription_watcher(bot: Bot, check_interval: int = 3600):
     """Check subscriptions periodically and notify users."""
 
@@ -255,38 +294,8 @@ async def _daily_check(bot: Bot):
     now = datetime.utcnow()
     users = session.query(User).all()
     for user in users:
-        update_limits(user)
-        if user.trial and user.trial_end:
-            t_days = (user.trial_end.date() - now.date()).days
-            if t_days <= 0 and not user.notified_0d:
-                try:
-                    text = TRIAL_ENDED
-                    if user.resume_grade == "light" and user.grade.startswith("pro"):
-                        text = TRIAL_PRO_ENDED_START
-                    await bot.send_message(
-                        user.telegram_id,
-                        text,
-                        reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
-                    )
-                    log("notification", "trial ended notice to %s", user.telegram_id)
-                except Exception:
-                    pass
-                if user.resume_grade:
-                    user.grade = user.resume_grade
-                    user.period_end = user.resume_period_end
-                else:
-                    user.grade = "free"
-                    user.request_limit = FREE_LIMIT
-                    user.requests_used = 0
-                    user.period_start = now
-                    user.period_end = now + timedelta(days=30)
-                    user.notified_free = True
-                user.trial = False
-                user.trial_end = None
-                user.resume_grade = None
-                user.resume_period_end = None
-                user.notified_0d = True
-        elif user.grade in {"light", "pro"} and user.period_end and not user.trial:
+        await notify_trial_end(bot, session, user)
+        if user.grade in {"light", "pro"} and user.period_end and not user.trial:
             days = (user.period_end.date() - now.date()).days
             text = None
             price = PLAN_PRICES["1m"] if user.grade == "light" else PRO_PLAN_PRICES["1m"]

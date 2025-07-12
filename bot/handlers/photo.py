@@ -7,7 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..services import analyze_photo
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import meal_actions_kb, back_menu_kb, subscribe_button
-from ..subscriptions import consume_request, ensure_user, has_request_quota
+from ..subscriptions import consume_request, ensure_user, has_request_quota, notify_trial_end
 from ..database import SessionLocal
 from ..states import EditMeal
 from ..storage import pending_meals
@@ -30,6 +30,7 @@ from ..logger import log
 async def request_photo(message: types.Message):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    await notify_trial_end(message.bot, session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT
@@ -69,6 +70,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    await notify_trial_end(message.bot, session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT

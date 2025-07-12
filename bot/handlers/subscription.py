@@ -3,7 +3,7 @@ from aiogram import types, Dispatcher, F, Bot
 from aiogram.fsm.context import FSMContext
 
 from ..database import SessionLocal
-from ..subscriptions import ensure_user, process_payment_success
+from ..subscriptions import ensure_user, process_payment_success, notify_trial_end
 from ..keyboards import (
     subscription_plans_kb,
     pay_kb,
@@ -101,6 +101,7 @@ async def cb_pay(query: types.CallbackQuery):
 async def show_subscription_menu(message: types.Message):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    await notify_trial_end(message.bot, session, user)
     text = build_intro_text(user)
     session.close()
     await message.answer(text, reply_markup=subscription_grades_inline_kb(), parse_mode="HTML")
@@ -109,6 +110,7 @@ async def show_subscription_menu(message: types.Message):
 async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
+    await notify_trial_end(query.bot, session, user)
     text = build_intro_text(user)
     session.close()
     await query.message.edit_text(text, parse_mode="HTML")
@@ -178,6 +180,7 @@ async def cb_plan_back(query: types.CallbackQuery):
 async def cb_sub_plans(query: types.CallbackQuery):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
+    await notify_trial_end(query.bot, session, user)
     text = build_intro_text(user)
     session.close()
     await query.message.edit_text(text, parse_mode="HTML")
@@ -195,6 +198,7 @@ async def handle_successful_payment(message: types.Message):
     months = {"1m": 1, "3m": 3, "6m": 6}.get(code, 1)
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    await notify_trial_end(message.bot, session, user)
     process_payment_success(session, user, months, grade=tier)
     session.close()
     # Don't delete the invoice message here so Telegram can replace it

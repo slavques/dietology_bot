@@ -2,7 +2,7 @@ from aiogram import types, Dispatcher, F
 from aiogram.filters import Command
 
 from ..database import SessionLocal, User
-from ..subscriptions import ensure_user, days_left, update_limits
+from ..subscriptions import ensure_user, days_left, update_limits, notify_trial_end
 from ..keyboards import main_menu_kb, menu_inline_kb, back_inline_kb
 from ..texts import (
     WELCOME_BASE,
@@ -38,6 +38,7 @@ def get_welcome_text(user: User) -> str:
 async def cmd_start(message: types.Message):
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    await notify_trial_end(message.bot, session, user)
     from ..subscriptions import check_start_trial
     from ..texts import TRIAL_STARTED
 
@@ -72,6 +73,7 @@ async def back_to_menu(message: types.Message):
     """Return user to the main menu."""
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    await notify_trial_end(message.bot, session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT
@@ -89,6 +91,7 @@ async def back_to_menu(message: types.Message):
 async def cb_menu(query: types.CallbackQuery):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
+    await notify_trial_end(query.bot, session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT

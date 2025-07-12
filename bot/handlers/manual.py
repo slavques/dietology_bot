@@ -12,7 +12,7 @@ from ..keyboards import (
     back_inline_kb,
     subscribe_button,
 )
-from ..subscriptions import consume_request, ensure_user
+from ..subscriptions import consume_request, ensure_user, notify_trial_end
 from ..database import SessionLocal
 from ..states import ManualMeal, EditMeal
 from ..storage import pending_meals
@@ -39,6 +39,7 @@ async def manual_start(query: types.CallbackQuery, state: FSMContext):
 
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
+    await notify_trial_end(query.bot, session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT
@@ -66,6 +67,7 @@ async def process_manual(message: types.Message, state: FSMContext):
 
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    await notify_trial_end(message.bot, session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT
