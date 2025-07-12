@@ -8,12 +8,8 @@ PRO_PHOTO_PROMPT = (
     '{"is_food": false}\n\n'
     "Если продукт в заводской упаковке — ищи его на fatsecret.ru по точному названию бренда и продукта и возьми оттуда массу нетто и КБЖУ (до десятых).\n\n"
     "Иначе (напиток в стакане или готовое блюдо) — оцени визуально вес порции в граммах и рассчитай КБЖУ (до десятых), при необходимости уточни поиск в интернете (включая FatSecret).\n\n"
-    "Всегда указывай:\n"
-    "• confidence 0.0–1.0\n"
-    '• type: "drink" или "meal"\n'
-    "• name: по-русски с заглавной буквы\n\n"
     "Ответь строго одним JSON без пояснений:\n"
-    '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
+    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<СТРОГО drink ИЛИ meal>", "name": "<Название на русском с заглавной буквы>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
 )
 
 LIGHT_PHOTO_PROMPT = (
@@ -21,12 +17,8 @@ LIGHT_PHOTO_PROMPT = (
     "Если на фото нет еды или напитка — верни\n"
     '{"is_food": false}\n\n'
     "Иначе (напиток в стакане или готовое блюдо) — оцени визуально вес порции в граммах и рассчитай КБЖУ (до десятых)\n\n"
-    "Всегда указывай:\n"
-    "• confidence 0.0–1.0\n"
-    '• type: "drink" или "meal"\n'
-    "• name: по-русски с заглавной буквы\n\n"
     "Ответь строго одним JSON без пояснений:\n"
-    '{"is_food":…, "confidence":…, "type":"…", "name":"…", "serving":…, "calories":…, "protein":…, "fat":…, "carbs":…}'
+    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<СТРОГО drink ИЛИ meal>", "name": "<Название на русском с заглавной буквы>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
 )
 
 FREE_PHOTO_PROMPT = LIGHT_PHOTO_PROMPT
@@ -38,9 +30,7 @@ PRO_TEXT_PROMPT = (
     "2. Если упомянут бренд или магазин — ищи точный продукт на fatsecret.ru и бери его КБЖУ и массу нетто(до десятых).\n\n"
     "3. Иначе — по ингредиентам и объёмам оцени вес порции и рассчитай КБЖУ (при необходимости уточни в интернете).\n\n"
     "Ответь строго JSON:\n"
-    '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", '
-    '"name": "<Название на русском с заглавной буквы>", "serving": <граммы>, '
-    '"calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
+    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<СТРОГО drink ИЛИ meal>", "name": "<Название на русском с заглавной буквы>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
 )
 
 LIGHT_TEXT_PROMPT = (
@@ -49,9 +39,7 @@ LIGHT_TEXT_PROMPT = (
     '{"is_food": false}\n\n'
     "По ингредиентам и объёмам оцени вес порции и рассчитай КБЖУ (до десятых).\n\n"
     "Ответь строго JSON:\n"
-    '{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", '
-    '"name": "<Название на русском с заглавной буквы>", "serving": <граммы>, '
-    '"calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}'
+    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<СТРОГО drink ИЛИ meal>", "name": "<Название на русском с заглавной буквы>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
 )
 
 FREE_TEXT_PROMPT = LIGHT_TEXT_PROMPT
@@ -63,7 +51,7 @@ PRO_HINT_PROMPT_BASE = (
     "Если указан бренд или производитель, найди точные КБЖУ на fatsecret.ru (значения до десятых) и используй массу всей порции.(если это составляющая блюда, то прибавь кбжу этого продукта к твоему расчету блюда)\n"
     'Если уточнение не касается еды или продуктов — верни `{{"is_food": false}}`.\n\n'
     "Ответь строго одним JSON по шаблону:\n"
-    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
+    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<СТРОГО drink ИЛИ meal>", "name": "<Название на русском с заглавной буквы>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
 )
 
 LIGHT_HINT_PROMPT_BASE = (
@@ -72,7 +60,7 @@ LIGHT_HINT_PROMPT_BASE = (
     "Если уточнение относится к еде — проанализируй уточнение, сравни с фото или текстом, рассчитай примерный вес и КБЖУ(до десятых).\n"
     'Если уточнение не касается еды или продуктов — верни {{"is_food": false}}.\n\n'
     "Ответь строго одним JSON по шаблону:\n"
-    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<drink|meal>", "name": "<Название>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
+    '{{"success": true, "is_food": true, "confidence": <0–1>, "type": "<СТРОГО drink ИЛИ meal>", "name": "<Название на русском с заглавной буквы>", "serving": <граммы>, "calories": <ккал>, "protein": <г>, "fat": <г>, "carbs": <г>}}'
 )
 
 FREE_HINT_PROMPT_BASE = LIGHT_HINT_PROMPT_BASE
