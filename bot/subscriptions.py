@@ -14,6 +14,7 @@ from .texts import (
     BTN_RENEW_SUB,
     BTN_REMOVE_LIMIT,
     TRIAL_ENDED,
+    TRIAL_PRO_ENDED_START,
 )
 
 from .database import SessionLocal, User, Payment
@@ -247,9 +248,12 @@ async def _daily_check(bot: Bot):
             t_days = (user.trial_end.date() - now.date()).days
             if t_days <= 0 and not user.notified_0d:
                 try:
+                    text = TRIAL_ENDED
+                    if user.resume_grade == "light" and user.grade.startswith("pro"):
+                        text = TRIAL_PRO_ENDED_START
                     await bot.send_message(
                         user.telegram_id,
-                        TRIAL_ENDED,
+                        text,
                         reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
                     )
                     log("notification", "trial ended notice to %s", user.telegram_id)
