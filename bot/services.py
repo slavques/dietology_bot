@@ -129,6 +129,64 @@ async def _chat(
             return "__ERROR__"
 
 
+async def _chat_completion(
+    messages: List[Dict],
+    model: str = COMPLETION_MODEL,
+    retries: int = 3,
+    backoff: float = 0.5,
+) -> str:
+    """Call the Chat Completions API without web search."""
+    if not client.api_key:
+        return ""
+    try:
+        system_msg = next(
+            m["content"] for m in messages if m.get("role") == "system"
+        )
+        log("prompt", "%s", system_msg)
+    except Exception:
+        pass
+    for attempt in range(retries):
+        try:
+            resp = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.2,
+                max_tokens=350,
+                top_p=0.9,
+            )
+            content = resp.choices[0].message.content
+            log("response", "%s", content)
+            usage = getattr(resp, "usage", None)
+            if usage:
+                tokens_in = getattr(
+                    usage,
+                    "prompt_tokens",
+                    getattr(usage, "input_tokens", None),
+                )
+                tokens_out = getattr(
+                    usage,
+                    "completion_tokens",
+                    getattr(usage, "output_tokens", None),
+                )
+                log(
+                    "tokens",
+                    "in=%s out=%s total=%s",
+                    tokens_in,
+                    tokens_out,
+                    usage.total_tokens,
+                )
+            return content
+        except RateLimitError:
+            if attempt < retries - 1:
+                await asyncio.sleep(backoff * (2**attempt))
+                continue
+            return "__RATE_LIMIT__"
+        except BadRequestError:
+            return "__BAD_REQUEST__"
+        except Exception:
+            return "__ERROR__"
+
+
 async def _completion(
     messages: List[Dict],
     model: str = COMPLETION_MODEL,
@@ -219,9 +277,12 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
         prompt = LIGHT_PHOTO_PROMPT
     else:
         prompt = FREE_PHOTO_PROMPT
-    # The Completions API does not support images, so we always use
-    # the Responses API for photo analysis regardless of user tier.
-    sender = _chat
+    # Use Responses for PRO tiers to enable web search,
+    # Chat Completions for Start and other tiers.
+    if grade.startswith("pro"):
+        sender = _chat
+    else:
+        sender = _chat_completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -280,7 +341,12 @@ async def analyze_text(description: str, grade: str = "pro") -> Dict[str, Any]:
         prompt = LIGHT_TEXT_PROMPT
     else:
         prompt = FREE_TEXT_PROMPT
-    sender = _chat if grade.startswith("pro") or grade.startswith("light") else _completion
+    if grade.startswith("pro"):
+        sender = _chat
+    elif grade.startswith("light"):
+        sender = _chat_completion
+    else:
+        sender = _completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -339,7 +405,12 @@ async def analyze_text_with_hint(
         context=context.replace("{", "{{").replace("}", "}}"),
         hint=hint.replace("{", "{{").replace("}", "}}"),
     )
-    sender = _chat if grade.startswith("pro") or grade.startswith("light") else _completion
+    if grade.startswith("pro"):
+        sender = _chat
+    elif grade.startswith("light"):
+        sender = _chat_completion
+    else:
+        sender = _completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -401,9 +472,11 @@ async def analyze_photo_with_hint(
         context=context.replace("{", "{{").replace("}", "}}"),
         hint=hint.replace("{", "{{").replace("}", "}}"),
     )
-    # As with the initial photo analysis, clarifications with photos must always use
-    # the Responses API since the Completions endpoint cannot process images.
-    sender = _chat
+    # Use Responses for PRO tiers and Chat Completions otherwise.
+    if grade.startswith("pro"):
+        sender = _chat
+    else:
+        sender = _chat_completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
