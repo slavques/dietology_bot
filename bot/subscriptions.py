@@ -282,6 +282,7 @@ def subscription_watcher(bot: Bot, check_interval: int = 3600):
     """Check subscriptions periodically and notify users."""
 
     async def _watch():
+        log("watcher", "subscription watcher started with %s sec interval", check_interval)
         while True:
             await _daily_check(bot)
             await asyncio.sleep(check_interval)
@@ -290,6 +291,7 @@ def subscription_watcher(bot: Bot, check_interval: int = 3600):
 
 
 async def _daily_check(bot: Bot):
+    log("watcher", "running subscription check")
     session = SessionLocal()
     now = datetime.utcnow()
     users = session.query(User).all()
