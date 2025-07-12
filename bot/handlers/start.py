@@ -28,9 +28,10 @@ def get_welcome_text(user: User) -> str:
     else:
         days = days_left(user) or 0
         extra = REMAINING_DAYS.format(days=days)
-        grade_name = (
-            "🔸 Старт" if user.grade == "light" else "⚡ Pro-режим"
-        )
+        if user.grade.startswith("light"):
+            grade_name = "🔸 Старт"
+        else:
+            grade_name = "⚡ Pro-режим"
         grade_line = f"\nТариф: <b>{grade_name}</b>"
     return f"{BASE_TEXT}{grade_line}\n{extra}"
 
