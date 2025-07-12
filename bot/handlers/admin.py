@@ -1,7 +1,7 @@
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ..database import SessionLocal, User
 from ..states import AdminState
@@ -29,6 +29,8 @@ from ..texts import (
     BTN_TRIAL_START,
     BTN_STATUS,
     BTN_TRIAL_DAYS,
+    BTN_GRADE,
+    ADMIN_GRADE_DONE,
     ADMIN_MODE,
     ADMIN_UNAVAILABLE,
     BROADCAST_PROMPT,
@@ -47,6 +49,7 @@ from ..texts import (
     ADMIN_TRIAL_DONE,
     ADMIN_STATS,
 )
+from ..subscriptions import PAID_LIMIT
 
 admins = set()
 
@@ -57,6 +60,7 @@ def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_DAYS, callback_data="admin:days")
     builder.button(text=BTN_FEATURES, callback_data="admin:features")
     builder.button(text=BTN_TRIAL, callback_data="admin:trial")
+    builder.button(text=BTN_GRADE, callback_data="admin:grade")
     builder.button(text=BTN_BLOCK, callback_data="admin:block")
     builder.button(text=BTN_BLOCKED_USERS, callback_data="admin:blocked")
     builder.button(text=BTN_STATS_ADMIN, callback_data="admin:stats")
@@ -95,6 +99,15 @@ def trial_grade_kb(prefix: str) -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_GRADE_PRO, callback_data=f"admin:{prefix}:pro")
     builder.button(text=BTN_GRADE_START, callback_data=f"admin:{prefix}:light")
     builder.button(text=BTN_BACK, callback_data="admin:trial")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def grade_menu_kb() -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_GRADE_PRO, callback_data="admin:grade_set:pro")
+    builder.button(text=BTN_GRADE_START, callback_data="admin:grade_set:light")
+    builder.button(text=BTN_BACK, callback_data="admin:menu")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -411,6 +424,77 @@ async def process_trial_user_id(message: types.Message, state: FSMContext):
     await state.clear()
 
 
+async def admin_grade_menu(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await query.message.edit_text(ADMIN_CHOOSE_ACTION, reply_markup=grade_menu_kb())
+    await query.answer()
+
+
+async def admin_grade_type(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    grade = query.data.split(":")[2]
+    await state.update_data(grade_type=grade)
+    await state.set_state(AdminState.waiting_grade_days)
+    await query.message.edit_text(ADMIN_ENTER_DAYS, reply_markup=admin_back_kb())
+    await query.answer()
+
+
+async def process_grade_days(message: types.Message, state: FSMContext):
+    if message.from_user.id not in admins:
+        return
+    try:
+        days = int(message.text.strip())
+    except ValueError:
+        await message.answer(ADMIN_ENTER_DAYS)
+        return
+    await state.update_data(grade_days=days)
+    await state.set_state(AdminState.waiting_grade_user_id)
+    await message.answer(ADMIN_ENTER_ID, reply_markup=admin_back_kb())
+
+
+async def process_grade_user_id(message: types.Message, state: FSMContext):
+    if message.from_user.id not in admins:
+        return
+    data = await state.get_data()
+    grade = data.get("grade_type")
+    days = int(data.get("grade_days", 0))
+    try:
+        telegram_id = int(message.text.strip())
+    except ValueError:
+        await message.answer(ADMIN_ENTER_ID)
+        return
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=telegram_id).first()
+    if not user:
+        from ..subscriptions import ensure_user
+        user = ensure_user(session, telegram_id)
+    now = datetime.utcnow()
+    if user.trial:
+        user.trial = False
+        user.trial_end = None
+        user.resume_grade = None
+        user.resume_period_end = None
+    user.grade = grade
+    user.request_limit = PAID_LIMIT
+    user.requests_used = 0
+    user.period_start = now
+    user.period_end = now + timedelta(days=days)
+    user.notified_7d = False
+    user.notified_3d = False
+    user.notified_1d = False
+    user.notified_0d = False
+    session.commit()
+    from ..logger import log
+    log("grade", "set %s grade for %s days to %s", grade, days, telegram_id)
+    session.close()
+    await message.answer(ADMIN_GRADE_DONE, reply_markup=admin_menu_kb())
+    await state.clear()
+
+
 async def admin_trial_start(query: types.CallbackQuery):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
@@ -627,6 +711,8 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_methods, F.data == "admin:methods")
     dp.callback_query.register(admin_grades, F.data == "admin:grades")
     dp.callback_query.register(admin_toggle, F.data.startswith("admin:toggle:"))
+    dp.callback_query.register(admin_grade_menu, F.data == "admin:grade")
+    dp.callback_query.register(admin_grade_type, F.data.startswith("admin:grade_set:"))
     dp.callback_query.register(admin_blocked_list, F.data == "admin:blocked")
     dp.callback_query.register(admin_unblock, F.data.startswith("admin:unblock:"))
     dp.callback_query.register(admin_stats, F.data == "admin:stats")
@@ -639,3 +725,5 @@ def register(dp: Dispatcher):
     dp.message.register(process_trial_days, AdminState.waiting_trial_days, F.text)
     dp.message.register(process_trial_user_id, AdminState.waiting_trial_user_id, F.text)
     dp.message.register(process_trial_start_days, AdminState.waiting_trial_start_days, F.text)
+    dp.message.register(process_grade_days, AdminState.waiting_grade_days, F.text)
+    dp.message.register(process_grade_user_id, AdminState.waiting_grade_user_id, F.text)

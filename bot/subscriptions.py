@@ -62,17 +62,32 @@ def update_limits(user: User) -> None:
         log("notification", "trial expired for %s pending notice", user.telegram_id)
     elif user.grade in {"light", "pro"} and not user.trial:
         if user.period_end and now > user.period_end:
-            user.grade = "free"
-            user.request_limit = FREE_LIMIT
-            user.requests_used = 0
-            user.period_start = now
-            user.period_end = now + timedelta(days=30)
-            user.notified_7d = False
-            user.notified_3d = False
-            user.notified_1d = False
-            user.notified_0d = False
-            user.notified_free = True
-            log("notification", "subscription expired for %s", user.telegram_id)
+            if user.resume_grade:
+                user.grade = user.resume_grade
+                user.period_end = user.resume_period_end
+                user.resume_grade = None
+                user.resume_period_end = None
+                log(
+                    "notification",
+                    "subscription resumed for %s",
+                    user.telegram_id,
+                )
+            elif user.notified_0d:
+                user.grade = "free"
+                user.request_limit = FREE_LIMIT
+                user.requests_used = 0
+                user.period_start = now
+                user.period_end = now + timedelta(days=30)
+                user.notified_7d = False
+                user.notified_3d = False
+                user.notified_1d = False
+                user.notified_0d = False
+                user.notified_free = True
+                log(
+                    "notification",
+                    "subscription expired for %s",
+                    user.telegram_id,
+                )
     else:
         if user.period_end is None:
             user.period_end = user.period_start + timedelta(days=30)
@@ -123,11 +138,29 @@ def process_payment_success(
 ):
     now = datetime.utcnow()
 
+    if user.trial:
+        user.trial = False
+        user.trial_end = None
+        user.resume_grade = None
+        user.resume_period_end = None
+
     def add_period(dt: datetime, count: int = 1) -> datetime:
         """Add count * 30 days to dt."""
         return dt + timedelta(days=30 * count)
 
-    if user.grade in {"light", "pro"} and user.period_end and user.period_end > now:
+    current_grade = user.grade
+
+    if (
+        current_grade == "light"
+        and grade == "pro"
+        and user.period_end
+        and user.period_end > now
+        and not user.resume_grade
+    ):
+        user.resume_grade = "light"
+        user.resume_period_end = user.period_end
+
+    if current_grade == grade and user.period_end and user.period_end > now:
         user.period_end = add_period(user.period_end, months)
     else:
         user.period_end = add_period(now, months)
