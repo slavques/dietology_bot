@@ -115,10 +115,10 @@ async def cb_stats(query: types.CallbackQuery):
         totals['fat'] += m.fat
         totals['carbs'] += m.carbs
     text = STATS_TOTALS.format(
-        calories=int(totals['calories']),
-        protein=int(totals['protein']),
-        fat=int(totals['fat']),
-        carbs=int(totals['carbs']),
+        calories=round(totals['calories'], 1),
+        protein=round(totals['protein'], 1),
+        fat=round(totals['fat'], 1),
+        carbs=round(totals['carbs'], 1),
         chart=make_bar_chart(totals),
     )
     await query.message.edit_text(text)
@@ -172,10 +172,10 @@ async def cb_report_day(query: types.CallbackQuery):
         REPORT_HEADER,
         "",
         REPORT_TOTAL,
-        REPORT_LINE_CAL.format(cal=int(totals['calories'])),
-        REPORT_LINE_P.format(protein=int(totals['protein'])),
-        REPORT_LINE_F.format(fat=int(totals['fat'])),
-        REPORT_LINE_C.format(carbs=int(totals['carbs'])),
+        REPORT_LINE_CAL.format(cal=round(totals['calories'], 1)),
+        REPORT_LINE_P.format(protein=round(totals['protein'], 1)),
+        REPORT_LINE_F.format(fat=round(totals['fat'], 1)),
+        REPORT_LINE_C.format(carbs=round(totals['carbs'], 1)),
         "",
         REPORT_MEALS_TITLE,
     ]
@@ -187,9 +187,9 @@ async def cb_report_day(query: types.CallbackQuery):
         line = MEAL_LINE.format(
             icon=icon,
             name=meal.name,
-            protein=int(meal.protein),
-            fat=int(meal.fat),
-            carbs=int(meal.carbs),
+            protein=round(meal.protein, 1),
+            fat=round(meal.fat, 1),
+            carbs=round(meal.carbs, 1),
         )
         if getattr(meal, 'type', 'meal') == 'drink':
             drinks.append(line)
@@ -257,10 +257,10 @@ async def report_day(message: types.Message):
         REPORT_HEADER,
         "",
         REPORT_TOTAL,
-        REPORT_LINE_CAL.format(cal=int(totals['calories'])),
-        REPORT_LINE_P.format(protein=int(totals['protein'])),
-        REPORT_LINE_F.format(fat=int(totals['fat'])),
-        REPORT_LINE_C.format(carbs=int(totals['carbs'])),
+        REPORT_LINE_CAL.format(cal=round(totals['calories'], 1)),
+        REPORT_LINE_P.format(protein=round(totals['protein'], 1)),
+        REPORT_LINE_F.format(fat=round(totals['fat'], 1)),
+        REPORT_LINE_C.format(carbs=round(totals['carbs'], 1)),
         "",
         REPORT_MEALS_TITLE,
     ]
@@ -272,9 +272,9 @@ async def report_day(message: types.Message):
         line = MEAL_LINE.format(
             icon=icon,
             name=meal.name,
-            protein=int(meal.protein),
-            fat=int(meal.fat),
-            carbs=int(meal.carbs),
+            protein=round(meal.protein, 1),
+            fat=round(meal.fat, 1),
+            carbs=round(meal.carbs, 1),
         )
         if getattr(meal, 'type', 'meal') == 'drink':
             drinks.append(line)
