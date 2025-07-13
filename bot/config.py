@@ -13,5 +13,5 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ADMIN_PASSWORD")
 YOOKASSA_TOKEN = os.getenv("YOOKASSA_TOKEN", "YOOKASSA_TOKEN")
 # Interval in seconds for checking subscription status.
 # Defaults to 10 minutes if the environment variable is missing.
-SUBSCRIPTION_CHECK_INTERVAL = int(os.getenv("SUBSCRIPTION_CHECK_INTERVAL", "600"))
+SUBSCRIPTION_CHECK_INTERVAL = int(os.getenv("SUBSCRIPTION_CHECK_INTERVAL", "1800"))
 LOG_DIR = os.getenv("LOG_DIR", "logs")
