@@ -71,16 +71,20 @@ def update_limits(user: User) -> None:
     elif user.grade in {"light", "pro"} and not user.trial:
         if user.period_end and now > user.period_end:
             if user.resume_grade:
-                user.grade = user.resume_grade
-                user.period_end = user.resume_period_end
-                user.resume_grade = None
-                user.resume_period_end = None
-                user.notified_0d = False
-                log(
-                    "notification",
-                    "subscription resumed for %s",
-                    user.telegram_id,
-                )
+                if user.resume_period_end and now <= user.resume_period_end:
+                    user.grade = user.resume_grade
+                    user.period_end = user.resume_period_end
+                    user.resume_grade = None
+                    user.resume_period_end = None
+                    user.notified_0d = False
+                    log(
+                        "notification",
+                        "subscription resumed for %s",
+                        user.telegram_id,
+                    )
+                else:
+                    user.resume_grade = None
+                    user.resume_period_end = None
             elif user.notified_0d:
                 user.grade = "free"
                 user.request_limit = FREE_LIMIT
@@ -312,11 +316,43 @@ async def _daily_check(bot: Bot):
     for user in users:
         await notify_trial_end(bot, session, user)
         if (
+            user.grade in {"light", "pro"}
+            and user.period_end
+            and now > user.period_end
+            and user.resume_grade
+            and user.resume_period_end
+            and user.resume_period_end > now
+            and not user.trial
+        ):
+            if not user.notified_0d:
+                text = SUB_SWITCHED.format(
+                    old=grade_name(user.grade),
+                    new=grade_name(user.resume_grade),
+                )
+                try:
+                    await bot.send_message(user.telegram_id, text)
+                    log(
+                        "notification",
+                        "sent plan switch notice to %s",
+                        user.telegram_id,
+                    )
+                except Exception:
+                    pass
+            user.grade = user.resume_grade
+            user.period_end = user.resume_period_end
+            user.resume_grade = None
+            user.resume_period_end = None
+            user.notified_0d = False
+            session.commit()
+            continue
+        if (
             user.resume_grade
             and user.resume_period_end
             and now > user.resume_period_end
             and user.grade in {"light", "pro"}
             and not user.trial
+            and user.period_end
+            and now <= user.period_end
         ):
             if not user.notified_0d:
                 text = SUB_SWITCHED.format(
@@ -332,9 +368,7 @@ async def _daily_check(bot: Bot):
                     )
                 except Exception:
                     pass
-            user.resume_grade = None
-            user.resume_period_end = None
-            user.notified_0d = False
+                user.notified_0d = True
         if user.grade in {"light", "pro"} and user.period_end and not user.trial:
             days = (user.period_end.date() - now.date()).days
             text = None
