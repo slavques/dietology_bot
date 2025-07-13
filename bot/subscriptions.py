@@ -16,6 +16,7 @@ from .texts import (
     TRIAL_ENDED,
     TRIAL_PRO_ENDED_START,
 )
+from .settings import PLAN_PRICES, PRO_PLAN_PRICES
 
 from .database import SessionLocal, User, Payment
 
