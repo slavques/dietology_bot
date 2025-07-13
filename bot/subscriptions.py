@@ -264,10 +264,11 @@ async def notify_trial_end(bot: Bot, session: SessionLocal, user: User) -> None:
         if user.resume_grade == "light" and user.grade.startswith("pro"):
             text = TRIAL_PRO_ENDED_START
         try:
+            kb = None if text == TRIAL_PRO_ENDED_START else subscribe_button(BTN_REMOVE_LIMIT)
             await bot.send_message(
                 user.telegram_id,
                 text,
-                reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
+                reply_markup=kb,
             )
             log("notification", "trial ended notice to %s", user.telegram_id)
         except Exception:
