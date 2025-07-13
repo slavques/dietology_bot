@@ -15,6 +15,7 @@ from .texts import (
     BTN_REMOVE_LIMIT,
     TRIAL_ENDED,
     TRIAL_PRO_ENDED_START,
+    SUB_SWITCHED,
 )
 from .settings import PLAN_PRICES, PRO_PLAN_PRICES
 
@@ -24,6 +25,11 @@ from .logger import log
 
 FREE_LIMIT = 20
 PAID_LIMIT = 800
+
+
+def grade_name(grade: str) -> str:
+    """Return user-facing name for a subscription grade."""
+    return "⚡ Pro-режим" if grade.startswith("pro") else "🔸 Старт"
 
 
 def ensure_user(session: SessionLocal, telegram_id: int) -> User:
@@ -68,6 +74,7 @@ def update_limits(user: User) -> None:
                 user.period_end = user.resume_period_end
                 user.resume_grade = None
                 user.resume_period_end = None
+                user.notified_0d = False
                 log(
                     "notification",
                     "subscription resumed for %s",
@@ -275,7 +282,10 @@ async def notify_trial_end(bot: Bot, session: SessionLocal, user: User) -> None:
         user.trial_end = None
         user.resume_grade = None
         user.resume_period_end = None
-        user.notified_0d = True
+        # Don't mark the subscription as notified about expiry yet.
+        # The user's previous plan may still be active after the trial ends,
+        # so keep this flag clear to allow future expiry reminders.
+        user.notified_0d = False
         session.commit()
 
 
@@ -298,6 +308,24 @@ async def _daily_check(bot: Bot):
     users = session.query(User).all()
     for user in users:
         await notify_trial_end(bot, session, user)
+        if (
+            user.resume_grade
+            and user.resume_period_end
+            and now > user.resume_period_end
+            and user.grade in {"light", "pro"}
+            and not user.trial
+            and not user.notified_0d
+        ):
+            text = SUB_SWITCHED.format(
+                old=grade_name(user.resume_grade),
+                new=grade_name(user.grade),
+            )
+            try:
+                await bot.send_message(user.telegram_id, text)
+                log("notification", "sent plan switch notice to %s", user.telegram_id)
+            except Exception:
+                pass
+            user.notified_0d = True
         if user.grade in {"light", "pro"} and user.period_end and not user.trial:
             days = (user.period_end.date() - now.date()).days
             text = None
