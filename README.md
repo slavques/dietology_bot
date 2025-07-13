@@ -66,6 +66,8 @@ such file older than seven days. The bot keeps them only to allow clarification
 requests to reuse the original image. When a meal is entered manually, the
 initial text is stored in memory and included again whenever the user asks to
 refine the result.
+Before analysis each photo is resized to 512×512 and saved in JPEG format, so
+token usage remains predictable regardless of the original resolution.
 
 ### Manual database access
 
