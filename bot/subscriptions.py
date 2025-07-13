@@ -315,18 +315,24 @@ async def _daily_check(bot: Bot):
             and now > user.resume_period_end
             and user.grade in {"light", "pro"}
             and not user.trial
-            and not user.notified_0d
         ):
-            text = SUB_SWITCHED.format(
-                old=grade_name(user.resume_grade),
-                new=grade_name(user.grade),
-            )
-            try:
-                await bot.send_message(user.telegram_id, text)
-                log("notification", "sent plan switch notice to %s", user.telegram_id)
-            except Exception:
-                pass
-            user.notified_0d = True
+            if not user.notified_0d:
+                text = SUB_SWITCHED.format(
+                    old=grade_name(user.resume_grade),
+                    new=grade_name(user.grade),
+                )
+                try:
+                    await bot.send_message(user.telegram_id, text)
+                    log(
+                        "notification",
+                        "sent plan switch notice to %s",
+                        user.telegram_id,
+                    )
+                except Exception:
+                    pass
+            user.resume_grade = None
+            user.resume_period_end = None
+            user.notified_0d = False
         if user.grade in {"light", "pro"} and user.period_end and not user.trial:
             days = (user.period_end.date() - now.date()).days
             text = None
