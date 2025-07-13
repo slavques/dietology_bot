@@ -46,6 +46,8 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE users ADD COLUMN request_limit INTEGER DEFAULT 20"))
         if "requests_used" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN requests_used INTEGER DEFAULT 0"))
+        if "requests_total" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN requests_total INTEGER DEFAULT 0"))
         if "period_start" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN period_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
         conn.execute(text("UPDATE users SET period_start=CURRENT_TIMESTAMP WHERE period_start IS NULL"))
@@ -92,6 +94,7 @@ class User(Base):
     grade = Column(String, default='free')  # 'free', 'light', 'pro', etc.
     request_limit = Column(Integer, default=20)
     requests_used = Column(Integer, default=0)
+    requests_total = Column(Integer, default=0)
     period_start = Column(DateTime, default=datetime.utcnow)
     period_end = Column(DateTime, nullable=True)
     trial_end = Column(DateTime, nullable=True)
@@ -134,6 +137,16 @@ class Payment(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     tier = Column(String)
     months = Column(Integer, default=1)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    user = relationship('User')
+
+
+class Comment(Base):
+    __tablename__ = 'comments'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    text = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
     user = relationship('User')
 
