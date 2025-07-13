@@ -41,6 +41,7 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             grade="free",
             request_limit=FREE_LIMIT,
             requests_used=0,
+            requests_total=0,
             period_start=now,
             period_end=now + timedelta(days=30),
             notified_1d=False,
@@ -126,6 +127,7 @@ def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
         log("limit", "monthly limit reached for %s", user.telegram_id)
         return False, "monthly"
     user.requests_used += 1
+    user.requests_total += 1
     if user.grade in {"light", "pro"}:
         user.daily_used += 1
     session.commit()

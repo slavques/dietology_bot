@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timedelta
 
-from ..database import SessionLocal, User
+from ..database import SessionLocal, User, Comment
 from ..states import AdminState
 from ..config import ADMIN_COMMAND, ADMIN_PASSWORD
 from ..texts import (
@@ -30,6 +30,8 @@ from ..texts import (
     BTN_STATUS,
     BTN_TRIAL_DAYS,
     BTN_GRADE,
+    BTN_USER,
+    BTN_COMMENT,
     ADMIN_GRADE_DONE,
     ADMIN_MODE,
     ADMIN_UNAVAILABLE,
@@ -42,6 +44,9 @@ from ..texts import (
     ADMIN_DAYS_DONE,
     ADMIN_BLOCK_DONE,
     ADMIN_UNBLOCK_DONE,
+    ADMIN_USER_NOT_FOUND,
+    ADMIN_ENTER_COMMENT,
+    ADMIN_COMMENT_SAVED,
     ADMIN_BLOCKED_TITLE,
     ADMIN_BLOCKED_EMPTY,
     ADMIN_METHODS_TITLE,
@@ -63,6 +68,7 @@ def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_GRADE, callback_data="admin:grade")
     builder.button(text=BTN_BLOCK, callback_data="admin:block")
     builder.button(text=BTN_BLOCKED_USERS, callback_data="admin:blocked")
+    builder.button(text=BTN_USER, callback_data="admin:user")
     builder.button(text=BTN_STATS_ADMIN, callback_data="admin:stats")
     builder.adjust(1)
     return builder.as_markup()
@@ -196,6 +202,15 @@ async def admin_block_prompt(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
 
 
+async def admin_user_prompt(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await state.set_state(AdminState.waiting_view_id)
+    await query.message.edit_text(ADMIN_ENTER_ID, reply_markup=admin_back_kb())
+    await query.answer()
+
+
 async def admin_stats(query: types.CallbackQuery):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
@@ -231,6 +246,100 @@ async def admin_stats(query: types.CallbackQuery):
     )
     await query.message.edit_text(text, reply_markup=admin_menu_kb())
     await query.answer()
+
+
+def user_info_kb(tg_id: int) -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_COMMENT, callback_data=f"admin:comment:{tg_id}")
+    builder.button(text=BTN_BACK, callback_data="admin:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+async def process_view_id(message: types.Message, state: FSMContext):
+    if message.from_user.id not in admins:
+        return
+    try:
+        tg_id = int(message.text.strip())
+    except ValueError:
+        await message.answer(ADMIN_ENTER_ID)
+        return
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=tg_id).first()
+    if not user:
+        session.close()
+        await message.answer(ADMIN_USER_NOT_FOUND, reply_markup=admin_menu_kb())
+        await state.clear()
+        return
+    from ..subscriptions import days_left, grade_name
+    days = days_left(user)
+    frozen = "нет"
+    if user.resume_grade:
+        d = None
+        if user.resume_period_end:
+            d = (user.resume_period_end.date() - datetime.utcnow().date()).days
+        frozen = f"{grade_name(user.resume_grade)}"
+        if d is not None:
+            frozen += f" ({d})"
+    comments = (
+        session.query(Comment)
+        .filter_by(user_id=user.id)
+        .order_by(Comment.timestamp.desc())
+        .all()
+    )
+    comments_text = "\n".join(
+        f"{c.timestamp.date()} - {c.text}" for c in comments
+    ) or "-"
+    sub = "бесплатная"
+    if user.trial:
+        sub = "пробная"
+    elif user.grade in {"light", "pro"}:
+        sub = "платная"
+    text = (
+        f"ID: {user.telegram_id}\n"
+        f"Текущая подписка: {sub}\n"
+        f"Остаток дней по текущей подписке: {days if days is not None else '-'}\n"
+        f"Замороженная подписка: {frozen}\n"
+        f"Общее кол-во запросов: {user.requests_total}\n"
+        f"Кол-во запросов за месяц: {user.requests_used}\n"
+        f"Комментарии:\n{comments_text}"
+    )
+    kb = user_info_kb(user.telegram_id)
+    await message.answer(text, reply_markup=kb)
+    session.close()
+    await state.clear()
+
+
+async def admin_comment_prompt(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    try:
+        tg_id = int(query.data.split(":")[2])
+    except (IndexError, ValueError):
+        await query.answer()
+        return
+    await state.update_data(comment_id=tg_id)
+    await state.set_state(AdminState.waiting_comment_text)
+    await query.message.edit_text(ADMIN_ENTER_COMMENT, reply_markup=admin_back_kb())
+    await query.answer()
+
+
+async def process_comment_text(message: types.Message, state: FSMContext):
+    if message.from_user.id not in admins:
+        return
+    data = await state.get_data()
+    tg_id = data.get("comment_id")
+    text = message.text.strip()
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=tg_id).first()
+    if user:
+        c = Comment(user_id=user.id, text=text)
+        session.add(c)
+        session.commit()
+    session.close()
+    await message.answer(ADMIN_COMMENT_SAVED, reply_markup=admin_menu_kb())
+    await state.clear()
 
 
 async def process_broadcast(message: types.Message, state: FSMContext):
@@ -698,6 +807,8 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_days_one, F.data == "admin:days_one")
     dp.callback_query.register(admin_days_all, F.data == "admin:days_all")
     dp.callback_query.register(admin_block_prompt, F.data == "admin:block")
+    dp.callback_query.register(admin_user_prompt, F.data == "admin:user")
+    dp.callback_query.register(admin_comment_prompt, F.data.startswith("admin:comment:"))
     dp.callback_query.register(admin_trial_menu, F.data == "admin:trial")
     dp.callback_query.register(admin_trial_one, F.data == "admin:trial_one")
     dp.callback_query.register(admin_trial_all, F.data == "admin:trial_all")
@@ -727,3 +838,5 @@ def register(dp: Dispatcher):
     dp.message.register(process_trial_start_days, AdminState.waiting_trial_start_days, F.text)
     dp.message.register(process_grade_days, AdminState.waiting_grade_days, F.text)
     dp.message.register(process_grade_user_id, AdminState.waiting_grade_user_id, F.text)
+    dp.message.register(process_view_id, AdminState.waiting_view_id, F.text)
+    dp.message.register(process_comment_text, AdminState.waiting_comment_text, F.text)
