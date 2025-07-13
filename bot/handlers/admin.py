@@ -46,7 +46,6 @@ from ..texts import (
     ADMIN_UNBLOCK_DONE,
     ADMIN_USER_NOT_FOUND,
     ADMIN_ENTER_COMMENT,
-    ADMIN_COMMENT_SAVED,
     ADMIN_BLOCKED_TITLE,
     ADMIN_BLOCKED_EMPTY,
     ADMIN_METHODS_TITLE,
@@ -57,6 +56,46 @@ from ..texts import (
 from ..subscriptions import PAID_LIMIT
 
 admins = set()
+
+
+def grade_title(grade: str) -> str:
+    return "PRO" if grade.startswith("pro") else "Старт"
+
+
+def build_user_info(session: SessionLocal, user: User) -> str:
+    from ..subscriptions import days_left
+
+    days = days_left(user)
+    frozen = "нет"
+    if user.resume_grade:
+        d = None
+        if user.resume_period_end:
+            d = (user.resume_period_end.date() - datetime.utcnow().date()).days
+        frozen = grade_title(user.resume_grade)
+        if d is not None:
+            frozen += f" ({d})"
+    comments = (
+        session.query(Comment)
+        .filter_by(user_id=user.id)
+        .order_by(Comment.timestamp.desc())
+        .all()
+    )
+    comments_text = "\n".join(f"{c.timestamp.date()} - {c.text}" for c in comments) or "-"
+    if user.grade == "free":
+        sub = "бесплатный"
+    elif user.trial:
+        sub = f"пробный ({grade_title(user.grade)})"
+    else:
+        sub = f"платный ({grade_title(user.grade)})"
+    return (
+        f"ID: {user.telegram_id}\n"
+        f"Текущая подписка: {sub}\n"
+        f"Остаток дней по текущей подписке: {days if days is not None else '-'}\n"
+        f"Замороженная подписка: {frozen}\n"
+        f"Общее кол-во запросов: {user.requests_total}\n"
+        f"Кол-во запросов за месяц: {user.monthly_used}\n"
+        f"Комментарии:\n{comments_text}"
+    )
 
 
 def admin_menu_kb() -> types.InlineKeyboardMarkup:
@@ -271,39 +310,7 @@ async def process_view_id(message: types.Message, state: FSMContext):
         await message.answer(ADMIN_USER_NOT_FOUND, reply_markup=admin_menu_kb())
         await state.clear()
         return
-    from ..subscriptions import days_left, grade_name
-    days = days_left(user)
-    frozen = "нет"
-    if user.resume_grade:
-        d = None
-        if user.resume_period_end:
-            d = (user.resume_period_end.date() - datetime.utcnow().date()).days
-        frozen = f"{grade_name(user.resume_grade)}"
-        if d is not None:
-            frozen += f" ({d})"
-    comments = (
-        session.query(Comment)
-        .filter_by(user_id=user.id)
-        .order_by(Comment.timestamp.desc())
-        .all()
-    )
-    comments_text = "\n".join(
-        f"{c.timestamp.date()} - {c.text}" for c in comments
-    ) or "-"
-    sub = "бесплатная"
-    if user.trial:
-        sub = "пробная"
-    elif user.grade in {"light", "pro"}:
-        sub = "платная"
-    text = (
-        f"ID: {user.telegram_id}\n"
-        f"Текущая подписка: {sub}\n"
-        f"Остаток дней по текущей подписке: {days if days is not None else '-'}\n"
-        f"Замороженная подписка: {frozen}\n"
-        f"Общее кол-во запросов: {user.requests_total}\n"
-        f"Кол-во запросов за месяц: {user.requests_used}\n"
-        f"Комментарии:\n{comments_text}"
-    )
+    text = build_user_info(session, user)
     kb = user_info_kb(user.telegram_id)
     await message.answer(text, reply_markup=kb)
     session.close()
@@ -319,7 +326,7 @@ async def admin_comment_prompt(query: types.CallbackQuery, state: FSMContext):
     except (IndexError, ValueError):
         await query.answer()
         return
-    await state.update_data(comment_id=tg_id)
+    await state.update_data(comment_id=tg_id, info_msg_id=query.message.message_id)
     await state.set_state(AdminState.waiting_comment_text)
     await query.message.edit_text(ADMIN_ENTER_COMMENT, reply_markup=admin_back_kb())
     await query.answer()
@@ -330,6 +337,7 @@ async def process_comment_text(message: types.Message, state: FSMContext):
         return
     data = await state.get_data()
     tg_id = data.get("comment_id")
+    info_msg_id = data.get("info_msg_id")
     text = message.text.strip()
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=tg_id).first()
@@ -337,8 +345,20 @@ async def process_comment_text(message: types.Message, state: FSMContext):
         c = Comment(user_id=user.id, text=text)
         session.add(c)
         session.commit()
+    if user:
+        updated = build_user_info(session, user)
+    else:
+        updated = ADMIN_USER_NOT_FOUND
     session.close()
-    await message.answer(ADMIN_COMMENT_SAVED, reply_markup=admin_menu_kb())
+    try:
+        await message.bot.edit_message_text(
+            updated,
+            chat_id=message.chat.id,
+            message_id=info_msg_id,
+            reply_markup=user_info_kb(tg_id) if user else admin_menu_kb(),
+        )
+    except Exception:
+        await message.answer(updated, reply_markup=user_info_kb(tg_id) if user else admin_menu_kb())
     await state.clear()
 
 

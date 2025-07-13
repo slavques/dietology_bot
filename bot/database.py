@@ -48,6 +48,10 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE users ADD COLUMN requests_used INTEGER DEFAULT 0"))
         if "requests_total" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN requests_total INTEGER DEFAULT 0"))
+        if "monthly_used" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN monthly_used INTEGER DEFAULT 0"))
+        if "monthly_start" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN monthly_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
         if "period_start" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN period_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
         conn.execute(text("UPDATE users SET period_start=CURRENT_TIMESTAMP WHERE period_start IS NULL"))
@@ -95,6 +99,8 @@ class User(Base):
     request_limit = Column(Integer, default=20)
     requests_used = Column(Integer, default=0)
     requests_total = Column(Integer, default=0)
+    monthly_used = Column(Integer, default=0)
+    monthly_start = Column(DateTime, default=datetime.utcnow)
     period_start = Column(DateTime, default=datetime.utcnow)
     period_end = Column(DateTime, nullable=True)
     trial_end = Column(DateTime, nullable=True)

@@ -27,6 +27,17 @@ FREE_LIMIT = 20
 PAID_LIMIT = 800
 
 
+def update_monthly(user: User) -> None:
+    """Reset monthly counters every 30 days since registration."""
+    if user.monthly_start is None:
+        user.monthly_start = user.created_at or datetime.utcnow()
+        user.monthly_used = 0
+    now = datetime.utcnow()
+    while (now - user.monthly_start).days >= 30:
+        user.monthly_start += timedelta(days=30)
+        user.monthly_used = 0
+
+
 def grade_name(grade: str) -> str:
     """Return user-facing name for a subscription grade."""
     return "⚡ Pro-режим" if grade.startswith("pro") else "🔸 Старт"
@@ -42,6 +53,8 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             request_limit=FREE_LIMIT,
             requests_used=0,
             requests_total=0,
+            monthly_used=0,
+            monthly_start=now,
             period_start=now,
             period_end=now + timedelta(days=30),
             notified_1d=False,
@@ -55,6 +68,7 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
 
 
 def update_limits(user: User) -> None:
+    update_monthly(user)
     now = datetime.utcnow()
     if user.period_start is None:
         user.period_start = now
@@ -131,6 +145,7 @@ def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
         log("limit", "monthly limit reached for %s", user.telegram_id)
         return False, "monthly"
     user.requests_used += 1
+    user.monthly_used += 1
     user.requests_total += 1
     if user.grade in {"light", "pro"}:
         user.daily_used += 1
