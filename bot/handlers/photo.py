@@ -122,12 +122,11 @@ async def handle_photo(message: types.Message, state: FSMContext):
     ) as tmp:
         await message.bot.download(photo.file_id, destination=tmp.name)
         photo_path = tmp.name
-    # Use the original resolution without downscaling to improve recognition
-    # consistency. Only convert to JPEG to match the API requirements.
     try:
         from PIL import Image
 
         img = Image.open(photo_path)
+        img = img.resize((512, 512), Image.LANCZOS)
         img.save(photo_path, format="JPEG", quality=95)
     except Exception:
         pass
