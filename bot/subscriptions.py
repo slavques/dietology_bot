@@ -275,7 +275,10 @@ async def notify_trial_end(bot: Bot, session: SessionLocal, user: User) -> None:
         user.trial_end = None
         user.resume_grade = None
         user.resume_period_end = None
-        user.notified_0d = True
+        # Don't mark the subscription as notified about expiry yet.
+        # The user's previous plan may still be active after the trial ends,
+        # so keep this flag clear to allow future expiry reminders.
+        user.notified_0d = False
         session.commit()
 
 
