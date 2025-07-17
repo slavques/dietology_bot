@@ -2,6 +2,7 @@ import logging
 import logging.handlers
 import os
 import asyncio
+from datetime import datetime, time, timedelta, timezone
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
@@ -42,13 +43,29 @@ async def main() -> None:
 if __name__ == '__main__':
     os.makedirs(LOG_DIR, exist_ok=True)
     log_file = os.path.join(LOG_DIR, 'bot.log')
+
+    # Moscow timezone for log timestamps
+    MSK = timezone(timedelta(hours=3))
+
+    # Rotate logs at midnight Moscow time (21:00 server time)
+    rotate_time = time(hour=21)
+
     file_handler = logging.handlers.TimedRotatingFileHandler(
-        log_file, when='D', backupCount=3
+        log_file,
+        when='midnight',
+        backupCount=3,
+        atTime=rotate_time,
     )
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s - %(message)s",
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[file_handler, logging.StreamHandler()]
     )
+    formatter.converter = lambda ts: datetime.fromtimestamp(ts, MSK).timetuple()
+
+    file_handler.setFormatter(formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
+
     asyncio.run(main())
