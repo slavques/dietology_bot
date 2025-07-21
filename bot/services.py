@@ -25,8 +25,8 @@ from .prompts import (
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Model names for different API methods
-MODEL_NAME = "gpt-4o-mini"  # used with the Responses API
-COMPLETION_MODEL = "gpt-4o-mini"  # weaker model for Completions
+MODEL_NAME = "gpt-4.1-mini"  # used with the Responses API
+COMPLETION_MODEL = "gpt-4.1-mini"  # weaker model for Completions
 
 
 def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
@@ -92,8 +92,8 @@ async def _chat(
                     }
                 ],
                 temperature=0.2,
-                max_output_tokens=350,
-                top_p=0.9,
+                max_output_tokens=1000,
+                top_p=0.7,
                 store=False,
             )
             content = resp.output_text
@@ -151,8 +151,8 @@ async def _chat_completion(
                 model=model,
                 messages=messages,
                 temperature=0.2,
-                max_tokens=350,
-                top_p=0.9,
+                max_tokens=1000,
+                top_p=0.7,
             )
             content = resp.choices[0].message.content
             log("response", "%s", content)
@@ -219,8 +219,8 @@ async def _completion(
                 model=model,
                 prompt=prompt,
                 temperature=0.2,
-                max_tokens=350,
-                top_p=0.9,
+                max_tokens=1000,
+                top_p=0.7,
             )
             content = resp.choices[0].text
             log("response", "%s", content)
