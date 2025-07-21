@@ -3,12 +3,14 @@ import base64
 import re
 import asyncio
 from typing import Dict, List, Any, Optional
+import requests
+from bs4 import BeautifulSoup
 from .logger import log
 
 import openai
 from openai import RateLimitError, BadRequestError
 
-from .config import OPENAI_API_KEY
+from .config import OPENAI_API_KEY, GOOGLE_API_KEY, GOOGLE_CX
 from .utils import parse_serving, to_float
 from .prompts import (
     PRO_PHOTO_PROMPT,
@@ -127,6 +129,51 @@ async def _chat(
             return "__BAD_REQUEST__"
         except Exception:
             return "__ERROR__"
+
+
+async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
+    """Search fatsecret.ru via Google CSE and parse macros."""
+    if not GOOGLE_API_KEY or not GOOGLE_CX:
+        return None
+    loop = asyncio.get_running_loop()
+    try:
+        resp = await loop.run_in_executor(
+            None,
+            lambda: requests.get(
+                "https://www.googleapis.com/customsearch/v1",
+                params={"key": GOOGLE_API_KEY, "cx": GOOGLE_CX, "q": name},
+                timeout=10,
+            ),
+        )
+        data = resp.json()
+        items = data.get("items")
+        if not items:
+            return None
+        link = items[0].get("link")
+        if not link:
+            return None
+        page = await loop.run_in_executor(
+            None, lambda: requests.get(link, timeout=10)
+        )
+        soup = BeautifulSoup(page.text, "html.parser")
+        text = soup.get_text(" ", strip=True)
+        m = re.search(
+            r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал.*?Белк[аи][^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Углевод[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
+            text,
+            re.I | re.S,
+        )
+        if not m:
+            return None
+        calories, protein, fat, carbs = m.groups()
+        return {
+            "calories": to_float(calories),
+            "protein": to_float(protein),
+            "fat": to_float(fat),
+            "carbs": to_float(carbs),
+        }
+    except Exception as exc:
+        log("google", "lookup failed: %s", exc)
+        return None
 
 
 async def _chat_completion(
@@ -255,20 +302,22 @@ async def _completion(
             return "__ERROR__"
 
 
-async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
+async def analyze_photo(photo_path: str, grade: str = "pro") -> List[Dict[str, Any]]:
     """Analyze photo in a single GPT request and return dish info and macros."""
     if not client.api_key:
-        return {
-            "is_food": True,
-            "confidence": 1.0,
-            "name": "Пример блюда",
-            "type": "meal",
-            "serving": 200,
-            "calories": 250,
-            "protein": 15,
-            "fat": 10,
-            "carbs": 30,
-        }
+        return [
+            {
+                "is_food": True,
+                "confidence": 1.0,
+                "name": "Пример блюда",
+                "type": "meal",
+                "serving": 200,
+                "calories": 250,
+                "protein": 15,
+                "fat": 10,
+                "carbs": 30,
+            }
+        ]
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     if grade.startswith("pro"):
@@ -298,43 +347,53 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> Dict[str, Any]:
         ]
     )
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
-        return {"error": content.strip("_").lower()}
+        return [{"error": content.strip("_").lower()}]
     try:
-        data = json.loads(content)
-        if "serving" in data:
-            data["serving"] = parse_serving(data["serving"])
-        for k in ("calories", "protein", "fat", "carbs"):
-            if k in data:
-                data[k] = to_float(data[k])
-        if "name" in data and isinstance(data["name"], str):
-            data["name"] = data["name"].strip().capitalize()
-        if "type" in data and isinstance(data["type"], str):
-            data["type"] = data["type"].lower()
-        return data
+        raw = json.loads(content)
+        items = raw if isinstance(raw, list) else [raw]
+        results: List[Dict[str, Any]] = []
+        for data in items:
+            if "serving" in data:
+                data["serving"] = parse_serving(data["serving"])
+            for k in ("calories", "protein", "fat", "carbs"):
+                if k in data:
+                    data[k] = to_float(data[k])
+            if "name" in data and isinstance(data["name"], str):
+                data["name"] = data["name"].strip().capitalize()
+            if "type" in data and isinstance(data["type"], str):
+                data["type"] = data["type"].lower()
+            results.append(data)
+        return results
     except Exception:
-        match = re.search(r"\{.*\}", content, re.S)
+        match = re.findall(r"\{.*?\}", content, re.S)
         if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                pass
-        return {"error": "parse"}
+            results = []
+            for m in match:
+                try:
+                    results.append(json.loads(m))
+                except Exception:
+                    continue
+            if results:
+                return results
+        return [{"error": "parse"}]
 
 
-async def analyze_text(description: str, grade: str = "pro") -> Dict[str, Any]:
+async def analyze_text(description: str, grade: str = "pro") -> List[Dict[str, Any]]:
     """Analyze a text description of a meal or drink."""
     if not client.api_key:
-        return {
-            "is_food": True,
-            "confidence": 1.0,
-            "name": description,
-            "type": "meal",
-            "serving": 200,
-            "calories": 250,
-            "protein": 15,
-            "fat": 10,
-            "carbs": 30,
-        }
+        return [
+            {
+                "is_food": True,
+                "confidence": 1.0,
+                "name": description,
+                "type": "meal",
+                "serving": 200,
+                "calories": 250,
+                "protein": 15,
+                "fat": 10,
+                "carbs": 30,
+            }
+        ]
     if grade.startswith("pro"):
         prompt = PRO_TEXT_PROMPT
     elif grade.startswith("light"):
@@ -354,27 +413,35 @@ async def analyze_text(description: str, grade: str = "pro") -> Dict[str, Any]:
         ]
     )
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
-        return {"error": content.strip("_").lower()}
+        return [{"error": content.strip("_").lower()}]
     try:
-        data = json.loads(content)
-        if "serving" in data:
-            data["serving"] = parse_serving(data["serving"])
-        for k in ("calories", "protein", "fat", "carbs"):
-            if k in data:
-                data[k] = to_float(data[k])
-        if "name" in data and isinstance(data["name"], str):
-            data["name"] = data["name"].strip().capitalize()
-        if "type" in data and isinstance(data["type"], str):
-            data["type"] = data["type"].lower()
-        return data
+        raw = json.loads(content)
+        items = raw if isinstance(raw, list) else [raw]
+        results: List[Dict[str, Any]] = []
+        for data in items:
+            if "serving" in data:
+                data["serving"] = parse_serving(data["serving"])
+            for k in ("calories", "protein", "fat", "carbs"):
+                if k in data:
+                    data[k] = to_float(data[k])
+            if "name" in data and isinstance(data["name"], str):
+                data["name"] = data["name"].strip().capitalize()
+            if "type" in data and isinstance(data["type"], str):
+                data["type"] = data["type"].lower()
+            results.append(data)
+        return results
     except Exception:
-        match = re.search(r"\{.*\}", content, re.S)
+        match = re.findall(r"\{.*?\}", content, re.S)
         if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                pass
-        return {"error": "parse"}
+            results = []
+            for m in match:
+                try:
+                    results.append(json.loads(m))
+                except Exception:
+                    continue
+            if results:
+                return results
+        return [{"error": "parse"}]
 
 
 async def analyze_text_with_hint(
