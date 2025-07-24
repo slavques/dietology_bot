@@ -135,7 +135,10 @@ async def process_time(message: types.Message, state: FSMContext, field: str, na
 
 def register(dp: Dispatcher):
     dp.callback_query.register(open_settings, F.data == "settings")
-    dp.callback_query.register(open_reminders, F.data.in_("reminders", "reminders_back", "update_tz"))
+    dp.callback_query.register(
+        open_reminders,
+        F.data.in_(["reminders", "reminders_back", "update_tz"]),
+    )
     dp.callback_query.register(open_reminder_settings, F.data == "reminder_settings")
     dp.callback_query.register(lambda q: toggle(q, "morning_enabled"), F.data == "toggle_morning")
     dp.callback_query.register(lambda q: toggle(q, "day_enabled"), F.data == "toggle_day")
