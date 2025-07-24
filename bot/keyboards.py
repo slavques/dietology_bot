@@ -37,6 +37,12 @@ from .texts import (
     BTN_LIGHT_MODE,
     BTN_MANUAL,
     BTN_SETTINGS,
+    BTN_REMINDERS,
+    BTN_GOALS,
+    BTN_UPDATE_TIME,
+    BTN_MORNING,
+    BTN_DAY_REM,
+    BTN_EVENING,
 )
 from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -245,5 +251,37 @@ def subscription_plans_inline_kb(tier: str) -> InlineKeyboardMarkup:
     builder.button(text=BTN_PLAN_3M.format(price=prices['3m']), callback_data=f"plan:{tier}:3m")
     builder.button(text=BTN_PLAN_6M.format(price=prices['6m']), callback_data=f"plan:{tier}:6m")
     builder.button(text=BTN_BACK_TEXT, callback_data="sub_grades")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def settings_menu_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_REMINDERS, callback_data="reminders")
+    builder.button(text=BTN_GOALS, callback_data="goals")
+    builder.button(text=BTN_BACK, callback_data="menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def reminders_main_kb(user) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    on = "🟢"
+    off = "🔴"
+    builder.button(text=f"{BTN_MORNING} {on if user.morning_enabled else off}", callback_data="toggle_morning")
+    builder.button(text=f"{BTN_DAY_REM} {on if user.day_enabled else off}", callback_data="toggle_day")
+    builder.button(text=f"{BTN_EVENING} {on if user.evening_enabled else off}", callback_data="toggle_evening")
+    builder.button(text=BTN_SETTINGS, callback_data="reminder_settings")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def reminders_settings_kb(user) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"{BTN_MORNING} - {user.morning_time}", callback_data="set_morning")
+    builder.button(text=f"{BTN_DAY_REM} - {user.day_time}", callback_data="set_day")
+    builder.button(text=f"{BTN_EVENING} - {user.evening_time}", callback_data="set_evening")
+    builder.button(text=BTN_UPDATE_TIME, callback_data="update_tz")
+    builder.button(text=BTN_BACK, callback_data="reminders_back")
     builder.adjust(1)
     return builder.as_markup()

@@ -3,14 +3,13 @@ from aiogram.filters import Command
 
 from ..database import SessionLocal, User
 from ..subscriptions import ensure_user, days_left, update_limits, notify_trial_end
-from ..keyboards import main_menu_kb, menu_inline_kb, back_inline_kb
+from ..keyboards import main_menu_kb, menu_inline_kb
 from ..texts import (
     WELCOME_BASE,
     BTN_MAIN_MENU,
     BTN_BACK,
     REMAINING_FREE,
     REMAINING_DAYS,
-    DEV_FEATURE,
     TRIAL_STARTED,
 )
 from ..utils import plural_ru_day
@@ -108,17 +107,6 @@ async def cb_menu(query: types.CallbackQuery):
     await query.answer()
 
 
-async def cb_settings(query: types.CallbackQuery):
-    from ..database import get_option_bool
-    from ..texts import FEATURE_DISABLED
-
-    if not get_option_bool("feat_settings"):
-        await query.answer(FEATURE_DISABLED, show_alert=True)
-        return
-
-    await query.message.edit_text(DEV_FEATURE)
-    await query.message.edit_reply_markup(reply_markup=back_inline_kb())
-    await query.answer()
 
 
 def register(dp: Dispatcher):
@@ -128,4 +116,3 @@ def register(dp: Dispatcher):
         lambda m: m.text in {BTN_MAIN_MENU, BTN_BACK},
     )
     dp.callback_query.register(cb_menu, F.data == "menu")
-    dp.callback_query.register(cb_settings, F.data == "settings")
