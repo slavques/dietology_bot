@@ -75,12 +75,12 @@ async def process_timezone(message: types.Message, state: FSMContext):
     user = ensure_user(session, message.from_user.id)
     user.timezone = diff
     session.commit()
-    session.close()
     await state.clear()
     await message.answer(
         TIME_CURRENT.format(local_time=message.text.strip()),
         reply_markup=reminders_main_kb(user),
     )
+    session.close()
 
 
 async def toggle(query: types.CallbackQuery, field: str):
@@ -89,7 +89,11 @@ async def toggle(query: types.CallbackQuery, field: str):
     value = getattr(user, field)
     setattr(user, field, not value)
     session.commit()
-    text = REMINDER_ON.format(name=query.data.split('_')[1]) if not value else REMINDER_OFF.format(name=query.data.split('_')[1])
+    text = (
+        REMINDER_ON.format(name=query.data.split('_')[1])
+        if not value
+        else REMINDER_OFF.format(name=query.data.split('_')[1])
+    )
     await query.message.edit_reply_markup(reminders_main_kb(user))
     await query.answer(text, show_alert=False)
     session.close()
@@ -126,7 +130,11 @@ async def process_time(message: types.Message, state: FSMContext, field: str, na
     session.commit()
     await message.answer(REMINDER_ON.format(name=name))
     await message.answer(
-        TIME_CURRENT.format(local_time=(datetime.utcnow() + timedelta(minutes=user.timezone or 0)).strftime("%H:%M")),
+        TIME_CURRENT.format(
+            local_time=(
+                datetime.utcnow() + timedelta(minutes=user.timezone or 0)
+            ).strftime("%H:%M")
+        ),
         reply_markup=reminders_settings_kb(user),
     )
     await state.clear()
@@ -135,7 +143,10 @@ async def process_time(message: types.Message, state: FSMContext, field: str, na
 
 def register(dp: Dispatcher):
     dp.callback_query.register(open_settings, F.data == "settings")
-    dp.callback_query.register(open_reminders, F.data.in_("reminders", "reminders_back", "update_tz"))
+    dp.callback_query.register(
+        open_reminders,
+        F.data.in_(["reminders", "reminders_back", "update_tz"]),
+    )
     dp.callback_query.register(open_reminder_settings, F.data == "reminder_settings")
     dp.callback_query.register(lambda q: toggle(q, "morning_enabled"), F.data == "toggle_morning")
     dp.callback_query.register(lambda q: toggle(q, "day_enabled"), F.data == "toggle_day")
