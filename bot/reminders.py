@@ -4,6 +4,7 @@ from aiogram import Bot
 
 from .database import SessionLocal, User
 from .logger import log
+from .texts import REM_TEXT_MORNING, REM_TEXT_DAY, REM_TEXT_EVENING
 
 
 def _parse_time(value: str) -> time:
@@ -34,17 +35,17 @@ def reminder_watcher(check_interval: int = 60):
                 if user.morning_enabled and user.morning_time:
                     target = _parse_time(user.morning_time)
                     if (user.last_morning is None or user.last_morning.date() != local_now.date()) and local_now.time().hour == target.hour and local_now.time().minute == target.minute:
-                        await _send(bot, user, "🤖 Напоминание: утро!")
+                        await _send(bot, user, REM_TEXT_MORNING)
                         user.last_morning = local_now
                 if user.day_enabled and user.day_time:
                     target = _parse_time(user.day_time)
                     if (user.last_day is None or user.last_day.date() != local_now.date()) and local_now.time().hour == target.hour and local_now.time().minute == target.minute:
-                        await _send(bot, user, "🤖 Напоминание: день!")
+                        await _send(bot, user, REM_TEXT_DAY)
                         user.last_day = local_now
                 if user.evening_enabled and user.evening_time:
                     target = _parse_time(user.evening_time)
                     if (user.last_evening is None or user.last_evening.date() != local_now.date()) and local_now.time().hour == target.hour and local_now.time().minute == target.minute:
-                        await _send(bot, user, "🤖 Напоминание: вечер!")
+                        await _send(bot, user, REM_TEXT_EVENING)
                         user.last_evening = local_now
             session.commit()
             session.close()
