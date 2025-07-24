@@ -10,6 +10,7 @@ from ..keyboards import (
     reminders_main_kb,
     reminders_settings_kb,
     back_inline_kb,
+    back_to_reminder_settings_kb,
 )
 from ..texts import (
     TZ_PROMPT,
@@ -36,7 +37,7 @@ async def open_reminders(query: types.CallbackQuery, state: FSMContext):
     """Entry point for reminder settings."""
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
-    if user.timezone is None:
+    if user.timezone is None or query.data == "update_tz":
         utc = datetime.utcnow().strftime("%H:%M")
         await query.message.edit_text(
             TZ_PROMPT.format(utc_time=utc), reply_markup=back_inline_kb()
@@ -104,15 +105,18 @@ async def toggle(query: types.CallbackQuery, field: str):
 async def open_reminder_settings(query: types.CallbackQuery):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
-    await query.message.edit_reply_markup(
-        reply_markup=reminders_settings_kb(user)
+    local = (datetime.utcnow() + timedelta(minutes=user.timezone or 0)).strftime("%H:%M")
+    await query.message.edit_text(
+        TIME_CURRENT.format(local_time=local),
+        reply_markup=reminders_settings_kb(user),
     )
     await query.answer()
     session.close()
 
 
 async def set_time_prompt(query: types.CallbackQuery, state: FSMContext, field: str, name: str):
-    await query.message.answer(SET_TIME_PROMPT.format(name=name))
+    await query.message.edit_text(SET_TIME_PROMPT.format(name=name))
+    await query.message.edit_reply_markup(reply_markup=back_to_reminder_settings_kb())
     await state.set_state(getattr(ReminderState, field))
     await query.answer()
 
