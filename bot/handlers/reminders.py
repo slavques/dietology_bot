@@ -94,7 +94,9 @@ async def toggle(query: types.CallbackQuery, field: str):
         if not value
         else REMINDER_OFF.format(name=query.data.split('_')[1])
     )
-    await query.message.edit_reply_markup(reminders_main_kb(user))
+    await query.message.edit_reply_markup(
+        reply_markup=reminders_main_kb(user)
+    )
     await query.answer(text, show_alert=False)
     session.close()
 
@@ -102,7 +104,9 @@ async def toggle(query: types.CallbackQuery, field: str):
 async def open_reminder_settings(query: types.CallbackQuery):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
-    await query.message.edit_reply_markup(reminders_settings_kb(user))
+    await query.message.edit_reply_markup(
+        reply_markup=reminders_settings_kb(user)
+    )
     await query.answer()
     session.close()
 
