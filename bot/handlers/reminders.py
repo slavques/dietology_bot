@@ -75,12 +75,12 @@ async def process_timezone(message: types.Message, state: FSMContext):
     user = ensure_user(session, message.from_user.id)
     user.timezone = diff
     session.commit()
-    session.close()
     await state.clear()
     await message.answer(
         TIME_CURRENT.format(local_time=message.text.strip()),
         reply_markup=reminders_main_kb(user),
     )
+    session.close()
 
 
 async def toggle(query: types.CallbackQuery, field: str):
@@ -89,7 +89,11 @@ async def toggle(query: types.CallbackQuery, field: str):
     value = getattr(user, field)
     setattr(user, field, not value)
     session.commit()
-    text = REMINDER_ON.format(name=query.data.split('_')[1]) if not value else REMINDER_OFF.format(name=query.data.split('_')[1])
+    text = (
+        REMINDER_ON.format(name=query.data.split('_')[1])
+        if not value
+        else REMINDER_OFF.format(name=query.data.split('_')[1])
+    )
     await query.message.edit_reply_markup(reminders_main_kb(user))
     await query.answer(text, show_alert=False)
     session.close()
@@ -126,7 +130,11 @@ async def process_time(message: types.Message, state: FSMContext, field: str, na
     session.commit()
     await message.answer(REMINDER_ON.format(name=name))
     await message.answer(
-        TIME_CURRENT.format(local_time=(datetime.utcnow() + timedelta(minutes=user.timezone or 0)).strftime("%H:%M")),
+        TIME_CURRENT.format(
+            local_time=(
+                datetime.utcnow() + timedelta(minutes=user.timezone or 0)
+            ).strftime("%H:%M")
+        ),
         reply_markup=reminders_settings_kb(user),
     )
     await state.clear()
