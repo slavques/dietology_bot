@@ -149,6 +149,45 @@ async def process_time(message: types.Message, state: FSMContext, field: str, na
     session.close()
 
 
+async def toggle_morning(query: types.CallbackQuery):
+    """Toggle morning reminder."""
+    await toggle(query, "morning_enabled")
+
+
+async def toggle_day(query: types.CallbackQuery):
+    """Toggle day reminder."""
+    await toggle(query, "day_enabled")
+
+
+async def toggle_evening(query: types.CallbackQuery):
+    """Toggle evening reminder."""
+    await toggle(query, "evening_enabled")
+
+
+async def set_morning_prompt(query: types.CallbackQuery, state: FSMContext):
+    await set_time_prompt(query, state, "set_morning", BTN_MORNING)
+
+
+async def set_day_prompt(query: types.CallbackQuery, state: FSMContext):
+    await set_time_prompt(query, state, "set_day", BTN_DAY_REM)
+
+
+async def set_evening_prompt(query: types.CallbackQuery, state: FSMContext):
+    await set_time_prompt(query, state, "set_evening", BTN_EVENING)
+
+
+async def process_morning_time(message: types.Message, state: FSMContext):
+    await process_time(message, state, "morning_time", BTN_MORNING)
+
+
+async def process_day_time(message: types.Message, state: FSMContext):
+    await process_time(message, state, "day_time", BTN_DAY_REM)
+
+
+async def process_evening_time(message: types.Message, state: FSMContext):
+    await process_time(message, state, "evening_time", BTN_EVENING)
+
+
 def register(dp: Dispatcher):
     dp.callback_query.register(open_settings, F.data == "settings")
     dp.callback_query.register(
@@ -156,14 +195,14 @@ def register(dp: Dispatcher):
         F.data.in_(["reminders", "reminders_back", "update_tz"]),
     )
     dp.callback_query.register(open_reminder_settings, F.data == "reminder_settings")
-    dp.callback_query.register(lambda q: toggle(q, "morning_enabled"), F.data == "toggle_morning")
-    dp.callback_query.register(lambda q: toggle(q, "day_enabled"), F.data == "toggle_day")
-    dp.callback_query.register(lambda q: toggle(q, "evening_enabled"), F.data == "toggle_evening")
-    dp.callback_query.register(lambda q, st: set_time_prompt(q, st, "set_morning", BTN_MORNING), F.data == "set_morning")
-    dp.callback_query.register(lambda q, st: set_time_prompt(q, st, "set_day", BTN_DAY_REM), F.data == "set_day")
-    dp.callback_query.register(lambda q, st: set_time_prompt(q, st, "set_evening", BTN_EVENING), F.data == "set_evening")
+    dp.callback_query.register(toggle_morning, F.data == "toggle_morning")
+    dp.callback_query.register(toggle_day, F.data == "toggle_day")
+    dp.callback_query.register(toggle_evening, F.data == "toggle_evening")
+    dp.callback_query.register(set_morning_prompt, F.data == "set_morning")
+    dp.callback_query.register(set_day_prompt, F.data == "set_day")
+    dp.callback_query.register(set_evening_prompt, F.data == "set_evening")
 
     dp.message.register(process_timezone, StateFilter(ReminderState.waiting_timezone))
-    dp.message.register(lambda m, st: process_time(m, st, "morning_time", BTN_MORNING), StateFilter(ReminderState.set_morning))
-    dp.message.register(lambda m, st: process_time(m, st, "day_time", BTN_DAY_REM), StateFilter(ReminderState.set_day))
-    dp.message.register(lambda m, st: process_time(m, st, "evening_time", BTN_EVENING), StateFilter(ReminderState.set_evening))
+    dp.message.register(process_morning_time, StateFilter(ReminderState.set_morning))
+    dp.message.register(process_day_time, StateFilter(ReminderState.set_day))
+    dp.message.register(process_evening_time, StateFilter(ReminderState.set_evening))
