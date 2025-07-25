@@ -244,6 +244,14 @@ def back_inline_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def back_to_reminder_settings_kb() -> InlineKeyboardMarkup:
+    """Back button returning to reminder settings."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data="reminder_settings")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def subscription_plans_inline_kb(tier: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     prices = PLAN_PRICES if tier == "light" else PRO_PLAN_PRICES
@@ -272,6 +280,7 @@ def reminders_main_kb(user) -> InlineKeyboardMarkup:
     builder.button(text=f"{BTN_DAY_REM} {on if user.day_enabled else off}", callback_data="toggle_day")
     builder.button(text=f"{BTN_EVENING} {on if user.evening_enabled else off}", callback_data="toggle_evening")
     builder.button(text=BTN_SETTINGS, callback_data="reminder_settings")
+    builder.button(text=BTN_BACK, callback_data="settings")
     builder.adjust(1)
     return builder.as_markup()
 
