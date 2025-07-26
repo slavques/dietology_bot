@@ -83,6 +83,26 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE users ADD COLUMN resume_grade TEXT"))
         if "resume_period_end" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN resume_period_end {dt_type}"))
+        if "timezone" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN timezone INTEGER"))
+        if "morning_time" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN morning_time TEXT DEFAULT '08:00'"))
+        if "day_time" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN day_time TEXT DEFAULT '13:00'"))
+        if "evening_time" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN evening_time TEXT DEFAULT '20:00'"))
+        if "morning_enabled" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN morning_enabled BOOLEAN DEFAULT {bool_default}"))
+        if "day_enabled" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN day_enabled BOOLEAN DEFAULT {bool_default}"))
+        if "evening_enabled" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN evening_enabled BOOLEAN DEFAULT {bool_default}"))
+        if "last_morning" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN last_morning {dt_type}"))
+        if "last_day" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN last_day {dt_type}"))
+        if "last_evening" not in existing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN last_evening {dt_type}"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
@@ -116,6 +136,16 @@ class User(Base):
     blocked = Column(Boolean, default=False)
     trial = Column(Boolean, default=False)
     trial_used = Column(Boolean, default=False)
+    timezone = Column(Integer, nullable=True)
+    morning_time = Column(String, default='08:00')
+    day_time = Column(String, default='13:00')
+    evening_time = Column(String, default='20:00')
+    morning_enabled = Column(Boolean, default=False)
+    day_enabled = Column(Boolean, default=False)
+    evening_enabled = Column(Boolean, default=False)
+    last_morning = Column(DateTime, nullable=True)
+    last_day = Column(DateTime, nullable=True)
+    last_evening = Column(DateTime, nullable=True)
     meals = relationship('Meal', back_populates='user')
 
 class Meal(Base):
