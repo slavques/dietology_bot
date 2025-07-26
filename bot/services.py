@@ -27,108 +27,56 @@ from .prompts import (
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Model names for different API methods
-MODEL_NAME = "gpt-4.1-mini"  # used with the Responses API
-COMPLETION_MODEL = "gpt-4.1-mini"  # weaker model for Completions
+MODEL_NAME = "gpt-4.1-mini"
+COMPLETION_MODEL = "gpt-4.1-mini"
 
 
-def _prepare_input(messages: List[Dict]) -> (Optional[str], List[Dict]):
-    """Convert chat messages to the format expected by the Responses API."""
-    instructions = None
-    input_items: List[Dict] = []
-    for msg in messages:
-        role = msg.get("role")
-        content = msg.get("content")
-        if role == "system" and isinstance(content, str):
-            # Treat the system prompt as instructions for the model
-            instructions = content
-            continue
-        parts: List[Dict] = []
-        if isinstance(content, list):
-            for part in content:
-                if part.get("type") == "image_url":
-                    parts.append(
-                        {
-                            "type": "input_image",
-                            "image_url": part["image_url"]["url"],
-                            "detail": "auto",
-                        }
-                    )
-                elif part.get("type") == "text":
-                    parts.append({"type": "input_text", "text": part["text"]})
-        elif isinstance(content, str):
-            parts.append({"type": "input_text", "text": content})
-        if parts:
-            input_items.append(
-                {"type": "message", "role": role, "content": parts}
-            )
-    return instructions, input_items
-
-
-async def _chat(
-    messages: List[Dict], retries: int = 3, backoff: float = 0.5
-) -> str:
-    if not client.api_key:
-        return ""
-    # Log the prompt being sent to OpenAI for easier debugging
+async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
+    """Search fatsecret.ru via Google CSE and parse macros."""
+    if not GOOGLE_API_KEY or not GOOGLE_CX:
+        return None
+    log("google", "query %s", name)
+    loop = asyncio.get_running_loop()
     try:
-        system_msg = next(
-            m["content"] for m in messages if m.get("role") == "system"
+        resp = await loop.run_in_executor(
+            None,
+            lambda: requests.get(
+                "https://www.googleapis.com/customsearch/v1",
+                params={"key": GOOGLE_API_KEY, "cx": GOOGLE_CX, "q": name},
+                timeout=10,
+            ),
         )
-        log("prompt", "%s", system_msg)
-    except Exception:
-        pass
-    instructions, input_items = _prepare_input(messages)
-    for attempt in range(retries):
-        try:
-            resp = await client.responses.create(
-                model=MODEL_NAME,
-                instructions=instructions,
-                input=input_items,
-                text={"format": {"type": "text"}},
-                reasoning={},
-                tools=[
-                    {
-                        "type": "web_search_preview",
-                        "user_location": {"type": "approximate"},
-                        "search_context_size": "low",
-                    }
-                ],
-                temperature=0.2,
-                max_output_tokens=1000,
-                top_p=0.7,
-                store=False,
-            )
-            content = resp.output_text
-            log("response", "%s", content)
-            usage = getattr(resp, "usage", None)
-            if usage:
-                tokens_in = getattr(
-                    usage,
-                    "prompt_tokens",
-                    getattr(usage, "input_tokens", None),
-                )
-                tokens_out = getattr(
-                    usage,
-                    "completion_tokens",
-                    getattr(usage, "output_tokens", None),
-                )
-                log(
-                    "tokens",
-                    "in=%s out=%s total=%s",
-                    tokens_in,
-                    tokens_out,
-                    usage.total_tokens,
-                )
-            return content
-        except RateLimitError:
-            if attempt < retries - 1:
-                await asyncio.sleep(backoff * (2**attempt))
-                continue
-            return "__RATE_LIMIT__"
-        except BadRequestError:
-            return "__BAD_REQUEST__"
-        except Exception:
-            return "__ERROR__"
+        data = resp.json()
+        items = data.get("items")
+        if not items:
+            return None
+        link = items[0].get("link")
+        if not link:
+            return None
+        page = await loop.run_in_executor(
+            None, lambda: requests.get(link, timeout=10)
+        )
+        soup = BeautifulSoup(page.text, "html.parser")
+        text = soup.get_text(" ", strip=True)
+        m = re.search(
+            r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал.*?Белк[аи][^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Углевод[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
+            text,
+            re.I | re.S,
+        )
+        if not m:
+            return None
+        calories, protein, fat, carbs = m.groups()
+        macros = {
+            "calories": to_float(calories),
+            "protein": to_float(protein),
+            "fat": to_float(fat),
+            "carbs": to_float(carbs),
+        }
+        log("google", "macros %s", macros)
+        return macros
+    except Exception as exc:
+        log("google", "lookup failed: %s", exc)
+        return None
 
 
 async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
@@ -326,12 +274,11 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> List[Dict[str, A
         prompt = LIGHT_PHOTO_PROMPT
     else:
         prompt = FREE_PHOTO_PROMPT
-    # Use Responses for PRO tiers to enable web search,
-    # Chat Completions for Start and other tiers.
-    if grade.startswith("pro"):
-        sender = _chat
-    else:
+    # Use Chat Completions for all paid tiers.
+    if grade.startswith("pro") or grade.startswith("light"):
         sender = _chat_completion
+    else:
+        sender = _completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -400,9 +347,7 @@ async def analyze_text(description: str, grade: str = "pro") -> List[Dict[str, A
         prompt = LIGHT_TEXT_PROMPT
     else:
         prompt = FREE_TEXT_PROMPT
-    if grade.startswith("pro"):
-        sender = _chat
-    elif grade.startswith("light"):
+    if grade.startswith("pro") or grade.startswith("light"):
         sender = _chat_completion
     else:
         sender = _completion
@@ -472,9 +417,7 @@ async def analyze_text_with_hint(
         context=context.replace("{", "{{").replace("}", "}}"),
         hint=hint.replace("{", "{{").replace("}", "}}"),
     )
-    if grade.startswith("pro"):
-        sender = _chat
-    elif grade.startswith("light"):
+    if grade.startswith("pro") or grade.startswith("light"):
         sender = _chat_completion
     else:
         sender = _completion
@@ -539,11 +482,11 @@ async def analyze_photo_with_hint(
         context=context.replace("{", "{{").replace("}", "}}"),
         hint=hint.replace("{", "{{").replace("}", "}}"),
     )
-    # Use Responses for PRO tiers and Chat Completions otherwise.
-    if grade.startswith("pro"):
-        sender = _chat
-    else:
+    # Use Chat Completions for all paid tiers.
+    if grade.startswith("pro") or grade.startswith("light"):
         sender = _chat_completion
+    else:
+        sender = _completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
