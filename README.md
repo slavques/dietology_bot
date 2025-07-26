@@ -10,8 +10,10 @@ The bot relies on OpenAI's `gpt-4o` model for food recognition.
    pip install -r requirements.txt
    ```
 2. Create a `.env` file with `BOT_TOKEN` (Telegram token) and optionally
-   `OPENAI_API_KEY` for OpenAI integration. These values are loaded in
-   `bot/config.py`. Set `ADMIN_PASSWORD` for admin access,
+   `OPENAI_API_KEY` for OpenAI integration. Set `GOOGLE_API_KEY` and `GOOGLE_CX`
+   if you want to enable product lookups via Google Programmable Search. These
+   values are loaded in `bot/config.py`. When GPT responds with `"google": true`
+   the bot fetches KBJU data from fatsecret.ru using this search engine. Set `ADMIN_PASSWORD` for admin access,
    `DATABASE_URL` (defaults to `sqlite:///bot.db`), and `YOOKASSA_TOKEN` for payments here. For testing, the
    `SUBSCRIPTION_CHECK_INTERVAL` (in seconds) controls how often subscription
    statuses are checked. It is read from `.env` and converted to an integer
