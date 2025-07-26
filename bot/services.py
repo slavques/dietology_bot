@@ -47,10 +47,12 @@ async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
             ),
         )
         data = resp.json()
+        log("google", "search %s", data)
         items = data.get("items")
         if not items:
             return None
         link = items[0].get("link")
+        log("google", "link %s", link)
         if not link:
             return None
         page = await loop.run_in_executor(
@@ -74,51 +76,6 @@ async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
         }
         log("google", "macros %s", macros)
         return macros
-    except Exception as exc:
-        log("google", "lookup failed: %s", exc)
-        return None
-
-
-async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
-    """Search fatsecret.ru via Google CSE and parse macros."""
-    if not GOOGLE_API_KEY or not GOOGLE_CX:
-        return None
-    loop = asyncio.get_running_loop()
-    try:
-        resp = await loop.run_in_executor(
-            None,
-            lambda: requests.get(
-                "https://www.googleapis.com/customsearch/v1",
-                params={"key": GOOGLE_API_KEY, "cx": GOOGLE_CX, "q": name},
-                timeout=10,
-            ),
-        )
-        data = resp.json()
-        items = data.get("items")
-        if not items:
-            return None
-        link = items[0].get("link")
-        if not link:
-            return None
-        page = await loop.run_in_executor(
-            None, lambda: requests.get(link, timeout=10)
-        )
-        soup = BeautifulSoup(page.text, "html.parser")
-        text = soup.get_text(" ", strip=True)
-        m = re.search(
-            r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал.*?Белк[аи][^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Углевод[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
-            text,
-            re.I | re.S,
-        )
-        if not m:
-            return None
-        calories, protein, fat, carbs = m.groups()
-        return {
-            "calories": to_float(calories),
-            "protein": to_float(protein),
-            "fat": to_float(fat),
-            "carbs": to_float(carbs),
-        }
     except Exception as exc:
         log("google", "lookup failed: %s", exc)
         return None

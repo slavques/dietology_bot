@@ -44,7 +44,9 @@ Log files are written to `logs/bot.log` by default (configurable via `LOG_DIR`).
 Timestamps are displayed in Moscow time (UTC+3) even if the server uses a
 different timezone. Files rotate at Moscow midnight (21:00 UTC), and the three
 most recent days are kept. Token usage for each OpenAI request is logged under
-the `tokens` category, showing input, output and total token counts.
+the `tokens` category, showing input, output and total token counts. Queries to
+Google Programmable Search and parsed macros are logged under the `google`
+category.
 
 
 ### Custom prompts

@@ -23,4 +23,6 @@ LOG_FLAGS = {
     'trial': True,
     # User blocking or unblocking
     'block': True,
+    # Google Programmable Search lookups
+    'google': True,
 }
