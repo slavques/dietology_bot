@@ -4,7 +4,7 @@ import tempfile
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ..services import analyze_photo
+from ..services import analyze_photo, _google_lookup
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import meal_actions_kb, back_menu_kb, subscribe_button
 from ..subscriptions import consume_request, ensure_user, has_request_quota, notify_trial_end
@@ -130,61 +130,70 @@ async def handle_photo(message: types.Message, state: FSMContext):
         img.save(photo_path, format="JPEG", quality=95)
     except Exception:
         pass
-    result = await analyze_photo(photo_path, grade=grade)
+    results = await analyze_photo(photo_path, grade=grade)
     log("prompt", "photo analyzed for %s", message.from_user.id)
-    if result.get("error"):
+    if isinstance(results, list) and results and results[0].get("error"):
         await message.answer(RECOGNITION_ERROR)
         return
-    if not result.get("is_food") or result.get("confidence", 0) < 0.7:
+    if not isinstance(results, list):
+        results = [results]
+
+    valid = [r for r in results if r.get("is_food") and r.get("confidence", 0) >= 0.7]
+    if not valid:
         await message.answer(NO_FOOD_ERROR)
         return
 
-    name = result.get("name")
-    ingredients = result.get("ingredients", [])
-    serving = parse_serving(result.get("serving", 0))
-    macros = {
-        "calories": to_float(result.get("calories", 0)),
-        "protein": to_float(result.get("protein", 0)),
-        "fat": to_float(result.get("fat", 0)),
-        "carbs": to_float(result.get("carbs", 0)),
-    }
+    for idx, res in enumerate(valid, 1):
+        name = res.get("name")
+        ingredients = res.get("ingredients", [])
+        serving = parse_serving(res.get("serving", 0))
+        macros = {
+            "calories": to_float(res.get("calories", 0)),
+            "protein": to_float(res.get("protein", 0)),
+            "fat": to_float(res.get("fat", 0)),
+            "carbs": to_float(res.get("carbs", 0)),
+        }
+        if grade.startswith("pro") and res.get("google"):
+            gmacros = await _google_lookup(name)
+            if gmacros:
+                macros.update(gmacros)
 
-    meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}"
-    pending_meals[meal_id] = {
-        "name": name,
-        "ingredients": ingredients,
-        "type": result.get("type", "meal"),
-        "serving": serving,
-        "orig_serving": serving,
-        "macros": macros,
-        "orig_macros": macros.copy(),
-        "initial_json": result,
-        "photo_path": photo_path,
-        "chat_id": message.chat.id,
-        "message_id": None,
-    }
+        meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}_{idx}"
+        pending_meals[meal_id] = {
+            "name": name,
+            "ingredients": ingredients,
+            "type": res.get("type", "meal"),
+            "serving": serving,
+            "orig_serving": serving,
+            "macros": macros,
+            "orig_macros": macros.copy(),
+            "initial_json": res,
+            "photo_path": photo_path,
+            "chat_id": message.chat.id,
+            "message_id": None,
+        }
 
-    if not name:
-        builder = InlineKeyboardBuilder()
-        builder.button(text=BTN_EDIT, callback_data="refine")
-        builder.button(text=BTN_DELETE, callback_data="cancel")
-        builder.adjust(2)
-        await state.update_data(meal_id=meal_id)
+        if not name:
+            builder = InlineKeyboardBuilder()
+            builder.button(text=BTN_EDIT, callback_data="refine")
+            builder.button(text=BTN_DELETE, callback_data="cancel")
+            builder.adjust(2)
+            await state.update_data(meal_id=meal_id)
+            msg = await message.answer(
+                CLARIFY_PROMPT,
+                reply_markup=builder.as_markup(),
+            )
+            pending_meals[meal_id]["message_id"] = msg.message_id
+            pending_meals[meal_id]["chat_id"] = msg.chat.id
+            await state.set_state(EditMeal.waiting_input)
+            continue
+
         msg = await message.answer(
-            CLARIFY_PROMPT,
-            reply_markup=builder.as_markup(),
+            format_meal_message(name, serving, macros),
+            reply_markup=meal_actions_kb(meal_id),
         )
         pending_meals[meal_id]["message_id"] = msg.message_id
         pending_meals[meal_id]["chat_id"] = msg.chat.id
-        await state.set_state(EditMeal.waiting_input)
-        return
-
-    msg = await message.answer(
-        format_meal_message(name, serving, macros),
-        reply_markup=meal_actions_kb(meal_id),
-    )
-    pending_meals[meal_id]["message_id"] = msg.message_id
-    pending_meals[meal_id]["chat_id"] = msg.chat.id
 
 
 async def handle_document(message: types.Message):
