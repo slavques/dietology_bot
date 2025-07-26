@@ -23,3 +23,10 @@ class AdminState(StatesGroup):
     waiting_comment_text = State()
 
 
+class ReminderState(StatesGroup):
+    waiting_timezone = State()
+    set_morning = State()
+    set_day = State()
+    set_evening = State()
+
+
