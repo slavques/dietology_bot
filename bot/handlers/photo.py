@@ -154,9 +154,10 @@ async def handle_photo(message: types.Message, state: FSMContext):
             "carbs": to_float(res.get("carbs", 0)),
         }
         if grade.startswith("pro") and res.get("google"):
-            gmacros = await fatsecret_lookup(name)
-            if gmacros:
-                macros.update(gmacros)
+            gdata = await fatsecret_lookup(name)
+            if gdata:
+                macros.update({k: gdata[k] for k in ("calories", "protein", "fat", "carbs")})
+                name = gdata.get("name", name)
 
         meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}_{idx}"
         pending_meals[meal_id] = {

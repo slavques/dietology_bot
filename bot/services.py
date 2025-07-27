@@ -33,9 +33,9 @@ COMPLETION_MODEL = "gpt-4.1-mini"
 
 
 
-async def fatsecret_lookup(name: str) -> Optional[Dict[str, float]]:
-    """Fetch macros for the first search result on fatsecret.ru."""
-    log("google", "query %s", name)
+async def fatsecret_lookup(query: str) -> Optional[Dict[str, Any]]:
+    """Fetch the first search result on fatsecret.ru and return its macros."""
+    log("google", "query %s", query)
     loop = asyncio.get_running_loop()
     try:
         url = "https://www.fatsecret.ru/калории-питание/search"
@@ -44,7 +44,7 @@ async def fatsecret_lookup(name: str) -> Optional[Dict[str, float]]:
             None,
             lambda: requests.get(
                 url,
-                params={"q": name},
+                params={"q": query},
                 headers={"User-Agent": "Mozilla/5.0"},
                 verify=False,
                 timeout=10,
@@ -54,7 +54,13 @@ async def fatsecret_lookup(name: str) -> Optional[Dict[str, float]]:
         log("google", "response %.120s", page.text)
         soup = BeautifulSoup(page.text, "html.parser")
         block = soup.select_one("table.searchResult tr")
-        text = block.get_text(" ", strip=True) if block else soup.get_text(" ", strip=True)
+        if block:
+            text = block.get_text(" ", strip=True)
+            name_elem = block.select_one("a")
+            item_name = name_elem.get_text(strip=True) if name_elem else query
+        else:
+            text = soup.get_text(" ", strip=True)
+            item_name = query
         m = re.search(
             r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
             text,
@@ -70,7 +76,7 @@ async def fatsecret_lookup(name: str) -> Optional[Dict[str, float]]:
             "carbs": to_float(carbs),
         }
         log("google", "macros %s", macros)
-        return macros
+        return {"name": item_name, **macros}
     except Exception as exc:
         log("google", "lookup failed: %s", exc)
         return None
