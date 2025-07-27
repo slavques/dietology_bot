@@ -8,6 +8,14 @@ class ManualMeal(StatesGroup):
     waiting_text = State()
 
 
+class LookupMeal(StatesGroup):
+    """Flow when choosing product and entering weight from FatSecret."""
+
+    choosing = State()
+    entering_weight = State()
+    entering_query = State()
+
+
 class AdminState(StatesGroup):
     waiting_broadcast = State()
     waiting_user_id = State()

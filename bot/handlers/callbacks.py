@@ -3,7 +3,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
 from ..database import SessionLocal, User, Meal
-from ..services import analyze_photo_with_hint, analyze_text_with_hint
+from ..services import (
+    analyze_photo_with_hint,
+    analyze_text_with_hint,
+    fatsecret_lookup,
+    fatsecret_search,
+)
 from ..subscriptions import ensure_user, notify_trial_end
 
 from ..utils import format_meal_message, parse_serving, to_float
@@ -13,8 +18,11 @@ from ..keyboards import (
     confirm_save_kb,
     main_menu_kb,
     refine_back_kb,
+    choose_product_kb,
+    weight_back_kb,
+    add_delete_back_kb,
 )
-from ..states import EditMeal
+from ..states import EditMeal, LookupMeal
 from ..storage import pending_meals
 from ..texts import (
     DELETE_NOTIFY,
@@ -26,6 +34,8 @@ from ..texts import (
     NOTHING_TO_SAVE,
     SESSION_EXPIRED_RETRY,
     PORTION_PREFIXES,
+    LOOKUP_PROMPT,
+    LOOKUP_WEIGHT,
 )
 from ..logger import log
 
@@ -37,6 +47,58 @@ async def cb_refine(query: types.CallbackQuery, state: FSMContext):
     text = REFINE_BASE
     await query.message.edit_text(text, reply_markup=refine_back_kb(meal_id))
     await state.set_state(EditMeal.waiting_input)
+    await query.answer()
+
+
+async def cb_pick(query: types.CallbackQuery, state: FSMContext):
+    meal_id, idx = query.data.split(':', 2)[1:]
+    meal = pending_meals.get(meal_id)
+    if not meal:
+        await query.answer(SESSION_EXPIRED, show_alert=True)
+        return
+    idx = int(idx)
+    results = meal.get('results', [])
+    if idx >= len(results):
+        await query.answer()
+        return
+    item = results[idx]
+    meal['name'] = item['name']
+    meal['per100'] = {
+        'calories': item['calories'],
+        'protein': item['protein'],
+        'fat': item['fat'],
+        'carbs': item['carbs'],
+    }
+    await state.update_data(meal_id=meal_id)
+    await state.set_state(LookupMeal.entering_weight)
+    await query.message.edit_text(
+        LOOKUP_WEIGHT.format(**item),
+        reply_markup=weight_back_kb(meal_id),
+    )
+    await query.answer()
+
+
+async def cb_lookup_back(query: types.CallbackQuery, state: FSMContext):
+    meal_id = query.data.split(':', 1)[1]
+    meal = pending_meals.get(meal_id)
+    if not meal:
+        await query.answer(SESSION_EXPIRED, show_alert=True)
+        return
+    builder = choose_product_kb(meal_id, meal.get('results', []))
+    await state.update_data(meal_id=meal_id)
+    await state.set_state(LookupMeal.choosing)
+    await query.message.edit_text(LOOKUP_PROMPT, reply_markup=builder)
+    await query.answer()
+
+
+async def cb_lookup_ref(query: types.CallbackQuery, state: FSMContext):
+    meal_id = query.data.split(':', 1)[1]
+    if meal_id not in pending_meals:
+        await query.answer(SESSION_EXPIRED, show_alert=True)
+        return
+    await state.update_data(meal_id=meal_id)
+    await state.set_state(LookupMeal.entering_query)
+    await query.message.edit_text(REFINE_BASE, reply_markup=weight_back_kb(meal_id))
     await query.answer()
 
 
@@ -91,18 +153,24 @@ async def process_edit(message: types.Message, state: FSMContext):
         return
 
     prev_json = meal.get('initial_json', meal)
-    if meal.get('photo_path'):
-        result = await analyze_photo_with_hint(
-            meal['photo_path'], message.text, grade
-        )
+    if grade.startswith("pro") and prev_json.get('google'):
+        result = await fatsecret_lookup(message.text)
+        log("google", "clarify %s -> %s", message.text, result)
+        if not result:
+            result = {"error": "lookup"}
     else:
-        result = await analyze_text_with_hint(
-            meal.get('text', ''), message.text, grade
-        )
-    log("prompt", "clarification analyzed for %s", message.from_user.id)
-    if result.get('error') or result.get('is_food') is False or not any(
-        k in result for k in ('name', 'serving', 'calories', 'protein', 'fat', 'carbs')
-    ):
+        if meal.get('photo_path'):
+            result = await analyze_photo_with_hint(
+                meal['photo_path'], message.text, grade
+            )
+        else:
+            result = await analyze_text_with_hint(
+                meal.get('text', ''), message.text, grade
+            )
+        log("prompt", "clarification analyzed for %s", message.from_user.id)
+    if not result or result.get('error') or (
+        result.get('is_food') is False and prev_json.get('google') is not True
+    ) or not any(k in result for k in ('name', 'calories', 'protein', 'fat', 'carbs')):
         if meal.get('error_msg'):
             try:
                 await message.bot.delete_message(message.chat.id, meal['error_msg'])
@@ -221,6 +289,59 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         reply_markup=main_menu_kb(),
     )
 
+
+async def process_lookup_query(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    meal_id = data.get('meal_id')
+    if not meal_id or meal_id not in pending_meals:
+        await message.answer(SESSION_EXPIRED_RETRY)
+        await state.clear()
+        return
+    results = await fatsecret_search(message.text)
+    if not results:
+        await message.answer(REFINE_BAD_ATTEMPT)
+        return
+    meal = pending_meals[meal_id]
+    meal['results'] = results
+    builder = choose_product_kb(meal_id, results)
+    await message.answer(LOOKUP_PROMPT, reply_markup=builder)
+    await state.set_state(LookupMeal.choosing)
+
+
+async def process_weight(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    meal_id = data.get('meal_id')
+    meal = pending_meals.get(meal_id)
+    if not meal:
+        await message.answer(SESSION_EXPIRED_RETRY)
+        await state.clear()
+        return
+    grams = parse_serving(message.text)
+    if not grams:
+        await message.answer(REFINE_BAD_ATTEMPT)
+        return
+    per100 = meal.get('per100')
+    if not per100:
+        await message.answer(SESSION_EXPIRED_RETRY)
+        await state.clear()
+        return
+    macros = {k: round(to_float(v) * grams / 100, 1) for k, v in per100.items()}
+    meal.update({
+        'ingredients': meal.get('ingredients', []),
+        'type': meal.get('initial_json', {}).get('type', 'meal'),
+        'serving': grams,
+        'orig_serving': grams,
+        'macros': macros,
+        'orig_macros': macros.copy(),
+    })
+    msg = await message.answer(
+        format_meal_message(meal['name'], grams, macros),
+        reply_markup=add_delete_back_kb(meal_id),
+    )
+    meal['message_id'] = msg.message_id
+    meal['chat_id'] = msg.chat.id
+    await state.clear()
+
 async def cb_save_full(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     meal = pending_meals.get(meal_id)
@@ -338,8 +459,13 @@ async def cb_add(query: types.CallbackQuery):
 def register(dp: Dispatcher):
     dp.callback_query.register(cb_edit, F.data.startswith('edit:'))
     dp.callback_query.register(cb_refine, F.data == 'refine')
+    dp.callback_query.register(cb_pick, F.data.startswith('pick:'))
+    dp.callback_query.register(cb_lookup_ref, F.data.startswith('lookref:'))
+    dp.callback_query.register(cb_lookup_back, F.data.startswith('lookback:'))
     dp.callback_query.register(cb_cancel, F.data == 'cancel')
     dp.message.register(process_edit, StateFilter(EditMeal.waiting_input), F.text)
+    dp.message.register(process_lookup_query, StateFilter(LookupMeal.entering_query), F.text)
+    dp.message.register(process_weight, StateFilter(LookupMeal.entering_weight), F.text)
     dp.callback_query.register(cb_delete, F.data.startswith('delete:'))
     dp.callback_query.register(cb_save, F.data.startswith('save:'))
     dp.callback_query.register(cb_save_full, F.data.startswith('full:'))

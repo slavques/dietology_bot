@@ -10,7 +10,7 @@ from .logger import log
 import openai
 from openai import RateLimitError, BadRequestError
 
-from .config import OPENAI_API_KEY, GOOGLE_API_KEY, GOOGLE_CX
+from .config import OPENAI_API_KEY
 from .utils import parse_serving, to_float
 from .prompts import (
     PRO_PHOTO_PROMPT,
@@ -31,49 +31,129 @@ MODEL_NAME = "gpt-4.1-mini"
 COMPLETION_MODEL = "gpt-4.1-mini"
 
 
-async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
-    """Search fatsecret.ru via Google CSE and parse macros."""
-    if not GOOGLE_API_KEY or not GOOGLE_CX:
-        return None
-    log("google", "query %s", name)
+async def fatsecret_search(query: str) -> List[Dict[str, Any]]:
+    """Return up to three search results with macros per 100 g."""
+    log("google", "search %s", query)
     loop = asyncio.get_running_loop()
     try:
+        url = "http://www.fatsecret.ru/калории-питание/search"
         resp = await loop.run_in_executor(
             None,
             lambda: requests.get(
-                "https://www.googleapis.com/customsearch/v1",
-                params={"key": GOOGLE_API_KEY, "cx": GOOGLE_CX, "q": name},
+                url,
+                params={"q": query},
+                headers={"User-Agent": "Mozilla/5.0"},
+                verify=False,
                 timeout=10,
             ),
         )
-        data = resp.json()
-        log("google", "search %s", data)
-        items = data.get("items")
-        if not items:
-            return None
-        link = items[0].get("link")
-        log("google", "link %s", link)
-        if not link:
-            return None
+        log("google", "request %s status %s", resp.url, resp.status_code)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        items: List[Dict[str, Any]] = []
+        for tr in soup.select("table.searchResult tr"):
+            link = tr.select_one("a.prominent")
+            info = tr.select_one("div.smallText")
+            if not link or not info:
+                continue
+            text = info.get_text(" ", strip=True)
+            m = re.search(
+                r"100\s*(?:г|гр)[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
+                text,
+                re.I,
+            )
+            if not m:
+                m = re.search(
+                    r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
+                    text,
+                    re.I,
+                )
+            if not m:
+                continue
+            calories, fat, carbs, protein = m.groups()
+            items.append(
+                {
+                    "name": link.get_text(strip=True),
+                    "calories": to_float(calories),
+                    "protein": to_float(protein),
+                    "fat": to_float(fat),
+                    "carbs": to_float(carbs),
+                }
+            )
+            if len(items) >= 3:
+                break
+        log("google", "results %s", len(items))
+        return items
+    except Exception as exc:
+        log("google", "search failed: %s", exc)
+        return []
+
+
+
+
+async def fatsecret_lookup(query: str) -> Optional[Dict[str, Any]]:
+    """Return macros for the first FatSecret result, preferring a serving link."""
+    log("google", "query %s", query)
+    loop = asyncio.get_running_loop()
+    try:
+        search_url = "http://www.fatsecret.ru/калории-питание/search"
         page = await loop.run_in_executor(
             None,
             lambda: requests.get(
-                link,
-                timeout=10,
+                search_url,
+                params={"q": query},
                 headers={"User-Agent": "Mozilla/5.0"},
                 verify=False,
+                timeout=10,
             ),
         )
+        log("google", "request %s status %s", page.url, page.status_code)
         soup = BeautifulSoup(page.text, "html.parser")
-        text = soup.get_text(" ", strip=True)
+
+        row = None
+        for tr in soup.select("table.searchResult tr"):
+            link = tr.select_one("a.prominent")
+            href = link.get("href", "") if link else ""
+            if href and "100" in href and ("%D0%B3" in href or "g" in href.lower()):
+                continue
+            if link:
+                row = tr
+                break
+        if not row:
+            row = soup.select_one("table.searchResult tr")
+        if not row:
+            return None
+
+        link = row.select_one("a.prominent")
+        item_name = link.get_text(strip=True) if link else query
+        href = link.get("href", "") if link else ""
+        log("google", "link %s", href)
+        item_url = (
+            "http://www.fatsecret.ru" + href if href.startswith("/") else href
+        )
+        item_page = await loop.run_in_executor(
+            None,
+            lambda: requests.get(
+                item_url,
+                headers={"User-Agent": "Mozilla/5.0"},
+                verify=False,
+                timeout=10,
+            ),
+        )
+        log("google", "page %s status %s", item_page.url, item_page.status_code)
+        soup_item = BeautifulSoup(item_page.text, "html.parser")
+        panel = soup_item.select_one("div.nutrition_facts")
+        text = panel.get_text(" ", strip=True) if panel else soup_item.get_text(" ", strip=True)
+        log("google", "response %.120s", text)
+
         m = re.search(
-            r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал.*?Белк[аи][^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Углевод[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
+            r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
             text,
             re.I | re.S,
         )
         if not m:
             return None
-        calories, protein, fat, carbs = m.groups()
+
+        calories, fat, carbs, protein = m.groups()
         macros = {
             "calories": to_float(calories),
             "protein": to_float(protein),
@@ -81,7 +161,7 @@ async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
             "carbs": to_float(carbs),
         }
         log("google", "macros %s", macros)
-        return macros
+        return {"name": item_name, **macros}
     except Exception as exc:
         log("google", "lookup failed: %s", exc)
         return None

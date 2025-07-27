@@ -87,6 +87,37 @@ def confirm_save_kb(meal_id: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def choose_product_kb(meal_id: str, items: list) -> InlineKeyboardMarkup:
+    """Keyboard with product options from FatSecret search."""
+    builder = InlineKeyboardBuilder()
+    for idx, item in enumerate(items[:3]):
+        txt = (
+            f"{item['name']} — {item['calories']}/{item['protein']}"
+            f"/{item['fat']}/{item['carbs']}"
+        )
+        builder.button(text=txt, callback_data=f"pick:{meal_id}:{idx}")
+    builder.button(text=BTN_EDIT, callback_data=f"lookref:{meal_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def weight_back_kb(meal_id: str) -> InlineKeyboardMarkup:
+    """Keyboard with a single Back button for weight entry."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data=f"lookback:{meal_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def add_delete_back_kb(meal_id: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_ADD, callback_data=f"add:{meal_id}")
+    builder.button(text=BTN_DELETE, callback_data=f"delete:{meal_id}")
+    builder.button(text=BTN_BACK, callback_data=f"lookback:{meal_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def history_nav_kb(offset: int, include_back: bool = False) -> InlineKeyboardMarkup:
     """Navigation keyboard for history with optional back button."""
     builder = InlineKeyboardBuilder()
