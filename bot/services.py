@@ -95,7 +95,6 @@ async def fatsecret_lookup(query: str) -> Optional[Dict[str, Any]]:
         )
         if not m:
             return None
-
         calories, fat, carbs, protein = m.groups()
         macros = {
             "calories": to_float(calories),
