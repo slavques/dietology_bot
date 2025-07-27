@@ -34,33 +34,60 @@ COMPLETION_MODEL = "gpt-4.1-mini"
 
 
 async def fatsecret_lookup(query: str) -> Optional[Dict[str, Any]]:
-    """Fetch the first search result on fatsecret.ru and return its macros."""
+    """Return macros for the first FatSecret result, preferring a serving link."""
     log("google", "query %s", query)
     loop = asyncio.get_running_loop()
     try:
-        url = "https://www.fatsecret.ru/калории-питание/search"
-        log("google", "request %s", url)
+        search_url = "http://www.fatsecret.ru/калории-питание/search"
         page = await loop.run_in_executor(
             None,
             lambda: requests.get(
-                url,
+                search_url,
                 params={"q": query},
                 headers={"User-Agent": "Mozilla/5.0"},
                 verify=False,
                 timeout=10,
             ),
         )
-        log("google", "url %s status %s", page.url, page.status_code)
-        log("google", "response %.120s", page.text)
+        log("google", "request %s status %s", page.url, page.status_code)
         soup = BeautifulSoup(page.text, "html.parser")
-        block = soup.select_one("table.searchResult tr")
-        if block:
-            text = block.get_text(" ", strip=True)
-            name_elem = block.select_one("a")
-            item_name = name_elem.get_text(strip=True) if name_elem else query
-        else:
-            text = soup.get_text(" ", strip=True)
-            item_name = query
+
+        row = None
+        for tr in soup.select("table.searchResult tr"):
+            link = tr.select_one("a.prominent")
+            href = link.get("href", "") if link else ""
+            if href and "100" in href and ("%D0%B3" in href or "g" in href.lower()):
+                continue
+            if link:
+                row = tr
+                break
+        if not row:
+            row = soup.select_one("table.searchResult tr")
+        if not row:
+            return None
+
+        link = row.select_one("a.prominent")
+        item_name = link.get_text(strip=True) if link else query
+        href = link.get("href", "") if link else ""
+        log("google", "link %s", href)
+        item_url = (
+            "http://www.fatsecret.ru" + href if href.startswith("/") else href
+        )
+        item_page = await loop.run_in_executor(
+            None,
+            lambda: requests.get(
+                item_url,
+                headers={"User-Agent": "Mozilla/5.0"},
+                verify=False,
+                timeout=10,
+            ),
+        )
+        log("google", "page %s status %s", item_page.url, item_page.status_code)
+        soup_item = BeautifulSoup(item_page.text, "html.parser")
+        panel = soup_item.select_one("div.nutrition_facts")
+        text = panel.get_text(" ", strip=True) if panel else soup_item.get_text(" ", strip=True)
+        log("google", "response %.120s", text)
+
         m = re.search(
             r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
             text,
