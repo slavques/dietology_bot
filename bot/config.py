@@ -15,5 +15,3 @@ YOOKASSA_TOKEN = os.getenv("YOOKASSA_TOKEN", "YOOKASSA_TOKEN")
 # Defaults to 10 minutes if the environment variable is missing.
 SUBSCRIPTION_CHECK_INTERVAL = int(os.getenv("SUBSCRIPTION_CHECK_INTERVAL", "1800"))
 LOG_DIR = os.getenv("LOG_DIR", "logs")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-GOOGLE_CX = os.getenv("GOOGLE_CX", "")
