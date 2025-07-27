@@ -56,7 +56,13 @@ async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
         if not link:
             return None
         page = await loop.run_in_executor(
-            None, lambda: requests.get(link, timeout=10)
+            None,
+            lambda: requests.get(
+                link,
+                timeout=10,
+                headers={"User-Agent": "Mozilla/5.0"},
+                verify=False,
+            ),
         )
         soup = BeautifulSoup(page.text, "html.parser")
         text = soup.get_text(" ", strip=True)
