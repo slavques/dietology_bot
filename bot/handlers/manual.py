@@ -4,7 +4,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import StateFilter
 from datetime import timedelta
 
-from ..services import analyze_text, _google_lookup
+from ..services import analyze_text, fatsecret_lookup
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import (
     meal_actions_kb,
@@ -136,9 +136,10 @@ async def process_manual(message: types.Message, state: FSMContext):
             "carbs": to_float(res.get("carbs", 0)),
         }
         if grade.startswith("pro") and res.get("google"):
-            gmacros = await _google_lookup(name)
-            if gmacros:
-                macros.update(gmacros)
+            gdata = await fatsecret_lookup(name)
+            if gdata:
+                macros.update({k: gdata[k] for k in ("calories", "protein", "fat", "carbs")})
+                name = gdata.get("name", name)
         meal_id = f"{message.from_user.id}_{message.message_id}_{idx}"
         pending_meals[meal_id] = {
             "name": name,
