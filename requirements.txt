@@ -4,3 +4,5 @@ openai
 python-dotenv
 psycopg2-binary
 pillow
+requests
+beautifulsoup4
