@@ -38,8 +38,8 @@ async def fatsecret_lookup(name: str) -> Optional[Dict[str, float]]:
     log("google", "query %s", name)
     loop = asyncio.get_running_loop()
     try:
-        url = "https://www.fatsecret.ru/\u043a\u0430\u043b\u043e\u0440\u0438\u0438-\u043f\u0438\u0442\u0430\u043d\u0438\u0435/search"
-        log("google", "request %s?q=%s", url, name)
+        url = "https://www.fatsecret.ru/калории-питание/search"
+        log("google", "request %s", url)
         page = await loop.run_in_executor(
             None,
             lambda: requests.get(
@@ -50,10 +50,10 @@ async def fatsecret_lookup(name: str) -> Optional[Dict[str, float]]:
                 timeout=10,
             ),
         )
-        log("google", "status %s", page.status_code)
+        log("google", "url %s status %s", page.url, page.status_code)
         log("google", "response %.120s", page.text)
         soup = BeautifulSoup(page.text, "html.parser")
-        block = soup.select_one("table.searchResult")
+        block = soup.select_one("table.searchResult tr")
         text = block.get_text(" ", strip=True) if block else soup.get_text(" ", strip=True)
         m = re.search(
             r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
