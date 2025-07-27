@@ -4,7 +4,7 @@ import tempfile
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ..services import analyze_photo, _google_lookup
+from ..services import analyze_photo, fatsecret_lookup
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import meal_actions_kb, back_menu_kb, subscribe_button
 from ..subscriptions import consume_request, ensure_user, has_request_quota, notify_trial_end
@@ -154,7 +154,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
             "carbs": to_float(res.get("carbs", 0)),
         }
         if grade.startswith("pro") and res.get("google"):
-            gmacros = await _google_lookup(name)
+            gmacros = await fatsecret_lookup(name)
             if gmacros:
                 macros.update(gmacros)
 

@@ -10,7 +10,7 @@ from .logger import log
 import openai
 from openai import RateLimitError, BadRequestError
 
-from .config import OPENAI_API_KEY, GOOGLE_API_KEY, GOOGLE_CX
+from .config import OPENAI_API_KEY
 from .utils import parse_serving, to_float
 from .prompts import (
     PRO_PHOTO_PROMPT,
@@ -31,49 +31,38 @@ MODEL_NAME = "gpt-4.1-mini"
 COMPLETION_MODEL = "gpt-4.1-mini"
 
 
-async def _google_lookup(name: str) -> Optional[Dict[str, float]]:
-    """Search fatsecret.ru via Google CSE and parse macros."""
-    if not GOOGLE_API_KEY or not GOOGLE_CX:
-        return None
+
+
+async def fatsecret_lookup(name: str) -> Optional[Dict[str, float]]:
+    """Fetch macros for the first search result on fatsecret.ru."""
     log("google", "query %s", name)
     loop = asyncio.get_running_loop()
     try:
-        resp = await loop.run_in_executor(
-            None,
-            lambda: requests.get(
-                "https://www.googleapis.com/customsearch/v1",
-                params={"key": GOOGLE_API_KEY, "cx": GOOGLE_CX, "q": name},
-                timeout=10,
-            ),
-        )
-        data = resp.json()
-        log("google", "search %s", data)
-        items = data.get("items")
-        if not items:
-            return None
-        link = items[0].get("link")
-        log("google", "link %s", link)
-        if not link:
-            return None
+        url = "https://www.fatsecret.ru/калории-питание/search"
+        log("google", "request %s", url)
         page = await loop.run_in_executor(
             None,
             lambda: requests.get(
-                link,
-                timeout=10,
+                url,
+                params={"q": name},
                 headers={"User-Agent": "Mozilla/5.0"},
                 verify=False,
+                timeout=10,
             ),
         )
+        log("google", "url %s status %s", page.url, page.status_code)
+        log("google", "response %.120s", page.text)
         soup = BeautifulSoup(page.text, "html.parser")
-        text = soup.get_text(" ", strip=True)
+        block = soup.select_one("table.searchResult tr")
+        text = block.get_text(" ", strip=True) if block else soup.get_text(" ", strip=True)
         m = re.search(
-            r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал.*?Белк[аи][^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г.*?Углевод[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
+            r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
             text,
             re.I | re.S,
         )
         if not m:
             return None
-        calories, protein, fat, carbs = m.groups()
+        calories, fat, carbs, protein = m.groups()
         macros = {
             "calories": to_float(calories),
             "protein": to_float(protein),
