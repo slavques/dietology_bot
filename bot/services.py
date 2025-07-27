@@ -38,16 +38,20 @@ async def fatsecret_lookup(name: str) -> Optional[Dict[str, float]]:
     log("google", "query %s", name)
     loop = asyncio.get_running_loop()
     try:
+        url = "https://www.fatsecret.ru/\u043a\u0430\u043b\u043e\u0440\u0438\u0438-\u043f\u0438\u0442\u0430\u043d\u0438\u0435/search"
+        log("google", "request %s?q=%s", url, name)
         page = await loop.run_in_executor(
             None,
             lambda: requests.get(
-                "https://www.fatsecret.ru/\u043a\u0430\u043b\u043e\u0440\u0438\u0438-\u043f\u0438\u0442\u0430\u043d\u0438\u0435/search",
+                url,
                 params={"q": name},
                 headers={"User-Agent": "Mozilla/5.0"},
                 verify=False,
                 timeout=10,
             ),
         )
+        log("google", "status %s", page.status_code)
+        log("google", "response %.120s", page.text)
         soup = BeautifulSoup(page.text, "html.parser")
         block = soup.select_one("table.searchResult")
         text = block.get_text(" ", strip=True) if block else soup.get_text(" ", strip=True)
