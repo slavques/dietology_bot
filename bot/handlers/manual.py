@@ -4,17 +4,20 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import StateFilter
 from datetime import timedelta
 
-from ..services import analyze_text, fatsecret_lookup
+from ..services import analyze_text, fatsecret_search
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import (
     meal_actions_kb,
     back_menu_kb,
     back_inline_kb,
     subscribe_button,
+    choose_product_kb,
+    weight_back_kb,
+    add_delete_back_kb,
 )
 from ..subscriptions import consume_request, ensure_user, notify_trial_end
 from ..database import SessionLocal
-from ..states import ManualMeal, EditMeal
+from ..states import ManualMeal, EditMeal, LookupMeal
 from ..storage import pending_meals
 from ..texts import (
     LIMIT_REACHED_TEXT,
@@ -22,6 +25,8 @@ from ..texts import (
     CLARIFY_PROMPT,
     MANUAL_PROMPT,
     MANUAL_ERROR,
+    LOOKUP_PROMPT,
+    LOOKUP_WEIGHT,
     BTN_EDIT,
     BTN_DELETE,
     BTN_REMOVE_LIMITS,
@@ -127,6 +132,7 @@ async def process_manual(message: types.Message, state: FSMContext):
         return
 
     for idx, res in enumerate(valid, 1):
+        meal_id = f"{message.from_user.id}_{message.message_id}_{idx}"
         name = res.get("name")
         serving = parse_serving(res.get("serving", 0))
         macros = {
@@ -136,11 +142,25 @@ async def process_manual(message: types.Message, state: FSMContext):
             "carbs": to_float(res.get("carbs", 0)),
         }
         if grade.startswith("pro") and res.get("google"):
-            gdata = await fatsecret_lookup(name)
-            if gdata:
-                macros.update({k: gdata[k] for k in ("calories", "protein", "fat", "carbs")})
-                name = gdata.get("name", name)
-        meal_id = f"{message.from_user.id}_{message.message_id}_{idx}"
+            results = await fatsecret_search(name)
+            if results:
+                pending_meals[meal_id] = {
+                    "initial_json": res,
+                    "text": message.text,
+                    "chat_id": message.chat.id,
+                    "message_id": None,
+                    "photo_path": None,
+                    "results": results,
+                    "ingredients": [],
+                    "type": res.get("type", "meal"),
+                }
+                builder = choose_product_kb(meal_id, results)
+                await state.update_data(meal_id=meal_id)
+                msg = await message.answer(LOOKUP_PROMPT, reply_markup=builder)
+                pending_meals[meal_id]["message_id"] = msg.message_id
+                pending_meals[meal_id]["chat_id"] = msg.chat.id
+                await state.set_state(LookupMeal.choosing)
+                continue
         pending_meals[meal_id] = {
             "name": name,
             "ingredients": [],

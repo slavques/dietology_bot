@@ -31,6 +31,63 @@ MODEL_NAME = "gpt-4.1-mini"
 COMPLETION_MODEL = "gpt-4.1-mini"
 
 
+async def fatsecret_search(query: str) -> List[Dict[str, Any]]:
+    """Return up to three search results with macros per 100 g."""
+    log("google", "search %s", query)
+    loop = asyncio.get_running_loop()
+    try:
+        url = "http://www.fatsecret.ru/калории-питание/search"
+        resp = await loop.run_in_executor(
+            None,
+            lambda: requests.get(
+                url,
+                params={"q": query},
+                headers={"User-Agent": "Mozilla/5.0"},
+                verify=False,
+                timeout=10,
+            ),
+        )
+        log("google", "request %s status %s", resp.url, resp.status_code)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        items: List[Dict[str, Any]] = []
+        for tr in soup.select("table.searchResult tr"):
+            link = tr.select_one("a.prominent")
+            info = tr.select_one("div.smallText")
+            if not link or not info:
+                continue
+            text = info.get_text(" ", strip=True)
+            m = re.search(
+                r"100\s*(?:г|гр)[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
+                text,
+                re.I,
+            )
+            if not m:
+                m = re.search(
+                    r"Калории[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
+                    text,
+                    re.I,
+                )
+            if not m:
+                continue
+            calories, fat, carbs, protein = m.groups()
+            items.append(
+                {
+                    "name": link.get_text(strip=True),
+                    "calories": to_float(calories),
+                    "protein": to_float(protein),
+                    "fat": to_float(fat),
+                    "carbs": to_float(carbs),
+                }
+            )
+            if len(items) >= 3:
+                break
+        log("google", "results %s", len(items))
+        return items
+    except Exception as exc:
+        log("google", "search failed: %s", exc)
+        return []
+
+
 
 
 async def fatsecret_lookup(query: str) -> Optional[Dict[str, Any]]:
