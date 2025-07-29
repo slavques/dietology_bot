@@ -62,7 +62,9 @@ async def process_timezone(message: types.Message, state: FSMContext):
         if not (0 <= hours < 24 and 0 <= minutes < 60):
             raise ValueError
     except Exception:
-        await message.answer("Неверный формат времени. Попробуйте ещё раз 10:00")
+        from ..texts import INVALID_TIME
+
+        await message.answer(INVALID_TIME)
         return
     user_time = hours * 60 + minutes
     utc_now = datetime.utcnow()
@@ -129,7 +131,9 @@ async def process_time(message: types.Message, state: FSMContext, field: str, na
         if not (0 <= hours < 24 and 0 <= minutes < 60):
             raise ValueError
     except Exception:
-        await message.answer("Неверный формат времени. Попробуйте ещё раз 10:00")
+        from ..texts import INVALID_TIME
+
+        await message.answer(INVALID_TIME)
         return
     time_str = f"{hours:02d}:{minutes:02d}"
     session = SessionLocal()

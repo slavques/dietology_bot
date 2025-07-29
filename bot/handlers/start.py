@@ -55,7 +55,9 @@ async def cmd_start(message: types.Message):
     # Send a temporary message to update the persistent reply keyboard
     # Send a helper message with the reply keyboard and keep it so the
     # "Меню" and "ЧаВО" buttons remain persistent for the user.
-    await message.answer("🥑", reply_markup=main_menu_kb())
+    from ..texts import MENU_STUB
+
+    await message.answer(MENU_STUB, reply_markup=main_menu_kb())
     if trial:
         grade, days = trial
         grade_name = "⚡ Pro-режим" if grade == "pro" else "🔸 Старт"
@@ -83,7 +85,9 @@ async def back_to_menu(message: types.Message):
     text = get_welcome_text(user)
     session.commit()
     session.close()
-    await message.answer("🥑", reply_markup=main_menu_kb())
+    from ..texts import MENU_STUB
+
+    await message.answer(MENU_STUB, reply_markup=main_menu_kb())
     await message.answer(text, reply_markup=menu_inline_kb(), parse_mode="HTML")
 
 
