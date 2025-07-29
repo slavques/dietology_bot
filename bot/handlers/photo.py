@@ -47,6 +47,15 @@ async def request_photo(message: types.Message):
         await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
         session.close()
         return
+    if user.grade == "free":
+        from ..texts import SUB_REQUIRED, BTN_SUBSCRIPTION
+        await message.answer(
+            SUB_REQUIRED,
+            reply_markup=subscribe_button(BTN_SUBSCRIPTION),
+            parse_mode="HTML",
+        )
+        session.close()
+        return
     if not has_request_quota(session, user):
         reset = (
             user.period_end.date()
@@ -85,6 +94,15 @@ async def handle_photo(message: types.Message, state: FSMContext):
         from ..texts import BLOCKED_TEXT
 
         await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
+        session.close()
+        return
+    if user.grade == "free":
+        from ..texts import SUB_REQUIRED, BTN_SUBSCRIPTION
+        await message.answer(
+            SUB_REQUIRED,
+            reply_markup=subscribe_button(BTN_SUBSCRIPTION),
+            parse_mode="HTML",
+        )
         session.close()
         return
     ok, reason = consume_request(session, user)
