@@ -310,17 +310,8 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> List[Dict[str, A
         ]
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    if grade.startswith("pro"):
-        prompt = PRO_PHOTO_PROMPT
-    elif grade.startswith("light"):
-        prompt = LIGHT_PHOTO_PROMPT
-    else:
-        prompt = FREE_PHOTO_PROMPT
-    # Use Chat Completions for all paid tiers.
-    if grade.startswith("pro") or grade.startswith("light"):
-        sender = _chat_completion
-    else:
-        sender = _completion
+    prompt = PRO_PHOTO_PROMPT
+    sender = _chat_completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -383,16 +374,8 @@ async def analyze_text(description: str, grade: str = "pro") -> List[Dict[str, A
                 "carbs": 30,
             }
         ]
-    if grade.startswith("pro"):
-        prompt = PRO_TEXT_PROMPT
-    elif grade.startswith("light"):
-        prompt = LIGHT_TEXT_PROMPT
-    else:
-        prompt = FREE_TEXT_PROMPT
-    if grade.startswith("pro") or grade.startswith("light"):
-        sender = _chat_completion
-    else:
-        sender = _completion
+    prompt = PRO_TEXT_PROMPT
+    sender = _chat_completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -449,20 +432,12 @@ async def analyze_text_with_hint(
             "carbs": 30,
         }
     context = f"Текст из первого запроса: {description}"
-    if grade.startswith("pro"):
-        base = PRO_HINT_PROMPT_BASE
-    elif grade.startswith("light"):
-        base = LIGHT_HINT_PROMPT_BASE
-    else:
-        base = FREE_HINT_PROMPT_BASE
+    base = PRO_HINT_PROMPT_BASE
     prompt = base.format(
         context=context.replace("{", "{{").replace("}", "}}"),
         hint=hint.replace("{", "{{").replace("}", "}}"),
     )
-    if grade.startswith("pro") or grade.startswith("light"):
-        sender = _chat_completion
-    else:
-        sender = _completion
+    sender = _chat_completion
     content = await sender(
         [
             {"role": "system", "content": prompt},
@@ -514,21 +489,12 @@ async def analyze_photo_with_hint(
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     context = "Фото из первого запроса"
-    if grade.startswith("pro"):
-        base = PRO_HINT_PROMPT_BASE
-    elif grade.startswith("light"):
-        base = LIGHT_HINT_PROMPT_BASE
-    else:
-        base = FREE_HINT_PROMPT_BASE
+    base = PRO_HINT_PROMPT_BASE
     prompt = base.format(
         context=context.replace("{", "{{").replace("}", "}}"),
         hint=hint.replace("{", "{{").replace("}", "}}"),
     )
-    # Use Chat Completions for all paid tiers.
-    if grade.startswith("pro") or grade.startswith("light"):
-        sender = _chat_completion
-    else:
-        sender = _completion
+    sender = _chat_completion
     content = await sender(
         [
             {"role": "system", "content": prompt},

@@ -141,7 +141,7 @@ async def process_manual(message: types.Message, state: FSMContext):
             "fat": to_float(res.get("fat", 0)),
             "carbs": to_float(res.get("carbs", 0)),
         }
-        if grade.startswith("pro") and res.get("google"):
+        if res.get("google"):
             results = await fatsecret_search(name)
             if results:
                 pending_meals[meal_id] = {
