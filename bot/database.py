@@ -115,7 +115,73 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     telegram_id = Column(BigInteger, unique=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    grade = Column(String, default='free')  # 'free', 'light', 'pro', etc.
+    blocked = Column(Boolean, default=False)
+
+    subscription = relationship(
+        'Subscription', back_populates='user', uselist=False, cascade='all, delete-orphan'
+    )
+    notification = relationship(
+        'NotificationStatus', back_populates='user', uselist=False, cascade='all, delete-orphan'
+    )
+    reminders = relationship(
+        'ReminderSettings', back_populates='user', uselist=False, cascade='all, delete-orphan'
+    )
+    meals = relationship('Meal', back_populates='user')
+
+    # convenience proxies for old attribute names
+    def _sub(self):
+        if not self.subscription:
+            self.subscription = Subscription()
+        return self.subscription
+
+    def _notif(self):
+        if not self.notification:
+            self.notification = NotificationStatus()
+        return self.notification
+
+    def _rem(self):
+        if not self.reminders:
+            self.reminders = ReminderSettings()
+        return self.reminders
+
+    grade = property(lambda self: self._sub().grade, lambda self, v: setattr(self._sub(), 'grade', v))
+    request_limit = property(lambda self: self._sub().request_limit, lambda self, v: setattr(self._sub(), 'request_limit', v))
+    requests_used = property(lambda self: self._sub().requests_used, lambda self, v: setattr(self._sub(), 'requests_used', v))
+    requests_total = property(lambda self: self._sub().requests_total, lambda self, v: setattr(self._sub(), 'requests_total', v))
+    monthly_used = property(lambda self: self._sub().monthly_used, lambda self, v: setattr(self._sub(), 'monthly_used', v))
+    monthly_start = property(lambda self: self._sub().monthly_start, lambda self, v: setattr(self._sub(), 'monthly_start', v))
+    period_start = property(lambda self: self._sub().period_start, lambda self, v: setattr(self._sub(), 'period_start', v))
+    period_end = property(lambda self: self._sub().period_end, lambda self, v: setattr(self._sub(), 'period_end', v))
+    trial_end = property(lambda self: self._sub().trial_end, lambda self, v: setattr(self._sub(), 'trial_end', v))
+    resume_grade = property(lambda self: self._sub().resume_grade, lambda self, v: setattr(self._sub(), 'resume_grade', v))
+    resume_period_end = property(lambda self: self._sub().resume_period_end, lambda self, v: setattr(self._sub(), 'resume_period_end', v))
+    daily_used = property(lambda self: self._sub().daily_used, lambda self, v: setattr(self._sub(), 'daily_used', v))
+    daily_start = property(lambda self: self._sub().daily_start, lambda self, v: setattr(self._sub(), 'daily_start', v))
+    trial = property(lambda self: self._sub().trial, lambda self, v: setattr(self._sub(), 'trial', v))
+    trial_used = property(lambda self: self._sub().trial_used, lambda self, v: setattr(self._sub(), 'trial_used', v))
+
+    notified_7d = property(lambda self: self._notif().notified_7d, lambda self, v: setattr(self._notif(), 'notified_7d', v))
+    notified_3d = property(lambda self: self._notif().notified_3d, lambda self, v: setattr(self._notif(), 'notified_3d', v))
+    notified_1d = property(lambda self: self._notif().notified_1d, lambda self, v: setattr(self._notif(), 'notified_1d', v))
+    notified_0d = property(lambda self: self._notif().notified_0d, lambda self, v: setattr(self._notif(), 'notified_0d', v))
+    notified_free = property(lambda self: self._notif().notified_free, lambda self, v: setattr(self._notif(), 'notified_free', v))
+
+    timezone = property(lambda self: self._rem().timezone, lambda self, v: setattr(self._rem(), 'timezone', v))
+    morning_time = property(lambda self: self._rem().morning_time, lambda self, v: setattr(self._rem(), 'morning_time', v))
+    day_time = property(lambda self: self._rem().day_time, lambda self, v: setattr(self._rem(), 'day_time', v))
+    evening_time = property(lambda self: self._rem().evening_time, lambda self, v: setattr(self._rem(), 'evening_time', v))
+    morning_enabled = property(lambda self: self._rem().morning_enabled, lambda self, v: setattr(self._rem(), 'morning_enabled', v))
+    day_enabled = property(lambda self: self._rem().day_enabled, lambda self, v: setattr(self._rem(), 'day_enabled', v))
+    evening_enabled = property(lambda self: self._rem().evening_enabled, lambda self, v: setattr(self._rem(), 'evening_enabled', v))
+    last_morning = property(lambda self: self._rem().last_morning, lambda self, v: setattr(self._rem(), 'last_morning', v))
+    last_day = property(lambda self: self._rem().last_day, lambda self, v: setattr(self._rem(), 'last_day', v))
+    last_evening = property(lambda self: self._rem().last_evening, lambda self, v: setattr(self._rem(), 'last_evening', v))
+
+class Subscription(Base):
+    __tablename__ = 'subscriptions'
+
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    grade = Column(String, default='free')
     request_limit = Column(Integer, default=20)
     requests_used = Column(Integer, default=0)
     requests_total = Column(Integer, default=0)
@@ -126,16 +192,31 @@ class User(Base):
     trial_end = Column(DateTime, nullable=True)
     resume_grade = Column(String, nullable=True)
     resume_period_end = Column(DateTime, nullable=True)
+    daily_used = Column(Integer, default=0)
+    daily_start = Column(DateTime, default=datetime.utcnow)
+    trial = Column(Boolean, default=False)
+    trial_used = Column(Boolean, default=False)
+
+    user = relationship('User', back_populates='subscription')
+
+
+class NotificationStatus(Base):
+    __tablename__ = 'notification_status'
+
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
     notified_7d = Column(Boolean, default=False)
     notified_3d = Column(Boolean, default=False)
     notified_1d = Column(Boolean, default=False)
     notified_0d = Column(Boolean, default=False)
     notified_free = Column(Boolean, default=False)
-    daily_used = Column(Integer, default=0)
-    daily_start = Column(DateTime, default=datetime.utcnow)
-    blocked = Column(Boolean, default=False)
-    trial = Column(Boolean, default=False)
-    trial_used = Column(Boolean, default=False)
+
+    user = relationship('User', back_populates='notification')
+
+
+class ReminderSettings(Base):
+    __tablename__ = 'reminders'
+
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
     timezone = Column(Integer, nullable=True)
     morning_time = Column(String, default='08:00')
     day_time = Column(String, default='13:00')
@@ -146,8 +227,8 @@ class User(Base):
     last_morning = Column(DateTime, nullable=True)
     last_day = Column(DateTime, nullable=True)
     last_evening = Column(DateTime, nullable=True)
-    meals = relationship('Meal', back_populates='user')
 
+    user = relationship('User', back_populates='reminders')
 class Meal(Base):
     __tablename__ = 'meals'
     id = Column(Integer, primary_key=True)
