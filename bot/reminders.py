@@ -28,7 +28,14 @@ def reminder_watcher(check_interval: int = 60):
         while True:
             now = datetime.utcnow()
             session = SessionLocal()
-            users = session.query(User).filter(User.timezone != None).all()
+            from .database import ReminderSettings
+
+            users = (
+                session.query(User)
+                .join(ReminderSettings)
+                .filter(ReminderSettings.timezone != None)
+                .all()
+            )
             for user in users:
                 offset = timedelta(minutes=user.timezone or 0)
                 local_now = now + offset

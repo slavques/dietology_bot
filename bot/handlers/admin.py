@@ -257,23 +257,38 @@ async def admin_stats(query: types.CallbackQuery):
     session = SessionLocal()
     now = datetime.utcnow()
     total = session.query(User).count()
+    from ..database import Subscription
+
     light = (
         session.query(User)
-        .filter(User.grade == "light", User.period_end > now)
+        .join(Subscription)
+        .filter(Subscription.grade == "light", Subscription.period_end > now)
         .count()
     )
-    pro = session.query(User).filter(User.grade == "pro", User.period_end > now).count()
+    pro = (
+        session.query(User)
+        .join(Subscription)
+        .filter(Subscription.grade == "pro", Subscription.period_end > now)
+        .count()
+    )
     trial_pro = (
         session.query(User)
-        .filter(User.grade == "pro_promo", User.trial_end > now)
+        .join(Subscription)
+        .filter(Subscription.grade == "pro_promo", Subscription.trial_end > now)
         .count()
     )
     trial_light = (
         session.query(User)
-        .filter(User.grade == "light_promo", User.trial_end > now)
+        .join(Subscription)
+        .filter(Subscription.grade == "light_promo", Subscription.trial_end > now)
         .count()
     )
-    used = session.query(User).filter(User.grade == "free", User.requests_used > 0).count()
+    used = (
+        session.query(User)
+        .join(Subscription)
+        .filter(Subscription.grade == "free", Subscription.requests_used > 0)
+        .count()
+    )
     session.close()
     text = ADMIN_STATS.format(
         total=total,
@@ -426,9 +441,12 @@ async def process_days_all(message: types.Message, state: FSMContext):
     session = SessionLocal()
     from ..subscriptions import add_subscription_days
 
+    from ..database import Subscription
+
     users = (
         session.query(User)
-        .filter(User.grade.in_(["light", "pro"]))
+        .join(Subscription)
+        .filter(Subscription.grade.in_(["light", "pro"]))
         .all()
     )
     for u in users:

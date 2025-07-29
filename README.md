@@ -83,6 +83,8 @@ sqlite3 bot.db
 
 Within the shell you can list tables with `.tables`, show table schemas with
 `.schema users`, `.schema meals` or `.schema payments` and execute regular SQL
+queries. Additional user data lives in `subscriptions`, `notification_status`
+and `reminders` tables.
 statements. For example, granting a user light status:
 
 ```sql

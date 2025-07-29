@@ -19,7 +19,14 @@ from .texts import (
 )
 from .settings import PLAN_PRICES, PRO_PLAN_PRICES
 
-from .database import SessionLocal, User, Payment
+from .database import (
+    SessionLocal,
+    User,
+    Payment,
+    Subscription,
+    NotificationStatus,
+    ReminderSettings,
+)
 
 from .logger import log
 
@@ -47,8 +54,8 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
     user = session.query(User).filter_by(telegram_id=telegram_id).first()
     if not user:
         now = datetime.utcnow()
-        user = User(
-            telegram_id=telegram_id,
+        user = User(telegram_id=telegram_id)
+        user.subscription = Subscription(
             grade="free",
             request_limit=FREE_LIMIT,
             requests_used=0,
@@ -57,11 +64,14 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             monthly_start=now,
             period_start=now,
             period_end=now + timedelta(days=30),
-            notified_1d=False,
-            notified_free=True,
             daily_used=0,
             daily_start=now,
         )
+        user.notification = NotificationStatus(
+            notified_1d=False,
+            notified_free=True,
+        )
+        user.reminders = ReminderSettings()
         session.add(user)
         session.commit()
     return user
