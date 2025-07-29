@@ -163,7 +163,7 @@ async def process_edit(message: types.Message, state: FSMContext):
         return
 
     prev_json = meal.get('initial_json', meal)
-    if grade.startswith("pro") and prev_json.get('google'):
+    if prev_json.get('google'):
         result = await fatsecret_lookup(message.text)
         log("google", "clarify %s -> %s", message.text, result)
         if not result:
