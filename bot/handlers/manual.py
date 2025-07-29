@@ -53,6 +53,16 @@ async def manual_start(query: types.CallbackQuery, state: FSMContext):
         session.close()
         await query.answer()
         return
+    if user.grade == "free":
+        from ..texts import SUB_REQUIRED, BTN_SUBSCRIPTION
+        await query.message.edit_text(
+            SUB_REQUIRED,
+            reply_markup=subscribe_button(BTN_SUBSCRIPTION),
+            parse_mode="HTML",
+        )
+        session.close()
+        await query.answer()
+        return
     session.close()
     await query.message.edit_text(MANUAL_PROMPT, parse_mode="HTML")
     await query.message.edit_reply_markup(reply_markup=back_inline_kb())
@@ -79,6 +89,16 @@ async def process_manual(message: types.Message, state: FSMContext):
 
         await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
         session.close()
+        return
+    if user.grade == "free":
+        from ..texts import SUB_REQUIRED, BTN_SUBSCRIPTION
+        await message.answer(
+            SUB_REQUIRED,
+            reply_markup=subscribe_button(BTN_SUBSCRIPTION),
+            parse_mode="HTML",
+        )
+        session.close()
+        await state.clear()
         return
     ok, reason = consume_request(session, user)
     if not ok:

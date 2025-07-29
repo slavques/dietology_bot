@@ -143,6 +143,16 @@ async def process_edit(message: types.Message, state: FSMContext):
         session.close()
         await state.clear()
         return
+    if user.grade == "free":
+        from ..texts import SUB_REQUIRED, BTN_SUBSCRIPTION
+        await message.answer(
+            SUB_REQUIRED,
+            reply_markup=subscribe_button(BTN_SUBSCRIPTION),
+            parse_mode="HTML",
+        )
+        session.close()
+        await state.clear()
+        return
     grade = user.grade
     session.close()
     MAX_LEN = 200
