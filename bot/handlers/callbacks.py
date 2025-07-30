@@ -28,6 +28,7 @@ from ..texts import (
     DELETE_NOTIFY,
     SESSION_EXPIRED,
     SAVE_DONE,
+    MENU_STUB,
     REFINE_BASE,
     REFINE_TOO_LONG,
     REFINE_BAD_ATTEMPT,
@@ -283,7 +284,8 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     session.commit()
     log("meal_save", "meal saved for %s: %s %s g", query.from_user.id, name, serving)
     session.close()
-    await query.message.edit_text(SAVE_DONE, reply_markup=main_menu_kb())
+    await query.message.edit_text(SAVE_DONE)
+    await query.message.answer(MENU_STUB, reply_markup=main_menu_kb())
     await query.answer()
 
 
