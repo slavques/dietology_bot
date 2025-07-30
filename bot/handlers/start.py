@@ -57,7 +57,11 @@ async def cmd_start(message: types.Message):
     # "Меню" and "ЧаВО" buttons remain persistent for the user.
     from ..texts import MENU_STUB
 
-    await message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    stub = await message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    try:
+        await stub.delete()
+    except Exception:
+        pass
     if trial:
         grade, days = trial
         grade_name = "⚡ Pro-режим" if grade == "pro" else "🔸 Старт"
