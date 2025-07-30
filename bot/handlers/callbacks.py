@@ -314,7 +314,13 @@ async def process_lookup_query(message: types.Message, state: FSMContext):
     meal = pending_meals[meal_id]
     meal['results'] = results
     builder = choose_product_kb(meal_id, results)
-    await message.answer(LOOKUP_PROMPT, reply_markup=builder)
+    await message.delete()
+    await message.bot.edit_message_text(
+        LOOKUP_PROMPT,
+        chat_id=meal["chat_id"],
+        message_id=meal["message_id"],
+        reply_markup=builder,
+    )
     await state.set_state(LookupMeal.choosing)
 
 
@@ -344,12 +350,13 @@ async def process_weight(message: types.Message, state: FSMContext):
         'macros': macros,
         'orig_macros': macros.copy(),
     })
-    msg = await message.answer(
+    await message.delete()
+    await message.bot.edit_message_text(
         format_meal_message(meal['name'], grams, macros),
+        chat_id=meal['chat_id'],
+        message_id=meal['message_id'],
         reply_markup=add_delete_back_kb(meal_id),
     )
-    meal['message_id'] = msg.message_id
-    meal['chat_id'] = msg.chat.id
     await state.clear()
 
 async def cb_save_full(query: types.CallbackQuery):
