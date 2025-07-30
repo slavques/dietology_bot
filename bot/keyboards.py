@@ -163,6 +163,7 @@ def main_menu_kb() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=BTN_FAQ)],
         ],
         resize_keyboard=True,
+        is_persistent=True,
     )
 
 
