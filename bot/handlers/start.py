@@ -57,7 +57,11 @@ async def cmd_start(message: types.Message):
     # "Меню" and "ЧаВО" buttons remain persistent for the user.
     from ..texts import MENU_STUB
 
-    await message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    stub = await message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    try:
+        await stub.delete()
+    except Exception:
+        pass
     if trial:
         grade, days = trial
         grade_name = "⚡ Pro-режим" if grade == "pro" else "🔸 Старт"
@@ -87,7 +91,11 @@ async def back_to_menu(message: types.Message):
     session.close()
     from ..texts import MENU_STUB
 
-    await message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    stub = await message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    try:
+        await stub.delete()
+    except Exception:
+        pass
     await message.answer(text, reply_markup=menu_inline_kb(), parse_mode="HTML")
 
 
