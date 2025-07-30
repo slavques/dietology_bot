@@ -142,7 +142,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
     grade = user.grade
     session.close()
 
-    await message.reply(PHOTO_ANALYZING)
+    processing_msg = await message.reply(PHOTO_ANALYZING)
     photo = message.photo[-1]
     with tempfile.NamedTemporaryFile(
         prefix="diet_photo_", delete=False
@@ -160,14 +160,14 @@ async def handle_photo(message: types.Message, state: FSMContext):
     results = await analyze_photo(photo_path, grade=grade)
     log("prompt", "photo analyzed for %s", message.from_user.id)
     if isinstance(results, list) and results and results[0].get("error"):
-        await message.answer(RECOGNITION_ERROR)
+        await processing_msg.edit_text(RECOGNITION_ERROR)
         return
     if not isinstance(results, list):
         results = [results]
 
     valid = [r for r in results if r.get("is_food") and r.get("confidence", 0) >= 0.7]
     if not valid:
-        await message.answer(NO_FOOD_ERROR)
+        await processing_msg.edit_text(NO_FOOD_ERROR)
         return
 
     for idx, res in enumerate(valid, 1):
@@ -195,9 +195,14 @@ async def handle_photo(message: types.Message, state: FSMContext):
                 }
                 builder = choose_product_kb(meal_id, results)
                 await state.update_data(meal_id=meal_id)
-                msg = await message.answer(LOOKUP_PROMPT, reply_markup=builder)
-                pending_meals[meal_id]["message_id"] = msg.message_id
-                pending_meals[meal_id]["chat_id"] = msg.chat.id
+                if idx == 1:
+                    await processing_msg.edit_text(LOOKUP_PROMPT, reply_markup=builder)
+                    pending_meals[meal_id]["message_id"] = processing_msg.message_id
+                    pending_meals[meal_id]["chat_id"] = processing_msg.chat.id
+                else:
+                    msg = await message.answer(LOOKUP_PROMPT, reply_markup=builder)
+                    pending_meals[meal_id]["message_id"] = msg.message_id
+                    pending_meals[meal_id]["chat_id"] = msg.chat.id
                 await state.set_state(LookupMeal.choosing)
                 continue
 
@@ -221,21 +226,37 @@ async def handle_photo(message: types.Message, state: FSMContext):
             builder.button(text=BTN_DELETE, callback_data="cancel")
             builder.adjust(2)
             await state.update_data(meal_id=meal_id)
-            msg = await message.answer(
-                CLARIFY_PROMPT,
-                reply_markup=builder.as_markup(),
-            )
-            pending_meals[meal_id]["message_id"] = msg.message_id
-            pending_meals[meal_id]["chat_id"] = msg.chat.id
+            if idx == 1:
+                await processing_msg.edit_text(
+                    CLARIFY_PROMPT,
+                    reply_markup=builder.as_markup(),
+                )
+                pending_meals[meal_id]["message_id"] = processing_msg.message_id
+                pending_meals[meal_id]["chat_id"] = processing_msg.chat.id
+            else:
+                msg = await message.answer(
+                    CLARIFY_PROMPT,
+                    reply_markup=builder.as_markup(),
+                )
+                pending_meals[meal_id]["message_id"] = msg.message_id
+                pending_meals[meal_id]["chat_id"] = msg.chat.id
             await state.set_state(EditMeal.waiting_input)
             continue
 
-        msg = await message.answer(
-            format_meal_message(name, serving, macros),
-            reply_markup=meal_actions_kb(meal_id),
-        )
-        pending_meals[meal_id]["message_id"] = msg.message_id
-        pending_meals[meal_id]["chat_id"] = msg.chat.id
+        if idx == 1:
+            await processing_msg.edit_text(
+                format_meal_message(name, serving, macros),
+                reply_markup=meal_actions_kb(meal_id),
+            )
+            pending_meals[meal_id]["message_id"] = processing_msg.message_id
+            pending_meals[meal_id]["chat_id"] = processing_msg.chat.id
+        else:
+            msg = await message.answer(
+                format_meal_message(name, serving, macros),
+                reply_markup=meal_actions_kb(meal_id),
+            )
+            pending_meals[meal_id]["message_id"] = msg.message_id
+            pending_meals[meal_id]["chat_id"] = msg.chat.id
 
 
 async def handle_document(message: types.Message):
