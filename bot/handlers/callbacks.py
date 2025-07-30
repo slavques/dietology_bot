@@ -28,6 +28,7 @@ from ..texts import (
     DELETE_NOTIFY,
     SESSION_EXPIRED,
     SAVE_DONE,
+    MENU_STUB,
     REFINE_BASE,
     REFINE_TOO_LONG,
     REFINE_BAD_ATTEMPT,
