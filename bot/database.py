@@ -35,74 +35,10 @@ def _column_names(table: str) -> set[str]:
 def _ensure_columns():
     """Add new columns to old databases if they are missing."""
     existing = _column_names("users")
-    dt_type = "DATETIME" if engine.dialect.name == "sqlite" else "TIMESTAMP"
     bool_default = "0" if engine.dialect.name == "sqlite" else "FALSE"
     with engine.begin() as conn:
-        if "grade" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN grade TEXT DEFAULT 'free'"))
-        else:
-            conn.execute(text("UPDATE users SET grade='light' WHERE grade='paid'"))
-        if "request_limit" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN request_limit INTEGER DEFAULT 20"))
-        if "requests_used" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN requests_used INTEGER DEFAULT 0"))
-        if "requests_total" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN requests_total INTEGER DEFAULT 0"))
-        if "monthly_used" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN monthly_used INTEGER DEFAULT 0"))
-        if "monthly_start" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN monthly_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
-        if "period_start" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN period_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
-        conn.execute(text("UPDATE users SET period_start=CURRENT_TIMESTAMP WHERE period_start IS NULL"))
-        if "period_end" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN period_end {dt_type}"))
-        if "notified_7d" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_7d BOOLEAN DEFAULT {bool_default}"))
-        if "notified_3d" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_3d BOOLEAN DEFAULT {bool_default}"))
-        if "notified_0d" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_0d BOOLEAN DEFAULT {bool_default}"))
-        if "notified_1d" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_1d BOOLEAN DEFAULT {bool_default}"))
-        if "notified_free" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN notified_free BOOLEAN DEFAULT {bool_default}"))
-        if "daily_used" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN daily_used INTEGER DEFAULT 0"))
-        if "daily_start" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN daily_start {dt_type} DEFAULT CURRENT_TIMESTAMP"))
         if "blocked" not in existing:
             conn.execute(text(f"ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT {bool_default}"))
-        if "trial" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN trial BOOLEAN DEFAULT {bool_default}"))
-        if "trial_used" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN trial_used BOOLEAN DEFAULT {bool_default}"))
-        if "trial_end" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN trial_end {dt_type}"))
-        if "resume_grade" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN resume_grade TEXT"))
-        if "resume_period_end" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN resume_period_end {dt_type}"))
-        if "timezone" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN timezone INTEGER"))
-        if "morning_time" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN morning_time TEXT DEFAULT '08:00'"))
-        if "day_time" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN day_time TEXT DEFAULT '13:00'"))
-        if "evening_time" not in existing:
-            conn.execute(text("ALTER TABLE users ADD COLUMN evening_time TEXT DEFAULT '20:00'"))
-        if "morning_enabled" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN morning_enabled BOOLEAN DEFAULT {bool_default}"))
-        if "day_enabled" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN day_enabled BOOLEAN DEFAULT {bool_default}"))
-        if "evening_enabled" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN evening_enabled BOOLEAN DEFAULT {bool_default}"))
-        if "last_morning" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN last_morning {dt_type}"))
-        if "last_day" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN last_day {dt_type}"))
-        if "last_evening" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN last_evening {dt_type}"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:

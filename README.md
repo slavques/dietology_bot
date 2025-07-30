@@ -33,8 +33,10 @@ To use PostgreSQL instead of SQLite, install `psycopg2-binary` and set
 
 `DATABASE_URL` to a PostgreSQL connection string, e.g.
 `postgresql+psycopg2://user:password@host:5432/dbname`.
-The bot automatically adds any missing columns on startup,
-so upgrades work without manual migrations on both SQLite and PostgreSQL.
+The bot automatically creates any missing tables and basic columns on
+startup, so upgrades work without manual migrations on both SQLite and
+PostgreSQL. Fields that no longer exist in the models are **not**
+restored, so removing unwanted columns is safe.
 
 
 ### Logging
@@ -88,7 +90,11 @@ and `reminders` tables.
 statements. For example, granting a user light status:
 
 ```sql
-UPDATE users SET grade='light' WHERE telegram_id = 12345;
+UPDATE subscriptions
+SET grade='light'
+WHERE user_id = (
+  SELECT id FROM users WHERE telegram_id = 12345
+);
 ```
 
 Exit the shell with `.quit` once your changes are complete. If you configured a
