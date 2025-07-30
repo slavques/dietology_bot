@@ -109,12 +109,8 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
     if meal_id:
         pending_meals.pop(meal_id, None)
     await state.clear()
-    await query.message.delete()
+    await query.message.edit_text(DELETE_NOTIFY, reply_markup=None)
     await query.answer()
-    await query.bot.send_message(
-        query.from_user.id,
-        DELETE_NOTIFY
-    )
 
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
@@ -235,12 +231,8 @@ async def process_edit(message: types.Message, state: FSMContext):
 async def cb_delete(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
     pending_meals.pop(meal_id, None)
-    await query.message.delete()
+    await query.message.edit_text(DELETE_NOTIFY, reply_markup=None)
     await query.answer()
-    await query.bot.send_message(
-        query.from_user.id,
-        DELETE_NOTIFY
-    )
 
 async def cb_save(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
@@ -291,13 +283,8 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     session.commit()
     log("meal_save", "meal saved for %s: %s %s g", query.from_user.id, name, serving)
     session.close()
-    await query.message.edit_reply_markup(reply_markup=None)
+    await query.message.edit_text(SAVE_DONE, reply_markup=main_menu_kb())
     await query.answer()
-    await query.bot.send_message(
-        query.from_user.id,
-        SAVE_DONE,
-        reply_markup=main_menu_kb(),
-    )
 
 
 async def process_lookup_query(message: types.Message, state: FSMContext):
