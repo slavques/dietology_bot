@@ -57,7 +57,7 @@ async def cmd_start(message: types.Message):
     # "Меню" and "ЧаВО" buttons remain persistent for the user.
     from ..texts import MENU_STUB
 
-    await message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    stub = await message.answer(MENU_STUB, reply_markup=main_menu_kb())
     if trial:
         grade, days = trial
         grade_name = "⚡ Pro-режим" if grade == "pro" else "🔸 Старт"
@@ -68,6 +68,10 @@ async def cmd_start(message: types.Message):
             parse_mode="HTML",
         )
     await message.answer(text, reply_markup=menu_inline_kb(), parse_mode="HTML")
+    try:
+        await stub.edit_text("\u2063")
+    except Exception:
+        pass
 
 
 async def back_to_menu(message: types.Message):
@@ -87,8 +91,16 @@ async def back_to_menu(message: types.Message):
     session.close()
     from ..texts import MENU_STUB
 
-    await message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    stub = await message.answer(MENU_STUB, reply_markup=main_menu_kb())
     await message.answer(text, reply_markup=menu_inline_kb(), parse_mode="HTML")
+    try:
+        await stub.edit_text("\u2063")
+    except Exception:
+        pass
 
 
 async def cb_menu(query: types.CallbackQuery):

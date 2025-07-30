@@ -1,4 +1,5 @@
 from aiogram import types, Dispatcher, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timedelta
@@ -298,7 +299,11 @@ async def admin_stats(query: types.CallbackQuery):
         trial_light=trial_light,
         used=used,
     )
-    await query.message.edit_text(text, reply_markup=admin_menu_kb())
+    try:
+        await query.message.edit_text(text, reply_markup=admin_menu_kb())
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
     await query.answer()
 
 
