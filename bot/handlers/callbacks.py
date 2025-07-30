@@ -37,6 +37,7 @@ from ..texts import (
     PORTION_PREFIXES,
     LOOKUP_PROMPT,
     LOOKUP_WEIGHT,
+    MENU_STUB,
 )
 from ..logger import log
 
@@ -285,6 +286,11 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     log("meal_save", "meal saved for %s: %s %s g", query.from_user.id, name, serving)
     session.close()
     await query.message.edit_text(SAVE_DONE)
+    stub = await query.message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    try:
+        await stub.edit_text("\u2063")
+    except Exception:
+        pass
     await query.answer()
 
 
