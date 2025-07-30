@@ -285,7 +285,6 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     log("meal_save", "meal saved for %s: %s %s g", query.from_user.id, name, serving)
     session.close()
     await query.message.edit_text(SAVE_DONE)
-    await query.message.answer(MENU_STUB, reply_markup=main_menu_kb())
     await query.answer()
 
 
