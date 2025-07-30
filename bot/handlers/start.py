@@ -87,6 +87,10 @@ async def back_to_menu(message: types.Message):
     session.close()
     from ..texts import MENU_STUB
 
+    try:
+        await message.delete()
+    except Exception:
+        pass
     await message.answer(MENU_STUB, reply_markup=main_menu_kb())
     await message.answer(text, reply_markup=menu_inline_kb(), parse_mode="HTML")
 

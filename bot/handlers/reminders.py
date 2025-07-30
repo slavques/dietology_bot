@@ -42,6 +42,7 @@ async def open_reminders(query: types.CallbackQuery, state: FSMContext):
         await query.message.edit_text(
             TZ_PROMPT.format(utc_time=utc), reply_markup=back_inline_kb()
         )
+        await state.update_data(prompt_id=query.message.message_id)
         await state.set_state(ReminderState.waiting_timezone)
     else:
         local = (datetime.utcnow() + timedelta(minutes=user.timezone)).strftime("%H:%M")
@@ -78,11 +79,25 @@ async def process_timezone(message: types.Message, state: FSMContext):
     user = ensure_user(session, message.from_user.id)
     user.timezone = diff
     session.commit()
+    data = await state.get_data()
+    prompt_id = data.get("prompt_id")
     await state.clear()
-    await message.answer(
-        TIME_CURRENT.format(local_time=message.text.strip()),
-        reply_markup=reminders_main_kb(user),
-    )
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    if prompt_id:
+        await message.bot.edit_message_text(
+            TIME_CURRENT.format(local_time=message.text.strip()),
+            chat_id=message.chat.id,
+            message_id=prompt_id,
+            reply_markup=reminders_main_kb(user),
+        )
+    else:
+        await message.answer(
+            TIME_CURRENT.format(local_time=message.text.strip()),
+            reply_markup=reminders_main_kb(user),
+        )
     session.close()
 
 
@@ -119,6 +134,7 @@ async def open_reminder_settings(query: types.CallbackQuery):
 async def set_time_prompt(query: types.CallbackQuery, state: FSMContext, field: str, name: str):
     await query.message.edit_text(SET_TIME_PROMPT.format(name=name))
     await query.message.edit_reply_markup(reply_markup=back_to_reminder_settings_kb())
+    await state.update_data(prompt_id=query.message.message_id)
     await state.set_state(getattr(ReminderState, field))
     await query.answer()
 
@@ -140,16 +156,26 @@ async def process_time(message: types.Message, state: FSMContext, field: str, na
     user = ensure_user(session, message.from_user.id)
     setattr(user, field, time_str)
     session.commit()
-    await message.answer(REMINDER_ON.format(name=name))
-    await message.answer(
-        TIME_CURRENT.format(
-            local_time=(
-                datetime.utcnow() + timedelta(minutes=user.timezone or 0)
-            ).strftime("%H:%M")
-        ),
-        reply_markup=reminders_settings_kb(user),
-    )
+    data = await state.get_data()
+    prompt_id = data.get("prompt_id")
+    local_time = (
+        datetime.utcnow() + timedelta(minutes=user.timezone or 0)
+    ).strftime("%H:%M")
     await state.clear()
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    text = REMINDER_ON.format(name=name) + "\n" + TIME_CURRENT.format(local_time=local_time)
+    if prompt_id:
+        await message.bot.edit_message_text(
+            text,
+            chat_id=message.chat.id,
+            message_id=prompt_id,
+            reply_markup=reminders_settings_kb(user),
+        )
+    else:
+        await message.answer(text, reply_markup=reminders_settings_kb(user))
     session.close()
 
 
