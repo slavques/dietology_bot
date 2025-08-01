@@ -311,8 +311,11 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> List[Dict[str, A
                 "carbs": 30,
             }
         ]
-    with open(photo_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
+    try:
+        with open(photo_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+    except FileNotFoundError:
+        return {"error": "missing_photo"}
     prompt = PRO_PHOTO_PROMPT
     sender = _chat_completion
     content = await sender(
@@ -505,8 +508,11 @@ async def analyze_photo_with_hint(
             "fat": 10,
             "carbs": 30,
         }
-    with open(photo_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
+    try:
+        with open(photo_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+    except FileNotFoundError:
+        return {"error": "missing_photo"}
     context = "Фото из первого запроса"
     if context_json:
         context += f". Ранее распознано: {context_json.get('name', '')}"
