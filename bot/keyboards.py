@@ -296,9 +296,13 @@ def subscription_plans_inline_kb(tier: str) -> InlineKeyboardMarkup:
 
 
 def settings_menu_kb() -> InlineKeyboardMarkup:
+    from .database import get_option_bool
+
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_REMINDERS, callback_data="reminders")
-    builder.button(text=BTN_GOALS, callback_data="goals")
+    if get_option_bool("feat_reminders"):
+        builder.button(text=BTN_REMINDERS, callback_data="reminders")
+    if get_option_bool("feat_goals"):
+        builder.button(text=BTN_GOALS, callback_data="goals")
     builder.button(text=BTN_BACK, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()
