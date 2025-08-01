@@ -167,6 +167,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         results = [results]
 
     valid = [r for r in results if r.get("is_food") and r.get("confidence", 0) >= 0.7]
+    all_names = [r.get("name") for r in valid if r.get("name")]
     if not valid:
         await processing_msg.edit_text(NO_FOOD_ERROR)
         return
