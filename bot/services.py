@@ -71,7 +71,7 @@ async def fatsecret_search(query: str) -> List[Dict[str, Any]]:
                 )
                 if m:
                     w = re.search(
-                        r"1\s*порц[аия][^\d]*(\d+(?:[\.,]\d+)?)\s*(?:г|гр)",
+                        r"1\s*(?:порц[аия]|шт\.?|бургер)[^\d]*(\d+(?:[\.,]\d+)?)\s*(?:г|гр)",
                         text,
                         re.I,
                     )
