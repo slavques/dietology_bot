@@ -158,6 +158,8 @@ def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
     user.monthly_used += 1
     user.requests_total += 1
     user.daily_used += 1
+    from .database import RequestLog
+    session.add(RequestLog(user_id=user.id))
     session.commit()
     log("limit", "request consumed by %s", user.telegram_id)
     return True, ""

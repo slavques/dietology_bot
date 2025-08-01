@@ -204,6 +204,17 @@ class Comment(Base):
     user = relationship('User')
 
 
+class RequestLog(Base):
+    """Timestamp of each GPT request for statistics."""
+
+    __tablename__ = 'request_log'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    user = relationship('User')
+
+
 class Option(Base):
     __tablename__ = 'options'
 

@@ -293,9 +293,9 @@ async def admin_stats(query: types.CallbackQuery):
         .filter(Subscription.grade == "free", Subscription.requests_used > 0)
         .count()
     )
-    from ..database import Meal
-    q_12h = session.query(Meal).filter(Meal.timestamp >= now - timedelta(hours=12)).count()
-    q_week = session.query(Meal).filter(Meal.timestamp >= now - timedelta(days=7)).count()
+    from ..database import RequestLog
+    q_12h = session.query(RequestLog).filter(RequestLog.timestamp >= now - timedelta(hours=12)).count()
+    q_week = session.query(RequestLog).filter(RequestLog.timestamp >= now - timedelta(days=7)).count()
     session.close()
     text = ADMIN_STATS.format(
         total=total,
