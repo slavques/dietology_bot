@@ -364,7 +364,7 @@ INVOICE_TITLE = "Подписка"
 # Additional buttons
 BTN_RENEW_SUB = "🔄Продлить подписку"
 BTN_REMOVE_LIMITS = "⚡ Снять ограничения"
-BTN_REMOVE_LIMIT = "⚡Снять ограничение"
+BTN_REMOVE_LIMIT = "⚡ Снять ограничение"
 
 # FAQ text
 FAQ_TEXT = (
