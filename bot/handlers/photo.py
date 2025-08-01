@@ -166,6 +166,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         results = [results]
 
     valid = [r for r in results if r.get("is_food") and r.get("confidence", 0) >= 0.7]
+    all_names = [r.get("name") for r in valid if r.get("name")]
     if not valid:
         await processing_msg.edit_text(NO_FOOD_ERROR)
         return
@@ -192,6 +193,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
                     "results": results,
                     "ingredients": ingredients,
                     "type": res.get("type", "meal"),
+                    "context_names": all_names,
                 }
                 builder = choose_product_kb(meal_id, results)
                 await state.update_data(meal_id=meal_id)
@@ -218,6 +220,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
             "photo_path": photo_path,
             "chat_id": message.chat.id,
             "message_id": None,
+            "context_names": all_names,
         }
 
         if not name:
