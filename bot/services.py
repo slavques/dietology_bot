@@ -57,6 +57,7 @@ async def fatsecret_search(query: str) -> List[Dict[str, Any]]:
             if not link or not info:
                 continue
             text = info.get_text(" ", strip=True)
+            weight = None
             m = re.search(
                 r"100\s*(?:г|гр)[^\d]*(\d+(?:[\.,]\d+)?)\s*ккал[^\d]*Жир[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Углев[^\d]*(\d+(?:[\.,]\d+)?)\s*г[^\d]*Белк[^\d]*(\d+(?:[\.,]\d+)?)\s*г",
                 text,
@@ -68,18 +69,27 @@ async def fatsecret_search(query: str) -> List[Dict[str, Any]]:
                     text,
                     re.I,
                 )
+                if m:
+                    w = re.search(
+                        r"1\s*порц[аия][^\d]*(\d+(?:[\.,]\d+)?)\s*(?:г|гр)",
+                        text,
+                        re.I,
+                    )
+                    if w:
+                        weight = parse_serving(w.group(1))
             if not m:
                 continue
             calories, fat, carbs, protein = m.groups()
-            items.append(
-                {
-                    "name": link.get_text(strip=True),
-                    "calories": to_float(calories),
-                    "protein": to_float(protein),
-                    "fat": to_float(fat),
-                    "carbs": to_float(carbs),
-                }
-            )
+            item = {
+                "name": link.get_text(strip=True),
+                "calories": to_float(calories),
+                "protein": to_float(protein),
+                "fat": to_float(fat),
+                "carbs": to_float(carbs),
+            }
+            if weight:
+                item["serving"] = weight
+            items.append(item)
             if len(items) >= 3:
                 break
         log("google", "results %s", len(items))
