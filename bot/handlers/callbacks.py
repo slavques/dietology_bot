@@ -67,18 +67,37 @@ async def cb_pick(query: types.CallbackQuery, state: FSMContext):
         return
     item = results[idx]
     meal['name'] = item['name']
-    meal['per100'] = {
-        'calories': item['calories'],
-        'protein': item['protein'],
-        'fat': item['fat'],
-        'carbs': item['carbs'],
-    }
-    await state.update_data(meal_id=meal_id)
-    await state.set_state(LookupMeal.entering_weight)
-    await query.message.edit_text(
-        LOOKUP_WEIGHT.format(**item),
-        reply_markup=weight_back_kb(meal_id),
-    )
+    if 'serving' in item:
+        macros = {
+            'calories': item['calories'],
+            'protein': item['protein'],
+            'fat': item['fat'],
+            'carbs': item['carbs'],
+        }
+        meal.update({
+            'serving': item['serving'],
+            'orig_serving': item['serving'],
+            'macros': macros,
+            'orig_macros': macros.copy(),
+        })
+        await state.clear()
+        await query.message.edit_text(
+            format_meal_message(meal['name'], item['serving'], macros),
+            reply_markup=add_delete_back_kb(meal_id),
+        )
+    else:
+        meal['per100'] = {
+            'calories': item['calories'],
+            'protein': item['protein'],
+            'fat': item['fat'],
+            'carbs': item['carbs'],
+        }
+        await state.update_data(meal_id=meal_id)
+        await state.set_state(LookupMeal.entering_weight)
+        await query.message.edit_text(
+            LOOKUP_WEIGHT.format(**item),
+            reply_markup=weight_back_kb(meal_id),
+        )
     await query.answer()
 
 
