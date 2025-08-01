@@ -253,6 +253,8 @@ def _ensure_options():
         "grade_pro": "1",
         "feat_manual": "1",
         "feat_settings": "1",
+        "feat_reminders": "1",
+        "feat_goals": "1",
         "trial_pro_enabled": "0",
         "trial_pro_days": "0",
         "trial_light_enabled": "0",

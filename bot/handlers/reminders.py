@@ -29,12 +29,24 @@ from ..states import ReminderState
 
 async def open_settings(query: types.CallbackQuery):
     """Show main settings menu."""
+    from ..database import get_option_bool
+    from ..texts import FEATURE_DISABLED
+
+    if not get_option_bool("feat_settings"):
+        await query.answer(FEATURE_DISABLED, show_alert=True)
+        return
     await query.message.edit_text(SETTINGS_TITLE, reply_markup=settings_menu_kb())
     await query.answer()
 
 
 async def open_reminders(query: types.CallbackQuery, state: FSMContext):
     """Entry point for reminder settings."""
+    from ..database import get_option_bool
+    from ..texts import FEATURE_DISABLED
+
+    if not get_option_bool("feat_reminders"):
+        await query.answer(FEATURE_DISABLED, show_alert=True)
+        return
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
     if user.timezone is None or query.data == "update_tz":
@@ -218,6 +230,17 @@ async def process_evening_time(message: types.Message, state: FSMContext):
     await process_time(message, state, "evening_time", BTN_EVENING)
 
 
+async def open_goals(query: types.CallbackQuery):
+    from ..database import get_option_bool
+    from ..texts import FEATURE_DISABLED, DEV_FEATURE
+
+    if not get_option_bool("feat_goals"):
+        await query.answer(FEATURE_DISABLED, show_alert=True)
+        return
+    await query.message.edit_text(DEV_FEATURE, reply_markup=back_inline_kb())
+    await query.answer()
+
+
 def register(dp: Dispatcher):
     dp.callback_query.register(open_settings, F.data == "settings")
     dp.callback_query.register(
@@ -225,6 +248,7 @@ def register(dp: Dispatcher):
         F.data.in_(["reminders", "reminders_back", "update_tz"]),
     )
     dp.callback_query.register(open_reminder_settings, F.data == "reminder_settings")
+    dp.callback_query.register(open_goals, F.data == "goals")
     dp.callback_query.register(toggle_morning, F.data == "toggle_morning")
     dp.callback_query.register(toggle_day, F.data == "toggle_day")
     dp.callback_query.register(toggle_evening, F.data == "toggle_evening")
