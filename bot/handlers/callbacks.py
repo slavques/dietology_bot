@@ -40,7 +40,6 @@ from ..texts import (
     PORTION_PREFIXES,
     LOOKUP_PROMPT,
     LOOKUP_WEIGHT,
-    MENU_STUB,
 )
 from ..logger import log
 
