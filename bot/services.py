@@ -25,6 +25,7 @@ from .prompts import (
 )
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+GPT_SEMAPHORE = asyncio.Semaphore(3)
 
 # Model names for different API methods
 MODEL_NAME = "gpt-4.1-mini"
@@ -184,13 +185,14 @@ async def _chat_completion(
         pass
     for attempt in range(retries):
         try:
-            resp = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=1000,
-                top_p=0.7,
-            )
+            async with GPT_SEMAPHORE:
+                resp = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=1000,
+                    top_p=0.7,
+                )
             content = resp.choices[0].message.content
             log("response", "%s", content)
             usage = getattr(resp, "usage", None)
@@ -252,13 +254,14 @@ async def _completion(
     prompt = "\n".join(prompt_parts)
     for attempt in range(retries):
         try:
-            resp = await client.completions.create(
-                model=model,
-                prompt=prompt,
-                temperature=0.2,
-                max_tokens=1000,
-                top_p=0.7,
-            )
+            async with GPT_SEMAPHORE:
+                resp = await client.completions.create(
+                    model=model,
+                    prompt=prompt,
+                    temperature=0.2,
+                    max_tokens=1000,
+                    top_p=0.7,
+                )
             content = resp.choices[0].text
             log("response", "%s", content)
             usage = getattr(resp, "usage", None)

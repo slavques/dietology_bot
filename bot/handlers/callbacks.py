@@ -1,4 +1,6 @@
 from aiogram import types, Dispatcher, F
+import os
+import time
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
@@ -32,12 +34,12 @@ from ..texts import (
     REFINE_BASE,
     REFINE_TOO_LONG,
     REFINE_BAD_ATTEMPT,
+    CLARIFY_EXPIRED,
     NOTHING_TO_SAVE,
     SESSION_EXPIRED_RETRY,
     PORTION_PREFIXES,
     LOOKUP_PROMPT,
     LOOKUP_WEIGHT,
-    MENU_STUB,
 )
 from ..logger import log
 
@@ -109,13 +111,30 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     meal_id = data.get('meal_id')
     if meal_id:
-        pending_meals.pop(meal_id, None)
+        meal = pending_meals.pop(meal_id, None)
+        path = meal.get("photo_path") if meal else None
+        if path:
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
+            except Exception:
+                pass
     await state.clear()
     await query.message.edit_text(DELETE_NOTIFY, reply_markup=None)
     await query.answer()
 
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
+    meal = pending_meals.get(meal_id)
+    if meal and meal.get("photo_path") and meal.get("timestamp"):
+        if time.time() - meal["timestamp"] > 3600:
+            await query.message.edit_text(
+                CLARIFY_EXPIRED, reply_markup=refine_back_kb(meal_id)
+            )
+            await state.clear()
+            await query.answer()
+            return
     await state.update_data(meal_id=meal_id)
     text = REFINE_BASE
     await query.message.edit_text(text, reply_markup=refine_back_kb(meal_id))
@@ -232,7 +251,15 @@ async def process_edit(message: types.Message, state: FSMContext):
 
 async def cb_delete(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
-    pending_meals.pop(meal_id, None)
+    meal = pending_meals.pop(meal_id, None)
+    path = meal.get("photo_path") if meal else None
+    if path:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except Exception:
+            pass
     await query.message.edit_text(DELETE_NOTIFY, reply_markup=None)
     await query.answer()
 
@@ -285,12 +312,19 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     session.commit()
     log("meal_save", "meal saved for %s: %s %s g", query.from_user.id, name, serving)
     session.close()
-    await query.message.edit_text(SAVE_DONE, reply_markup=main_menu_kb())
-    stub = await query.message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    path = meal.get("photo_path")
+    if path:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except Exception:
+            pass
     try:
-        await stub.edit_text("\u2063")
+        await query.message.delete()
     except Exception:
         pass
+    await query.message.answer(SAVE_DONE, reply_markup=main_menu_kb())
     await query.answer()
 
 

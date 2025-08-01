@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import time
 from aiogram import types, Dispatcher, F
 import tempfile
 from aiogram.fsm.context import FSMContext
@@ -172,6 +173,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
     for idx, res in enumerate(valid, 1):
         meal_id = f"{message.from_user.id}_{datetime.utcnow().timestamp()}_{idx}"
+        timestamp = time.time()
         name = res.get("name")
         ingredients = res.get("ingredients", [])
         serving = parse_serving(res.get("serving", 0))
@@ -192,6 +194,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
                     "results": results,
                     "ingredients": ingredients,
                     "type": res.get("type", "meal"),
+                    "timestamp": timestamp,
                 }
                 builder = choose_product_kb(meal_id, results)
                 await state.update_data(meal_id=meal_id)
@@ -218,6 +221,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
             "photo_path": photo_path,
             "chat_id": message.chat.id,
             "message_id": None,
+            "timestamp": timestamp,
         }
 
         if not name:
