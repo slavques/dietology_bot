@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 import os
 
 
@@ -6,7 +6,7 @@ import os
 pending_meals: Dict[str, Dict] = {}
 
 
-def remove_photo_if_unused(path: str, ignore_id: str | None = None) -> None:
+def remove_photo_if_unused(path: str, ignore_id: Optional[str] = None) -> None:
     """Delete the photo from disk if no other pending meal references it."""
     if not path:
         return
