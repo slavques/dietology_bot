@@ -1,4 +1,6 @@
 from aiogram import types, Dispatcher, F
+import os
+import time
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
@@ -23,7 +25,7 @@ from ..keyboards import (
     add_delete_back_kb,
 )
 from ..states import EditMeal, LookupMeal
-from ..storage import pending_meals
+from ..storage import pending_meals, remove_photo_if_unused
 from ..texts import (
     DELETE_NOTIFY,
     SESSION_EXPIRED,
@@ -32,12 +34,12 @@ from ..texts import (
     REFINE_BASE,
     REFINE_TOO_LONG,
     REFINE_BAD_ATTEMPT,
+    CLARIFY_EXPIRED,
     NOTHING_TO_SAVE,
     SESSION_EXPIRED_RETRY,
     PORTION_PREFIXES,
     LOOKUP_PROMPT,
     LOOKUP_WEIGHT,
-    MENU_STUB,
 )
 from ..logger import log
 
@@ -109,13 +111,24 @@ async def cb_cancel(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     meal_id = data.get('meal_id')
     if meal_id:
-        pending_meals.pop(meal_id, None)
+        meal = pending_meals.pop(meal_id, None)
+        path = meal.get("photo_path") if meal else None
+        remove_photo_if_unused(path, meal_id)
     await state.clear()
     await query.message.edit_text(DELETE_NOTIFY, reply_markup=None)
     await query.answer()
 
 async def cb_edit(query: types.CallbackQuery, state: FSMContext):
     meal_id = query.data.split(':', 1)[1]
+    meal = pending_meals.get(meal_id)
+    if meal and meal.get("photo_path") and meal.get("timestamp"):
+        if time.time() - meal["timestamp"] > 3600:
+            await query.message.edit_text(
+                CLARIFY_EXPIRED, reply_markup=refine_back_kb(meal_id)
+            )
+            await state.clear()
+            await query.answer()
+            return
     await state.update_data(meal_id=meal_id)
     text = REFINE_BASE
     await query.message.edit_text(text, reply_markup=refine_back_kb(meal_id))
@@ -130,6 +143,13 @@ async def process_edit(message: types.Message, state: FSMContext):
         await state.clear()
         return
     meal = pending_meals[meal_id]
+    if meal.get("photo_path") and meal.get("timestamp"):
+        if time.time() - meal["timestamp"] > 3600:
+            await message.answer(
+                CLARIFY_EXPIRED, reply_markup=refine_back_kb(meal_id)
+            )
+            await state.clear()
+            return
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
     await notify_trial_end(message.bot, session, user)
@@ -171,6 +191,12 @@ async def process_edit(message: types.Message, state: FSMContext):
             result = await analyze_photo_with_hint(
                 meal['photo_path'], message.text, grade
             )
+            if result.get('error') == 'missing_photo':
+                await message.answer(
+                    CLARIFY_EXPIRED, reply_markup=refine_back_kb(meal_id)
+                )
+                await state.clear()
+                return
         else:
             result = await analyze_text_with_hint(
                 meal.get('text', ''), message.text, grade
@@ -179,6 +205,12 @@ async def process_edit(message: types.Message, state: FSMContext):
     if not result or result.get('error') or (
         result.get('is_food') is False and prev_json.get('google') is not True
     ) or not any(k in result for k in ('name', 'calories', 'protein', 'fat', 'carbs')):
+        if result.get('error') == 'missing_photo':
+            await message.answer(
+                CLARIFY_EXPIRED, reply_markup=refine_back_kb(meal_id)
+            )
+            await state.clear()
+            return
         if meal.get('error_msg'):
             try:
                 await message.bot.delete_message(message.chat.id, meal['error_msg'])
@@ -232,7 +264,9 @@ async def process_edit(message: types.Message, state: FSMContext):
 
 async def cb_delete(query: types.CallbackQuery):
     meal_id = query.data.split(':', 1)[1]
-    pending_meals.pop(meal_id, None)
+    meal = pending_meals.pop(meal_id, None)
+    path = meal.get("photo_path") if meal else None
+    remove_photo_if_unused(path, meal_id)
     await query.message.edit_text(DELETE_NOTIFY, reply_markup=None)
     await query.answer()
 
@@ -285,12 +319,13 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     session.commit()
     log("meal_save", "meal saved for %s: %s %s g", query.from_user.id, name, serving)
     session.close()
-    await query.message.edit_text(SAVE_DONE, reply_markup=main_menu_kb())
-    stub = await query.message.answer(MENU_STUB, reply_markup=main_menu_kb())
+    path = meal.get("photo_path")
+    remove_photo_if_unused(path, meal_id)
     try:
-        await stub.edit_text("\u2063")
+        await query.message.delete()
     except Exception:
         pass
+    await query.message.answer(SAVE_DONE, reply_markup=main_menu_kb())
     await query.answer()
 
 

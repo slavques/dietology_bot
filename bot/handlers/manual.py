@@ -3,6 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import StateFilter
 from datetime import timedelta
+import time
 
 from ..services import analyze_text, fatsecret_search
 from ..utils import format_meal_message, parse_serving, to_float
@@ -153,6 +154,7 @@ async def process_manual(message: types.Message, state: FSMContext):
 
     for idx, res in enumerate(valid, 1):
         meal_id = f"{message.from_user.id}_{message.message_id}_{idx}"
+        timestamp = time.time()
         name = res.get("name")
         serving = parse_serving(res.get("serving", 0))
         macros = {
@@ -173,6 +175,7 @@ async def process_manual(message: types.Message, state: FSMContext):
                     "results": results,
                     "ingredients": [],
                     "type": res.get("type", "meal"),
+                    "timestamp": timestamp,
                 }
                 builder = choose_product_kb(meal_id, results)
                 await state.update_data(meal_id=meal_id)
@@ -193,6 +196,7 @@ async def process_manual(message: types.Message, state: FSMContext):
             "text": message.text,
             "chat_id": message.chat.id,
             "message_id": None,
+            "timestamp": timestamp,
         }
         if not name:
             builder = InlineKeyboardBuilder()
