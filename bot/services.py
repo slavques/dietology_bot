@@ -447,7 +447,11 @@ async def analyze_text_with_hint(
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
-        data = json.loads(content)
+        raw = json.loads(content)
+        items = raw if isinstance(raw, list) else [raw]
+        if not items:
+            return {"error": "parse"}
+        data = items[0]
         if "serving" in data:
             data["serving"] = parse_serving(data["serving"])
         for k in ("calories", "protein", "fat", "carbs"):
@@ -459,12 +463,22 @@ async def analyze_text_with_hint(
             data["type"] = data["type"].lower()
         return data
     except Exception:
-        match = re.search(r"\{.*\}", content, re.S)
+        match = re.findall(r"\{.*?\}", content, re.S)
         if match:
             try:
-                return json.loads(match.group(0))
+                data = json.loads(match[0])
             except Exception:
-                pass
+                return {"error": "parse"}
+            if "serving" in data:
+                data["serving"] = parse_serving(data["serving"])
+            for k in ("calories", "protein", "fat", "carbs"):
+                if k in data:
+                    data[k] = to_float(data[k])
+            if "name" in data and isinstance(data["name"], str):
+                data["name"] = data["name"].strip().capitalize()
+            if "type" in data and isinstance(data["type"], str):
+                data["type"] = data["type"].lower()
+            return data
         return {"error": "parse"}
 
 
@@ -472,6 +486,8 @@ async def analyze_photo_with_hint(
     photo_path: str,
     hint: str,
     grade: str = "pro",
+    context_json: Optional[Dict[str, Any]] = None,
+    all_names: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Re-analyze a photo using user clarification about the dish or beverage."""
     if not client.api_key:
@@ -489,7 +505,16 @@ async def analyze_photo_with_hint(
     with open(photo_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     context = "Фото из первого запроса"
-    base = PRO_HINT_PROMPT_BASE
+    if context_json:
+        context += f". Ранее распознано: {context_json.get('name', '')}"
+    if all_names:
+        context += f" среди других: {', '.join(all_names)}"
+    if grade == "pro":
+        base = PRO_HINT_PROMPT_BASE
+    elif grade == "light":
+        base = LIGHT_HINT_PROMPT_BASE
+    else:
+        base = FREE_HINT_PROMPT_BASE
     prompt = base.format(
         context=context.replace("{", "{{").replace("}", "}}"),
         hint=hint.replace("{", "{{").replace("}", "}}"),
@@ -512,7 +537,11 @@ async def analyze_photo_with_hint(
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
-        data = json.loads(content)
+        raw = json.loads(content)
+        items = raw if isinstance(raw, list) else [raw]
+        if not items:
+            return {"error": "parse"}
+        data = items[0]
         if "serving" in data:
             data["serving"] = parse_serving(data["serving"])
         for k in ("calories", "protein", "fat", "carbs"):
@@ -524,10 +553,20 @@ async def analyze_photo_with_hint(
             data["type"] = data["type"].lower()
         return data
     except Exception:
-        match = re.search(r"\{.*\}", content, re.S)
+        match = re.findall(r"\{.*?\}", content, re.S)
         if match:
             try:
-                return json.loads(match.group(0))
+                data = json.loads(match[0])
             except Exception:
-                pass
+                return {"error": "parse"}
+            if "serving" in data:
+                data["serving"] = parse_serving(data["serving"])
+            for k in ("calories", "protein", "fat", "carbs"):
+                if k in data:
+                    data[k] = to_float(data[k])
+            if "name" in data and isinstance(data["name"], str):
+                data["name"] = data["name"].strip().capitalize()
+            if "type" in data and isinstance(data["type"], str):
+                data["type"] = data["type"].lower()
+            return data
         return {"error": "parse"}
