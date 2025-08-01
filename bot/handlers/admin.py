@@ -22,6 +22,8 @@ from ..texts import (
     BTN_TELEGRAM_STARS,
     BTN_CRYPTO,
     BTN_SETTINGS,
+    BTN_REMINDERS,
+    BTN_GOALS,
     BTN_MANUAL,
     BTN_GRADE_START,
     BTN_GRADE_PRO,
@@ -51,6 +53,7 @@ from ..texts import (
     ADMIN_BLOCKED_EMPTY,
     ADMIN_METHODS_TITLE,
     ADMIN_GRADES_TITLE,
+    ADMIN_SETTINGS_TITLE,
     ADMIN_TRIAL_DONE,
     ADMIN_STATS,
 )
@@ -290,6 +293,9 @@ async def admin_stats(query: types.CallbackQuery):
         .filter(Subscription.grade == "free", Subscription.requests_used > 0)
         .count()
     )
+    from ..database import Meal
+    q_12h = session.query(Meal).filter(Meal.timestamp >= now - timedelta(hours=12)).count()
+    q_week = session.query(Meal).filter(Meal.timestamp >= now - timedelta(days=7)).count()
     session.close()
     text = ADMIN_STATS.format(
         total=total,
@@ -298,6 +304,8 @@ async def admin_stats(query: types.CallbackQuery):
         trial_pro=trial_pro,
         trial_light=trial_light,
         used=used,
+        req_12h=q_12h,
+        req_week=q_week,
     )
     try:
         await query.message.edit_text(text, reply_markup=admin_menu_kb())
@@ -755,15 +763,33 @@ def features_menu_kb() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_METHODS, callback_data="admin:methods")
     builder.button(text=BTN_GRADES, callback_data="admin:grades")
-    settings = "🟢" if get_option_bool("feat_settings") else "🔴"
     manual = "🟢" if get_option_bool("feat_manual") else "🔴"
-    builder.button(
-        text=f"{BTN_SETTINGS} {settings}", callback_data="admin:toggle:feat_settings"
-    )
+    builder.button(text=BTN_SETTINGS, callback_data="admin:settings")
     builder.button(
         text=f"{BTN_MANUAL} {manual}", callback_data="admin:toggle:feat_manual"
     )
     builder.button(text=BTN_BACK, callback_data="admin:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def admin_settings_kb() -> types.InlineKeyboardMarkup:
+    from ..database import get_option_bool
+
+    builder = InlineKeyboardBuilder()
+    settings = "🟢" if get_option_bool("feat_settings") else "🔴"
+    reminders = "🟢" if get_option_bool("feat_reminders") else "🔴"
+    goals = "🟢" if get_option_bool("feat_goals") else "🔴"
+    builder.button(
+        text=f"{BTN_SETTINGS} {settings}", callback_data="admin:toggle:feat_settings"
+    )
+    builder.button(
+        text=f"{BTN_REMINDERS} {reminders}", callback_data="admin:toggle:feat_reminders"
+    )
+    builder.button(
+        text=f"{BTN_GOALS} {goals}", callback_data="admin:toggle:feat_goals"
+    )
+    builder.button(text=BTN_BACK, callback_data="admin:features")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -820,6 +846,14 @@ async def admin_grades(query: types.CallbackQuery):
     await query.answer()
 
 
+async def admin_settings_menu(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await query.message.edit_text(ADMIN_SETTINGS_TITLE, reply_markup=admin_settings_kb())
+    await query.answer()
+
+
 async def admin_toggle(query: types.CallbackQuery):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
@@ -864,6 +898,7 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_features, F.data == "admin:features")
     dp.callback_query.register(admin_methods, F.data == "admin:methods")
     dp.callback_query.register(admin_grades, F.data == "admin:grades")
+    dp.callback_query.register(admin_settings_menu, F.data == "admin:settings")
     dp.callback_query.register(admin_toggle, F.data.startswith("admin:toggle:"))
     dp.callback_query.register(admin_grade_menu, F.data == "admin:grade")
     dp.callback_query.register(admin_grade_type, F.data.startswith("admin:grade_set:"))
