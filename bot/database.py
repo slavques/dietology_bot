@@ -204,6 +204,17 @@ class Comment(Base):
     user = relationship('User')
 
 
+class RequestLog(Base):
+    """Timestamp of each GPT request for statistics."""
+
+    __tablename__ = 'request_log'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    user = relationship('User')
+
+
 class Option(Base):
     __tablename__ = 'options'
 
@@ -253,6 +264,8 @@ def _ensure_options():
         "grade_pro": "1",
         "feat_manual": "1",
         "feat_settings": "1",
+        "feat_reminders": "1",
+        "feat_goals": "1",
         "trial_pro_enabled": "0",
         "trial_pro_days": "0",
         "trial_light_enabled": "0",

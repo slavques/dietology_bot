@@ -141,14 +141,14 @@ def has_request_quota(session: SessionLocal, user: User) -> bool:
     """Check if user has remaining GPT requests without consuming one."""
     update_limits(user)
     session.commit()
-    if user.grade in {"light", "pro"} and user.daily_used >= 100:
+    if user.daily_used >= 100:
         return False
     return user.requests_used < user.request_limit
 
 
 def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
     update_limits(user)
-    if user.grade in {"light", "pro"} and user.daily_used >= 100:
+    if user.daily_used >= 100:
         log("limit", "daily limit reached for %s", user.telegram_id)
         return False, "daily"
     if user.requests_used >= user.request_limit:
@@ -157,8 +157,9 @@ def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
     user.requests_used += 1
     user.monthly_used += 1
     user.requests_total += 1
-    if user.grade in {"light", "pro"}:
-        user.daily_used += 1
+    user.daily_used += 1
+    from .database import RequestLog
+    session.add(RequestLog(user_id=user.id))
     session.commit()
     log("limit", "request consumed by %s", user.telegram_id)
     return True, ""
