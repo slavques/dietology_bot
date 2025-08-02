@@ -3,6 +3,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timedelta
+from typing import Optional
 
 from ..database import SessionLocal, User, Comment
 from ..states import AdminState
@@ -735,7 +736,7 @@ def unblock_confirm_kb(telegram_id: int, page: int) -> types.InlineKeyboardMarku
     return builder.as_markup()
 
 
-async def admin_blocked_list(query: types.CallbackQuery, page: int | None = None):
+async def admin_blocked_list(query: types.CallbackQuery, page: Optional[int] = None):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
         return
