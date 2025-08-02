@@ -17,9 +17,9 @@ The bot relies on OpenAI's `gpt-4o` model for food recognition.
    `SUBSCRIPTION_CHECK_INTERVAL` (in seconds) controls how often subscription
    statuses are checked. It is read from `.env` and converted to an integer
    (default `3600`). If you want alerts in a separate bot/chat, also provide
-   `ALERT_BOT_TOKEN` and `ALERT_CHAT_ID`. To discover the chat ID, run
-   `python -m bot.alerts` and send any message to your alert bot—the ID will be
-   logged and echoed back.
+   `ALERT_BOT_TOKEN` and `ALERT_CHAT_IDS` (comma-separated chat IDs). To discover
+   chat IDs, run `python -m bot.alerts` and send any message to your alert bot—
+   the IDs will be logged and echoed back.
 
 3. Run the bot (package version):
    ```bash

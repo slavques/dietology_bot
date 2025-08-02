@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta, time
 from aiogram import Bot, Dispatcher, types
 
-from .config import ALERT_BOT_TOKEN, ALERT_CHAT_ID as ALERT_CHAT_ID_CONFIG
+from .config import ALERT_BOT_TOKEN, ALERT_CHAT_IDS as ALERT_CHAT_IDS_CONFIG
 from .database import (
     SessionLocal,
     User,
@@ -16,17 +16,19 @@ from .database import (
 
 
 alert_bot = Bot(token=ALERT_BOT_TOKEN) if ALERT_BOT_TOKEN else None
-ALERT_CHAT_ID = ALERT_CHAT_ID_CONFIG or None
+ALERT_CHAT_IDS = ALERT_CHAT_IDS_CONFIG
 
 
-async def send_alert(text: str) -> None:
-    """Send raw text to the alert chat if configured."""
-    if not alert_bot or not ALERT_CHAT_ID:
+async def send_alert(*texts: str) -> None:
+    """Send raw text to all configured alert chats."""
+    if not alert_bot or not ALERT_CHAT_IDS:
         return
-    try:
-        await alert_bot.send_message(ALERT_CHAT_ID, text)
-    except Exception:
-        pass
+    message = "".join(texts)
+    for chat_id in ALERT_CHAT_IDS:
+        try:
+            await alert_bot.send_message(chat_id, message)
+        except Exception:
+            pass
 
 
 class TokenMonitor:
@@ -61,7 +63,7 @@ class TokenMonitor:
     async def add(self, tokens_in: int, tokens_out: int) -> None:
         if tokens_in == 0 and tokens_out == 0:
             return
-        if not alert_bot or not ALERT_CHAT_ID:
+        if not alert_bot or not ALERT_CHAT_IDS:
             return
         self._check_date()
         self.input += tokens_in
@@ -76,7 +78,7 @@ class TokenMonitor:
             self._save()
 
     async def report_and_reset(self) -> None:
-        if alert_bot and ALERT_CHAT_ID:
+        if alert_bot and ALERT_CHAT_IDS:
             total = self.input + self.output
             await send_alert(
                 f"Отчет по токенам:\nInput: {self.input}\nOutput: {self.output}\nОбщее: {total}"

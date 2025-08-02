@@ -13,7 +13,8 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ADMIN_PASSWORD")
 YOOKASSA_TOKEN = os.getenv("YOOKASSA_TOKEN", "YOOKASSA_TOKEN")
 # Optional second bot for alerts
 ALERT_BOT_TOKEN = os.getenv("ALERT_BOT_TOKEN")
-ALERT_CHAT_ID = int(os.getenv("ALERT_CHAT_ID", "0"))
+# Comma-separated list of chat IDs for alerts
+ALERT_CHAT_IDS = [int(x) for x in os.getenv("ALERT_CHAT_IDS", "").split(",") if x]
 # Interval in seconds for checking subscription status.
 # Defaults to 10 minutes if the environment variable is missing.
 SUBSCRIPTION_CHECK_INTERVAL = int(os.getenv("SUBSCRIPTION_CHECK_INTERVAL", "1800"))
