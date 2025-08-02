@@ -1,6 +1,7 @@
 import asyncio
+import logging
 from datetime import datetime, timedelta, time
-from aiogram import Bot
+from aiogram import Bot, Dispatcher, types
 
 from .config import ALERT_BOT_TOKEN, ALERT_CHAT_ID as ALERT_CHAT_ID_CONFIG
 from .database import (
@@ -180,3 +181,23 @@ async def user_stats_watcher() -> None:
             )
         finally:
             session.close()
+
+
+async def _log_chat_id(message: types.Message) -> None:
+    chat_id = message.chat.id
+    logging.info("[alert-bot] chat_id=%s", chat_id)
+    await message.answer(f"Chat ID: {chat_id}")
+
+
+async def run_alert_bot() -> None:
+    if not alert_bot:
+        raise RuntimeError("ALERT_BOT_TOKEN is not set")
+    dp = Dispatcher()
+    dp.message.register(_log_chat_id)
+    await dp.start_polling(alert_bot)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(run_alert_bot())
+
