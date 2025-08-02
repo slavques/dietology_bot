@@ -9,6 +9,8 @@ from .database import (
     User,
     Subscription,
     Payment,
+    Meal,
+    RequestLog,
     get_option,
     get_option_int,
     set_option,
@@ -185,6 +187,11 @@ async def user_stats_watcher() -> None:
                 ]
             )
             await send_alert(report)
+
+            cutoff = datetime.utcnow() - timedelta(days=30)
+            session.query(Meal).filter(Meal.timestamp < cutoff).delete()
+            session.query(RequestLog).delete()
+            session.commit()
         finally:
             session.close()
 
