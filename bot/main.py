@@ -11,7 +11,7 @@ from .handlers import start, photo, history, stats, callbacks, faq, admin, subsc
 from .subscriptions import subscription_watcher
 from .cleanup import cleanup_watcher
 from .reminders import reminder_watcher
-from .alerts import token_watcher
+from .alerts import token_watcher, user_stats_watcher
 from .error_handler import handle_error
 
 bot = Bot(token=API_TOKEN)
@@ -36,11 +36,13 @@ async def main() -> None:
     cleanup = cleanup_watcher()()
     reminder = reminder_watcher()(bot)
     tokens = token_watcher()
+    stats = user_stats_watcher()
     tasks = [
         asyncio.create_task(watcher),
         asyncio.create_task(cleanup),
         asyncio.create_task(reminder),
         asyncio.create_task(tokens),
+        asyncio.create_task(stats),
     ]
     await dp.start_polling(bot)
     for t in tasks:

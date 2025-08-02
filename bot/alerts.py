@@ -3,7 +3,15 @@ from datetime import datetime, timedelta, time
 from aiogram import Bot
 
 from .config import ALERT_BOT_TOKEN, ALERT_CHAT_ID as ALERT_CHAT_ID_CONFIG
-from .database import get_option, get_option_int, set_option
+from .database import (
+    SessionLocal,
+    User,
+    Subscription,
+    Payment,
+    get_option,
+    get_option_int,
+    set_option,
+)
 
 
 alert_bot = Bot(token=ALERT_BOT_TOKEN) if ALERT_BOT_TOKEN else None
@@ -127,3 +135,48 @@ async def token_watcher() -> None:
         await asyncio.sleep((midnight - now).total_seconds())
         await token_monitor.report_and_reset()
 
+
+async def user_stats_watcher() -> None:
+    """Send daily user statistics to the alert chat at midnight UTC."""
+    while True:
+        now = datetime.utcnow()
+        tomorrow = now.date() + timedelta(days=1)
+        midnight = datetime.combine(tomorrow, time())
+        await asyncio.sleep((midnight - now).total_seconds())
+
+        session = SessionLocal()
+        try:
+            today = datetime.utcnow().date()
+            start = datetime.combine(today - timedelta(days=1), time())
+            end = datetime.combine(today, time())
+
+            total_users = session.query(User).count()
+            ended = (
+                session.query(Subscription)
+                .filter(
+                    Subscription.period_end >= start,
+                    Subscription.period_end < end,
+                )
+                .count()
+            )
+            new_users = (
+                session.query(User)
+                .filter(User.created_at >= start, User.created_at < end)
+                .count()
+            )
+            paid_users = (
+                session.query(Payment.user_id)
+                .filter(Payment.timestamp >= start, Payment.timestamp < end)
+                .distinct()
+                .count()
+            )
+
+            await send_alert(
+                "Статистика пользователей за сегодня\n\n"
+                f"Всего пользователей: {total_users}\n"
+                f"Закончилась подписка: {ended}\n"
+                f"Новых пользователей : {new_users}\n"
+                f"Пользователей оплативших подписку: {paid_users}"
+            )
+        finally:
+            session.close()

@@ -28,6 +28,10 @@ from ..texts import (
     BTN_GRADE_START,
     BTN_GRADE_PRO,
     BTN_STATS_ADMIN,
+    BTN_YES,
+    BTN_NO,
+    BTN_PREV,
+    BTN_NEXT,
     BTN_TRIAL,
     BTN_TRIAL_START,
     BTN_STATUS,
@@ -47,6 +51,7 @@ from ..texts import (
     ADMIN_DAYS_DONE,
     ADMIN_BLOCK_DONE,
     ADMIN_UNBLOCK_DONE,
+    ADMIN_UNBLOCK_CONFIRM,
     ADMIN_USER_NOT_FOUND,
     ADMIN_ENTER_COMMENT,
     ADMIN_BLOCKED_TITLE,
@@ -719,20 +724,80 @@ async def process_trial_start_days(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-async def admin_blocked_list(query: types.CallbackQuery):
+def unblock_confirm_kb(telegram_id: int, page: int) -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=BTN_YES, callback_data=f"admin:unblock_yes:{telegram_id}:{page}"
+    )
+    builder.button(text=BTN_NO, callback_data=f"admin:blocked:{page}")
+    builder.button(text=BTN_PREV, callback_data=f"admin:blocked:{page}")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+
+async def admin_blocked_list(query: types.CallbackQuery, page: int | None = None):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
         return
     session = SessionLocal()
-    users = session.query(User).filter_by(blocked=True).all()
+    users = session.query(User).filter_by(blocked=True).order_by(User.telegram_id).all()
+    per_page = 6
+    total = len(users)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    if page is None:
+        parts = query.data.split(":")
+        try:
+            page = int(parts[2])
+        except (IndexError, ValueError):
+            page = 0
+    if page >= total_pages:
+        page = total_pages - 1
+    start = page * per_page
+    chunk = users[start : start + per_page]
     builder = InlineKeyboardBuilder()
-    for u in users:
-        builder.button(text=str(u.telegram_id), callback_data=f"admin:unblock:{u.telegram_id}")
-    builder.button(text=BTN_BACK, callback_data="admin:menu")
+    for u in chunk:
+        builder.button(
+            text=str(u.telegram_id), callback_data=f"admin:unblock:{u.telegram_id}:{page}"
+        )
     builder.adjust(1)
+    nav = []
+    if total_pages > 1:
+        if page > 0:
+            nav.append(
+                types.InlineKeyboardButton(
+                    text=BTN_PREV, callback_data=f"admin:blocked:{page-1}"
+                )
+            )
+        if page < total_pages - 1:
+            nav.append(
+                types.InlineKeyboardButton(
+                    text=BTN_NEXT, callback_data=f"admin:blocked:{page+1}"
+                )
+            )
+    if nav:
+        builder.row(*nav)
+    builder.row(types.InlineKeyboardButton(text=BTN_BACK, callback_data="admin:menu"))
     text = ADMIN_BLOCKED_TITLE if users else ADMIN_BLOCKED_EMPTY
     await query.message.edit_text(text, reply_markup=builder.as_markup())
     session.close()
+    await query.answer()
+
+
+async def admin_unblock_prompt(query: types.CallbackQuery):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    parts = query.data.split(":")
+    try:
+        telegram_id = int(parts[2])
+        page = int(parts[3]) if len(parts) > 3 else 0
+    except (IndexError, ValueError):
+        await query.answer()
+        return
+    await query.message.edit_text(
+        ADMIN_UNBLOCK_CONFIRM.format(telegram_id=telegram_id),
+        reply_markup=unblock_confirm_kb(telegram_id, page),
+    )
     await query.answer()
 
 
@@ -740,8 +805,10 @@ async def admin_unblock(query: types.CallbackQuery):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
         return
+    parts = query.data.split(":")
     try:
-        telegram_id = int(query.data.split(":")[2])
+        telegram_id = int(parts[2])
+        page = int(parts[3]) if len(parts) > 3 else 0
     except (IndexError, ValueError):
         await query.answer()
         return
@@ -754,7 +821,7 @@ async def admin_unblock(query: types.CallbackQuery):
     log("block", "unblocked %s", telegram_id)
     session.close()
     await query.answer(ADMIN_UNBLOCK_DONE)
-    await admin_blocked_list(query)
+    await admin_blocked_list(query, page)
 
 
 def features_menu_kb() -> types.InlineKeyboardMarkup:
@@ -902,8 +969,9 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_toggle, F.data.startswith("admin:toggle:"))
     dp.callback_query.register(admin_grade_menu, F.data == "admin:grade")
     dp.callback_query.register(admin_grade_type, F.data.startswith("admin:grade_set:"))
-    dp.callback_query.register(admin_blocked_list, F.data == "admin:blocked")
-    dp.callback_query.register(admin_unblock, F.data.startswith("admin:unblock:"))
+    dp.callback_query.register(admin_blocked_list, F.data.startswith("admin:blocked"))
+    dp.callback_query.register(admin_unblock_prompt, F.data.startswith("admin:unblock:"))
+    dp.callback_query.register(admin_unblock, F.data.startswith("admin:unblock_yes:"))
     dp.callback_query.register(admin_stats, F.data == "admin:stats")
     dp.callback_query.register(admin_menu, F.data == "admin:menu")
     dp.message.register(process_broadcast, AdminState.waiting_broadcast, F.text)
