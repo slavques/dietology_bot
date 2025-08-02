@@ -40,6 +40,7 @@ from ..texts import (
     PORTION_PREFIXES,
     LOOKUP_PROMPT,
     LOOKUP_WEIGHT,
+    LOOKUP_REFINE,
 )
 from ..logger import log
 
@@ -121,7 +122,9 @@ async def cb_lookup_ref(query: types.CallbackQuery, state: FSMContext):
         return
     await state.update_data(meal_id=meal_id)
     await state.set_state(LookupMeal.entering_query)
-    await query.message.edit_text(REFINE_BASE, reply_markup=weight_back_kb(meal_id))
+    await query.message.edit_text(
+        LOOKUP_REFINE, reply_markup=weight_back_kb(meal_id)
+    )
     await query.answer()
 
 
