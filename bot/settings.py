@@ -18,4 +18,4 @@ PRO_PLAN_PRICES = {
 }
 
 # Link to FAQ article
-FAQ_LINK = "https://telegra.ph/CHaVo-06-25-3"
+FAQ_LINK = "https://telegra.ph/CHaVO--AI-Dietolog-Bot-08-02"
