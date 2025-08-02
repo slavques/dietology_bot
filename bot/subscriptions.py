@@ -29,6 +29,11 @@ from .database import (
 )
 
 from .logger import log
+from .alerts import (
+    anomalous_activity,
+    user_blocked_daily,
+    monthly_limit as alert_monthly_limit,
+)
 
 FREE_LIMIT = 20
 PAID_LIMIT = 800
@@ -158,9 +163,19 @@ def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
     user.monthly_used += 1
     user.requests_total += 1
     user.daily_used += 1
+    if user.daily_used in {50, 100}:
+        asyncio.create_task(anomalous_activity(user.telegram_id, user.daily_used))
+    blocked = False
+    if user.daily_used >= 100:
+        user.blocked = True
+        blocked = True
+    if user.monthly_used == 800:
+        asyncio.create_task(alert_monthly_limit(user.telegram_id))
     from .database import RequestLog
     session.add(RequestLog(user_id=user.id))
     session.commit()
+    if blocked:
+        asyncio.create_task(user_blocked_daily(user.telegram_id))
     log("limit", "request consumed by %s", user.telegram_id)
     return True, ""
 

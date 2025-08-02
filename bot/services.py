@@ -23,6 +23,7 @@ from .prompts import (
     LIGHT_HINT_PROMPT_BASE,
     FREE_HINT_PROMPT_BASE,
 )
+from .alerts import token_monitor, gpt_error
 
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 GPT_SEMAPHORE = asyncio.Semaphore(3)
@@ -182,10 +183,10 @@ async def _chat_completion(
     model: str = COMPLETION_MODEL,
     retries: int = 3,
     backoff: float = 0.5,
-) -> str:
+) -> tuple[str, int, int]:
     """Call the Chat Completions API without web search."""
     if not client.api_key:
-        return ""
+        return "", 0, 0
     try:
         system_msg = next(
             m["content"] for m in messages if m.get("role") == "system"
@@ -206,17 +207,18 @@ async def _chat_completion(
             content = resp.choices[0].message.content
             log("response", "%s", content)
             usage = getattr(resp, "usage", None)
+            tokens_in = tokens_out = 0
             if usage:
                 tokens_in = getattr(
                     usage,
                     "prompt_tokens",
                     getattr(usage, "input_tokens", None),
-                )
+                ) or 0
                 tokens_out = getattr(
                     usage,
                     "completion_tokens",
                     getattr(usage, "output_tokens", None),
-                )
+                ) or 0
                 log(
                     "tokens",
                     "in=%s out=%s total=%s",
@@ -224,16 +226,19 @@ async def _chat_completion(
                     tokens_out,
                     usage.total_tokens,
                 )
-            return content
-        except RateLimitError:
+            return content, tokens_in, tokens_out
+        except RateLimitError as exc:
             if attempt < retries - 1:
                 await asyncio.sleep(backoff * (2**attempt))
                 continue
-            return "__RATE_LIMIT__"
-        except BadRequestError:
-            return "__BAD_REQUEST__"
-        except Exception:
-            return "__ERROR__"
+            await gpt_error(str(exc))
+            return "__RATE_LIMIT__", 0, 0
+        except BadRequestError as exc:
+            await gpt_error(str(exc))
+            return "__BAD_REQUEST__", 0, 0
+        except Exception as exc:
+            await gpt_error(str(exc))
+            return "__ERROR__", 0, 0
 
 
 async def _completion(
@@ -241,10 +246,10 @@ async def _completion(
     model: str = COMPLETION_MODEL,
     retries: int = 3,
     backoff: float = 0.5,
-) -> str:
+) -> tuple[str, int, int]:
     """Call the legacy Completions API for non‑PRO tiers."""
     if not client.api_key:
-        return ""
+        return "", 0, 0
     try:
         system_msg = next(
             m["content"] for m in messages if m.get("role") == "system"
@@ -275,17 +280,18 @@ async def _completion(
             content = resp.choices[0].text
             log("response", "%s", content)
             usage = getattr(resp, "usage", None)
+            tokens_in = tokens_out = 0
             if usage:
                 tokens_in = getattr(
                     usage,
                     "prompt_tokens",
                     getattr(usage, "input_tokens", None),
-                )
+                ) or 0
                 tokens_out = getattr(
                     usage,
                     "completion_tokens",
                     getattr(usage, "output_tokens", None),
-                )
+                ) or 0
                 log(
                     "tokens",
                     "in=%s out=%s total=%s",
@@ -293,16 +299,19 @@ async def _completion(
                     tokens_out,
                     usage.total_tokens,
                 )
-            return content
-        except RateLimitError:
+            return content, tokens_in, tokens_out
+        except RateLimitError as exc:
             if attempt < retries - 1:
                 await asyncio.sleep(backoff * (2**attempt))
                 continue
-            return "__RATE_LIMIT__"
-        except BadRequestError:
-            return "__BAD_REQUEST__"
-        except Exception:
-            return "__ERROR__"
+            await gpt_error(str(exc))
+            return "__RATE_LIMIT__", 0, 0
+        except BadRequestError as exc:
+            await gpt_error(str(exc))
+            return "__BAD_REQUEST__", 0, 0
+        except Exception as exc:
+            await gpt_error(str(exc))
+            return "__ERROR__", 0, 0
 
 
 async def analyze_photo(photo_path: str, grade: str = "pro") -> List[Dict[str, Any]]:
@@ -328,7 +337,7 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> List[Dict[str, A
         return {"error": "missing_photo"}
     prompt = PRO_PHOTO_PROMPT
     sender = _chat_completion
-    content = await sender(
+    content, tokens_in, tokens_out = await sender(
         [
             {"role": "system", "content": prompt},
             {
@@ -342,6 +351,7 @@ async def analyze_photo(photo_path: str, grade: str = "pro") -> List[Dict[str, A
             },
         ]
     )
+    await token_monitor.add(tokens_in, tokens_out)
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return [{"error": content.strip("_").lower()}]
     try:
@@ -392,12 +402,13 @@ async def analyze_text(description: str, grade: str = "pro") -> List[Dict[str, A
         ]
     prompt = PRO_TEXT_PROMPT
     sender = _chat_completion
-    content = await sender(
+    content, tokens_in, tokens_out = await sender(
         [
             {"role": "system", "content": prompt},
             {"role": "user", "content": description},
         ]
     )
+    await token_monitor.add(tokens_in, tokens_out)
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return [{"error": content.strip("_").lower()}]
     try:
@@ -454,12 +465,13 @@ async def analyze_text_with_hint(
         hint=hint.replace("{", "{{").replace("}", "}}"),
     )
     sender = _chat_completion
-    content = await sender(
+    content, tokens_in, tokens_out = await sender(
         [
             {"role": "system", "content": prompt},
             {"role": "user", "content": description},
         ]
     )
+    await token_monitor.add(tokens_in, tokens_out)
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:
@@ -539,7 +551,7 @@ async def analyze_photo_with_hint(
         hint=hint.replace("{", "{{").replace("}", "}}"),
     )
     sender = _chat_completion
-    content = await sender(
+    content, tokens_in, tokens_out = await sender(
         [
             {"role": "system", "content": prompt},
             {
@@ -553,6 +565,7 @@ async def analyze_photo_with_hint(
             },
         ]
     )
+    await token_monitor.add(tokens_in, tokens_out)
     if content in {"__RATE_LIMIT__", "__BAD_REQUEST__", "__ERROR__"}:
         return {"error": content.strip("_").lower()}
     try:

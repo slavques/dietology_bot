@@ -2,8 +2,9 @@ from ..settings import PLAN_PRICES, PRO_PLAN_PRICES
 from aiogram import types, Dispatcher, F, Bot
 from aiogram.fsm.context import FSMContext
 
-from ..database import SessionLocal
+from ..database import SessionLocal, Payment
 from ..subscriptions import ensure_user, process_payment_success, notify_trial_end
+from ..alerts import subscription_paid as alert_subscription_paid
 from ..keyboards import (
     subscription_plans_kb,
     pay_kb,
@@ -200,7 +201,10 @@ async def handle_successful_payment(message: types.Message):
     user = ensure_user(session, message.from_user.id)
     await notify_trial_end(message.bot, session, user)
     process_payment_success(session, user, months, grade=tier)
+    count = session.query(Payment).filter_by(user_id=user.id).count()
     session.close()
+    grade_name = "🔸 Старт" if tier == "light" else "⚡ Pro-режим"
+    await alert_subscription_paid(user.telegram_id, count, grade_name, months)
     # Don't delete the invoice message here so Telegram can replace it
     # with the service notification that confirms the payment.
     await message.answer(
