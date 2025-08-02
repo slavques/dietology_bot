@@ -180,4 +180,3 @@ async def user_stats_watcher() -> None:
             )
         finally:
             session.close()
-
