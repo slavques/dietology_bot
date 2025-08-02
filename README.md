@@ -11,12 +11,13 @@ The bot relies on OpenAI's `gpt-4o` model for food recognition.
    ```
 2. Create a `.env` file with `BOT_TOKEN` (Telegram token) and optionally
    `OPENAI_API_KEY` for OpenAI integration. When GPT responds with `"google": true`
-  the bot fetches KBJU data directly from fatsecret.ru. Search results show macros per 100 g.
+   the bot fetches KBJU data directly from fatsecret.ru. Search results show macros per 100 g.
    Set `ADMIN_PASSWORD` for admin access,
    `DATABASE_URL` (defaults to `sqlite:///bot.db`), and `YOOKASSA_TOKEN` for payments here. For testing, the
    `SUBSCRIPTION_CHECK_INTERVAL` (in seconds) controls how often subscription
    statuses are checked. It is read from `.env` and converted to an integer
-   (default `3600`).
+   (default `3600`). If you want alerts in a separate bot/chat, also provide
+   `ALERT_BOT_TOKEN` and `ALERT_CHAT_ID`.
 
 3. Run the bot (package version):
    ```bash
