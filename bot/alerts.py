@@ -9,6 +9,8 @@ from .database import (
     User,
     Subscription,
     Payment,
+    Meal,
+    RequestLog,
     get_option,
     get_option_int,
     set_option,
@@ -172,13 +174,22 @@ async def user_stats_watcher() -> None:
                 .count()
             )
 
-            await send_alert(
-                "Статистика пользователей за сегодня\n\n"
-                f"Всего пользователей: {total_users}\n"
-                f"Закончилась подписка: {ended}\n"
-                f"Новых пользователей : {new_users}\n"
-                f"Пользователей оплативших подписку: {paid_users}"
+            report = "\n".join(
+                [
+                    "Статистика пользователей за сегодня",
+                    "",
+                    f"Всего пользователей: {total_users}",
+                    f"Закончилась подписка: {ended}",
+                    f"Новых пользователей : {new_users}",
+                    f"Пользователей оплативших подписку: {paid_users}",
+                ]
             )
+            await send_alert(report)
+
+            cutoff = datetime.utcnow() - timedelta(days=30)
+            session.query(Meal).filter(Meal.timestamp < cutoff).delete()
+            session.query(RequestLog).delete()
+            session.commit()
         finally:
             session.close()
 
