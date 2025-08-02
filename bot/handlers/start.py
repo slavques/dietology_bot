@@ -36,6 +36,8 @@ def get_welcome_text(user: User) -> str:
 
 async def cmd_start(message: types.Message):
     session = SessionLocal()
+    existed = session.query(User).filter_by(telegram_id=message.from_user.id).first()
+    new_user = existed is None
     user = ensure_user(session, message.from_user.id)
     await notify_trial_end(message.bot, session, user)
     from ..subscriptions import check_start_trial
@@ -52,6 +54,10 @@ async def cmd_start(message: types.Message):
     text = get_welcome_text(user)
     session.commit()
     session.close()
+    if new_user:
+        from ..alerts import new_user as alert_new_user
+
+        await alert_new_user(message.from_user.id)
     # Send a temporary message to update the persistent reply keyboard
     # Send a helper message with the reply keyboard and keep it so the
     # "Меню" and "ЧаВО" buttons remain persistent for the user.
@@ -72,6 +78,13 @@ async def cmd_start(message: types.Message):
         await stub.edit_text("\u2063")
     except Exception:
         pass
+
+
+async def on_user_left(event: types.ChatMemberUpdated):
+    if event.chat.type == "private" and event.new_chat_member.status in {"kicked", "left"}:
+        from ..alerts import user_left as alert_user_left
+
+        await alert_user_left(event.from_user.id)
 
 
 async def back_to_menu(message: types.Message):
@@ -132,3 +145,4 @@ def register(dp: Dispatcher):
         lambda m: m.text in {BTN_MAIN_MENU, BTN_BACK},
     )
     dp.callback_query.register(cb_menu, F.data == "menu")
+    dp.my_chat_member.register(on_user_left)
