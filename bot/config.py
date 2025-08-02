@@ -11,6 +11,9 @@ DATABASE_URL = os.getenv("DATABASE_URL", "DATABASE_URL")
 ADMIN_COMMAND = os.getenv("ADMIN_COMMAND", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ADMIN_PASSWORD")
 YOOKASSA_TOKEN = os.getenv("YOOKASSA_TOKEN", "YOOKASSA_TOKEN")
+# Optional second bot for alerts
+ALERT_BOT_TOKEN = os.getenv("ALERT_BOT_TOKEN")
+ALERT_CHAT_ID = int(os.getenv("ALERT_CHAT_ID", "0"))
 # Interval in seconds for checking subscription status.
 # Defaults to 10 minutes if the environment variable is missing.
 SUBSCRIPTION_CHECK_INTERVAL = int(os.getenv("SUBSCRIPTION_CHECK_INTERVAL", "1800"))
