@@ -16,7 +16,12 @@ from ..keyboards import (
     weight_back_kb,
     add_delete_back_kb,
 )
-from ..subscriptions import consume_request, ensure_user, notify_trial_end
+from ..subscriptions import (
+    consume_request,
+    ensure_user,
+    notify_trial_end,
+    has_request_quota,
+)
 from ..database import SessionLocal
 from ..states import ManualMeal, EditMeal, LookupMeal
 from ..storage import pending_meals
@@ -54,11 +59,16 @@ async def manual_start(query: types.CallbackQuery, state: FSMContext):
         session.close()
         await query.answer()
         return
-    if user.grade == "free":
-        from ..texts import SUB_REQUIRED, BTN_SUBSCRIPTION
+    if not has_request_quota(session, user):
+        reset = (
+            user.period_end.date()
+            if user.period_end
+            else (user.period_start + timedelta(days=30)).date()
+        )
+        text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
         await query.message.edit_text(
-            SUB_REQUIRED,
-            reply_markup=subscribe_button(BTN_SUBSCRIPTION),
+            text,
+            reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
             parse_mode="HTML",
         )
         session.close()
@@ -90,16 +100,6 @@ async def process_manual(message: types.Message, state: FSMContext):
 
         await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
         session.close()
-        return
-    if user.grade == "free":
-        from ..texts import SUB_REQUIRED, BTN_SUBSCRIPTION
-        await message.answer(
-            SUB_REQUIRED,
-            reply_markup=subscribe_button(BTN_SUBSCRIPTION),
-            parse_mode="HTML",
-        )
-        session.close()
-        await state.clear()
         return
     ok, reason = consume_request(session, user)
     if not ok:
