@@ -300,8 +300,8 @@ async def admin_stats(query: types.CallbackQuery):
         .count()
     )
     from ..database import RequestLog
-    q_12h = session.query(RequestLog).filter(RequestLog.timestamp >= now - timedelta(hours=12)).count()
-    q_week = session.query(RequestLog).filter(RequestLog.timestamp >= now - timedelta(days=7)).count()
+    start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    q_today = session.query(RequestLog).filter(RequestLog.timestamp >= start_today).count()
     session.close()
     text = ADMIN_STATS.format(
         total=total,
@@ -310,8 +310,7 @@ async def admin_stats(query: types.CallbackQuery):
         trial_pro=trial_pro,
         trial_light=trial_light,
         used=used,
-        req_12h=q_12h,
-        req_week=q_week,
+        req_today=q_today,
     )
     try:
         await query.message.edit_text(text, reply_markup=admin_menu_kb())

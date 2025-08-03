@@ -275,8 +275,7 @@ ADMIN_STATS = (
     "Пробная PRO: {trial_pro}\n"
     "Пробная Старт: {trial_light}\n"
     "Free с запросами: {used}\n"
-    "Запросы 12ч: {req_12h}\n"
-    "Запросы за неделю: {req_week}"
+    "Запросы за сегодня: {req_today}"
 )
 BTN_FEATURES = "Функционал"
 BTN_METHODS = "Методы оплаты"
