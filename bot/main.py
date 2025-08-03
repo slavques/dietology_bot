@@ -11,7 +11,7 @@ from .handlers import start, photo, history, stats, callbacks, faq, admin, subsc
 from .subscriptions import subscription_watcher
 from .cleanup import cleanup_watcher
 from .reminders import reminder_watcher
-from .alerts import token_watcher, user_stats_watcher
+from .alerts import token_watcher, user_stats_watcher, setup_error_alerts
 from .error_handler import handle_error
 
 bot = Bot(token=API_TOKEN)
@@ -76,5 +76,6 @@ if __name__ == '__main__':
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
     logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
+    setup_error_alerts()
 
     asyncio.run(main())

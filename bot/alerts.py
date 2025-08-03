@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import traceback
 from datetime import datetime, timedelta, time
 from aiogram import Bot, Dispatcher, types
 
@@ -31,6 +32,33 @@ async def send_alert(*texts: str) -> None:
             await alert_bot.send_message(chat_id, message)
         except Exception:
             pass
+
+
+class ErrorAlertHandler(logging.Handler):
+    """Log handler that forwards error stack traces to alert chats."""
+
+    def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - logging side effect
+        if record.levelno < logging.ERROR:
+            return
+        if record.exc_info:
+            trace = "".join(traceback.format_exception(*record.exc_info))
+        else:
+            trace = record.getMessage()
+        message = f"Ошибка - {trace}"
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(send_alert(message))
+        except RuntimeError:
+            try:
+                asyncio.run(send_alert(message))
+            except Exception:
+                pass
+
+
+def setup_error_alerts() -> None:
+    """Attach ErrorAlertHandler to root logger if alerting is enabled."""
+    if alert_bot and ALERT_CHAT_IDS:
+        logging.getLogger().addHandler(ErrorAlertHandler())
 
 
 class TokenMonitor:
