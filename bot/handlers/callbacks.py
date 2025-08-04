@@ -3,6 +3,7 @@ import os
 import time
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
+from aiogram.exceptions import TelegramBadRequest
 
 from ..database import SessionLocal, User, Meal
 from ..services import (
@@ -240,12 +241,16 @@ async def process_edit(message: types.Message, state: FSMContext):
             await message.delete()
         except Exception:
             pass
-        await message.bot.edit_message_text(
-            text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
-            chat_id=meal['chat_id'],
-            message_id=meal['message_id'],
-            reply_markup=meal_actions_kb(meal_id)
-        )
+        try:
+            await message.bot.edit_message_text(
+                text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
+                chat_id=meal['chat_id'],
+                message_id=meal['message_id'],
+                reply_markup=meal_actions_kb(meal_id)
+            )
+        except TelegramBadRequest as e:
+            if "message is not modified" not in str(e):
+                raise
         await state.clear()
         return
     serving = parse_serving(result.get('serving', meal['serving']))
@@ -270,12 +275,16 @@ async def process_edit(message: types.Message, state: FSMContext):
             pass
         meal.pop('error_msg', None)
     await message.delete()
-    await message.bot.edit_message_text(
-        text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
-        chat_id=meal['chat_id'],
-        message_id=meal['message_id'],
-        reply_markup=meal_actions_kb(meal_id)
-    )
+    try:
+        await message.bot.edit_message_text(
+            text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
+            chat_id=meal['chat_id'],
+            message_id=meal['message_id'],
+            reply_markup=meal_actions_kb(meal_id)
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
     await state.clear()
 
 async def cb_delete(query: types.CallbackQuery):
@@ -360,12 +369,16 @@ async def process_lookup_query(message: types.Message, state: FSMContext):
     meal['results'] = results
     builder = choose_product_kb(meal_id, results)
     await message.delete()
-    await message.bot.edit_message_text(
-        LOOKUP_PROMPT,
-        chat_id=meal["chat_id"],
-        message_id=meal["message_id"],
-        reply_markup=builder,
-    )
+    try:
+        await message.bot.edit_message_text(
+            LOOKUP_PROMPT,
+            chat_id=meal["chat_id"],
+            message_id=meal["message_id"],
+            reply_markup=builder,
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
     await state.set_state(LookupMeal.choosing)
 
 
@@ -396,12 +409,16 @@ async def process_weight(message: types.Message, state: FSMContext):
         'orig_macros': macros.copy(),
     })
     await message.delete()
-    await message.bot.edit_message_text(
-        format_meal_message(meal['name'], grams, macros),
-        chat_id=meal['chat_id'],
-        message_id=meal['message_id'],
-        reply_markup=add_delete_back_kb(meal_id),
-    )
+    try:
+        await message.bot.edit_message_text(
+            format_meal_message(meal['name'], grams, macros),
+            chat_id=meal['chat_id'],
+            message_id=meal['message_id'],
+            reply_markup=add_delete_back_kb(meal_id),
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
     await state.clear()
 
 async def cb_save_full(query: types.CallbackQuery):
