@@ -112,7 +112,11 @@ async def cb_lookup_back(query: types.CallbackQuery, state: FSMContext):
     builder = choose_product_kb(meal_id, meal.get('results', []))
     await state.update_data(meal_id=meal_id)
     await state.set_state(LookupMeal.choosing)
-    await query.message.edit_text(LOOKUP_PROMPT, reply_markup=builder)
+    try:
+        await query.message.edit_text(LOOKUP_PROMPT, reply_markup=builder)
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
     await query.answer()
 
 
@@ -123,9 +127,13 @@ async def cb_lookup_ref(query: types.CallbackQuery, state: FSMContext):
         return
     await state.update_data(meal_id=meal_id)
     await state.set_state(LookupMeal.entering_query)
-    await query.message.edit_text(
-        LOOKUP_REFINE, reply_markup=weight_back_kb(meal_id)
-    )
+    try:
+        await query.message.edit_text(
+            LOOKUP_REFINE, reply_markup=weight_back_kb(meal_id)
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
     await query.answer()
 
 
