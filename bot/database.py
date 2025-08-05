@@ -341,6 +341,33 @@ def _ensure_options():
     session.commit()
     session.close()
 
+
+def _ensure_cascades():
+    """Ensure user_id foreign keys cascade on delete for existing tables."""
+    if engine.dialect.name != "postgresql":
+        return
+
+    fks = {
+        "subscriptions": "subscriptions_user_id_fkey",
+        "notification_status": "notification_status_user_id_fkey",
+        "reminders": "reminders_user_id_fkey",
+        "engagement_status": "engagement_status_user_id_fkey",
+        "meals": "meals_user_id_fkey",
+        "payments": "payments_user_id_fkey",
+        "comments": "comments_user_id_fkey",
+        "request_log": "request_log_user_id_fkey",
+    }
+
+    with engine.begin() as conn:
+        for table, fk in fks.items():
+            conn.execute(text(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {fk}"))
+            conn.execute(
+                text(
+                    f"ALTER TABLE {table} ADD CONSTRAINT {fk} FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+                )
+            )
+
 Base.metadata.create_all(engine)
 _ensure_columns()
 _ensure_options()
+_ensure_cascades()
