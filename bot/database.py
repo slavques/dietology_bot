@@ -65,18 +65,39 @@ class User(Base):
     left_bot = Column(Boolean, default=False)
 
     subscription = relationship(
-        'Subscription', back_populates='user', uselist=False, cascade='all, delete-orphan'
+        'Subscription',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
     notification = relationship(
-        'NotificationStatus', back_populates='user', uselist=False, cascade='all, delete-orphan'
+        'NotificationStatus',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
     reminders = relationship(
-        'ReminderSettings', back_populates='user', uselist=False, cascade='all, delete-orphan'
+        'ReminderSettings',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
     engagement = relationship(
-        'EngagementStatus', back_populates='user', uselist=False, cascade='all, delete-orphan'
+        'EngagementStatus',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
-    meals = relationship('Meal', back_populates='user')
+    meals = relationship(
+        'Meal',
+        back_populates='user',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
 
     # convenience proxies for old attribute names
     def _sub(self):
@@ -135,7 +156,7 @@ class User(Base):
 class Subscription(Base):
     __tablename__ = 'subscriptions'
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     grade = Column(String, default='free')
     request_limit = Column(Integer, default=20)
     requests_used = Column(Integer, default=0)
@@ -158,7 +179,7 @@ class Subscription(Base):
 class NotificationStatus(Base):
     __tablename__ = 'notification_status'
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     notified_7d = Column(Boolean, default=False)
     notified_3d = Column(Boolean, default=False)
     notified_1d = Column(Boolean, default=False)
@@ -171,7 +192,7 @@ class NotificationStatus(Base):
 class EngagementStatus(Base):
     __tablename__ = 'engagement_status'
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     no_request_15m = Column(Boolean, default=False)
     no_request_24h = Column(Boolean, default=False)
     no_request_3d = Column(Boolean, default=False)
@@ -192,7 +213,7 @@ class EngagementStatus(Base):
 class ReminderSettings(Base):
     __tablename__ = 'reminders'
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     timezone = Column(Integer, nullable=True)
     morning_time = Column(String, default='08:00')
     day_time = Column(String, default='13:00')
@@ -210,7 +231,7 @@ class ReminderSettings(Base):
 class Meal(Base):
     __tablename__ = 'meals'
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     name = Column(String)
     ingredients = Column(String)
     type = Column(String, default='meal')
@@ -229,7 +250,7 @@ class Payment(Base):
     __tablename__ = 'payments'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     tier = Column(String)
     months = Column(Integer, default=1)
     timestamp = Column(DateTime, default=datetime.utcnow)
@@ -240,7 +261,7 @@ class Comment(Base):
     __tablename__ = 'comments'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     text = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
     user = relationship('User')
@@ -252,7 +273,7 @@ class RequestLog(Base):
     __tablename__ = 'request_log'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     timestamp = Column(DateTime, default=datetime.utcnow)
     user = relationship('User')
 
