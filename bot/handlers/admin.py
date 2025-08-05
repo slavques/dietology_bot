@@ -5,6 +5,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timedelta
 from typing import Optional
 
+from sqlalchemy import func
+
 from ..database import SessionLocal, User, Comment
 from ..states import AdminState
 from ..config import ADMIN_COMMAND, ADMIN_PASSWORD
@@ -300,9 +302,13 @@ async def admin_stats(query: types.CallbackQuery):
         .count()
     )
     left = session.query(User).filter_by(left_bot=True).count()
-    from ..database import RequestLog
     start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    q_today = session.query(RequestLog).filter(RequestLog.timestamp >= start_today).count()
+    q_today = (
+        session.query(func.sum(Subscription.daily_used))
+        .filter(Subscription.daily_start >= start_today)
+        .scalar()
+        or 0
+    )
     session.close()
     text = ADMIN_STATS.format(
         total=total,

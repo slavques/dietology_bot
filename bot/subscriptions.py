@@ -173,8 +173,6 @@ def consume_request(session: SessionLocal, user: User) -> tuple[bool, str]:
         blocked = True
     if user.monthly_used == 800:
         asyncio.create_task(alert_monthly_limit(user.telegram_id))
-    from .database import RequestLog
-    session.add(RequestLog(user_id=user.id))
     session.commit()
     if blocked:
         asyncio.create_task(user_blocked_daily(user.telegram_id))

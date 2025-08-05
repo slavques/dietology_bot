@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timedelta
 from aiogram import Bot
 
-from .database import SessionLocal, User, RequestLog, Meal, EngagementStatus
+from .database import SessionLocal, User, Meal, EngagementStatus
 from .keyboards import subscribe_button, feedback_button
 from .storage import pending_meals
 from .settings import SUPPORT_HANDLE
@@ -38,14 +38,7 @@ async def process_request_events(bot: Bot, telegram_id: int) -> None:
         user.engagement = eng
     now = datetime.utcnow()
 
-    prev = (
-        session.query(RequestLog.timestamp)
-        .filter_by(user_id=user.id)
-        .order_by(RequestLog.timestamp.desc())
-        .offset(1)
-        .first()
-    )
-    prev_ts = prev.timestamp if prev else None
+    prev_ts = user.last_request
 
     if not eng.first_request_sent and user.requests_total >= 1:
         try:
@@ -87,6 +80,8 @@ async def process_request_events(bot: Bot, telegram_id: int) -> None:
     eng.inactivity_7d_sent = False
     eng.inactivity_14d_sent = False
     eng.inactivity_30d_sent = False
+
+    user.last_request = now
 
     session.commit()
     session.close()
@@ -177,13 +172,7 @@ def engagement_watcher(check_interval: int = 60):
                     eng.limit_reminder_sent = False
 
                 # inactivity reminders
-                last = (
-                    session.query(RequestLog.timestamp)
-                    .filter_by(user_id=user.id)
-                    .order_by(RequestLog.timestamp.desc())
-                    .first()
-                )
-                last_ts = last.timestamp if last else None
+                last_ts = user.last_request
                 if last_ts:
                     days = (now - last_ts).days
                     if days >= 30 and not eng.inactivity_30d_sent:
