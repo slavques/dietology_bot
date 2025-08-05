@@ -54,15 +54,39 @@ class User(Base):
     blocked = Column(Boolean, default=False)
 
     subscription = relationship(
-        'Subscription', back_populates='user', uselist=False, cascade='all, delete-orphan'
+        'Subscription',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
     notification = relationship(
-        'NotificationStatus', back_populates='user', uselist=False, cascade='all, delete-orphan'
+        'NotificationStatus',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
     reminders = relationship(
-        'ReminderSettings', back_populates='user', uselist=False, cascade='all, delete-orphan'
+        'ReminderSettings',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
-    meals = relationship('Meal', back_populates='user')
+    engagement = relationship(
+        'EngagementStatus',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+    meals = relationship(
+        'Meal',
+        back_populates='user',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
 
     # convenience proxies for old attribute names
     def _sub(self):
@@ -79,6 +103,11 @@ class User(Base):
         if not self.reminders:
             self.reminders = ReminderSettings()
         return self.reminders
+
+    def _eng(self):
+        if not self.engagement:
+            self.engagement = EngagementStatus()
+        return self.engagement
 
     grade = property(lambda self: self._sub().grade, lambda self, v: setattr(self._sub(), 'grade', v))
     request_limit = property(lambda self: self._sub().request_limit, lambda self, v: setattr(self._sub(), 'request_limit', v))
@@ -116,7 +145,7 @@ class User(Base):
 class Subscription(Base):
     __tablename__ = 'subscriptions'
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     grade = Column(String, default='free')
     request_limit = Column(Integer, default=20)
     requests_used = Column(Integer, default=0)
@@ -139,7 +168,7 @@ class Subscription(Base):
 class NotificationStatus(Base):
     __tablename__ = 'notification_status'
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     notified_7d = Column(Boolean, default=False)
     notified_3d = Column(Boolean, default=False)
     notified_1d = Column(Boolean, default=False)
@@ -149,10 +178,31 @@ class NotificationStatus(Base):
     user = relationship('User', back_populates='notification')
 
 
+class EngagementStatus(Base):
+    __tablename__ = 'engagement_status'
+
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    no_request_15m = Column(Boolean, default=False)
+    no_request_24h = Column(Boolean, default=False)
+    no_request_3d = Column(Boolean, default=False)
+    first_request_sent = Column(Boolean, default=False)
+    three_requests_sent = Column(Boolean, default=False)
+    seven_requests_sent = Column(Boolean, default=False)
+    feedback_10d_sent = Column(Boolean, default=False)
+    five_no_meal_sent = Column(Boolean, default=False)
+    limit_reached_at = Column(DateTime, nullable=True)
+    limit_reminder_sent = Column(Boolean, default=False)
+    inactivity_7d_sent = Column(Boolean, default=False)
+    inactivity_14d_sent = Column(Boolean, default=False)
+    inactivity_30d_sent = Column(Boolean, default=False)
+
+    user = relationship('User', back_populates='engagement')
+
+
 class ReminderSettings(Base):
     __tablename__ = 'reminders'
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     timezone = Column(Integer, nullable=True)
     morning_time = Column(String, default='08:00')
     day_time = Column(String, default='13:00')
@@ -165,10 +215,12 @@ class ReminderSettings(Base):
     last_evening = Column(DateTime, nullable=True)
 
     user = relationship('User', back_populates='reminders')
+
+
 class Meal(Base):
     __tablename__ = 'meals'
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     name = Column(String)
     ingredients = Column(String)
     type = Column(String, default='meal')
@@ -187,7 +239,7 @@ class Payment(Base):
     __tablename__ = 'payments'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     tier = Column(String)
     months = Column(Integer, default=1)
     timestamp = Column(DateTime, default=datetime.utcnow)
@@ -198,7 +250,7 @@ class Comment(Base):
     __tablename__ = 'comments'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     text = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
     user = relationship('User')
@@ -210,7 +262,7 @@ class RequestLog(Base):
     __tablename__ = 'request_log'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     timestamp = Column(DateTime, default=datetime.utcnow)
     user = relationship('User')
 
@@ -278,6 +330,33 @@ def _ensure_options():
     session.commit()
     session.close()
 
+
+def _ensure_cascades():
+    """Ensure user_id foreign keys cascade on delete for existing tables."""
+    if engine.dialect.name != "postgresql":
+        return
+
+    fks = {
+        "subscriptions": "subscriptions_user_id_fkey",
+        "notification_status": "notification_status_user_id_fkey",
+        "reminders": "reminders_user_id_fkey",
+        "engagement_status": "engagement_status_user_id_fkey",
+        "meals": "meals_user_id_fkey",
+        "payments": "payments_user_id_fkey",
+        "comments": "comments_user_id_fkey",
+        "request_log": "request_log_user_id_fkey",
+    }
+
+    with engine.begin() as conn:
+        for table, fk in fks.items():
+            conn.execute(text(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {fk}"))
+            conn.execute(
+                text(
+                    f"ALTER TABLE {table} ADD CONSTRAINT {fk} FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+                )
+            )
+
 Base.metadata.create_all(engine)
 _ensure_columns()
 _ensure_options()
+_ensure_cascades()
