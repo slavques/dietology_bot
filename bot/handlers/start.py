@@ -84,9 +84,30 @@ async def cmd_start(message: types.Message):
 
 async def on_user_left(event: types.ChatMemberUpdated):
     if event.chat.type == "private" and event.new_chat_member.status in {"kicked", "left"}:
+        session = SessionLocal()
+        user = ensure_user(session, event.from_user.id)
+        user.left_bot = True
+        session.commit()
+        session.close()
         from ..alerts import user_left as alert_user_left
 
         await alert_user_left(event.from_user.id)
+
+
+async def on_user_unblocked(event: types.ChatMemberUpdated):
+    if (
+        event.chat.type == "private"
+        and event.new_chat_member.status == "member"
+        and event.old_chat_member.status in {"kicked", "left"}
+    ):
+        session = SessionLocal()
+        user = ensure_user(session, event.from_user.id)
+        user.left_bot = False
+        session.commit()
+        session.close()
+        from ..alerts import user_unblocked as alert_user_unblocked
+
+        await alert_user_unblocked(event.from_user.id)
 
 
 async def back_to_menu(message: types.Message):
@@ -148,3 +169,4 @@ def register(dp: Dispatcher):
     )
     dp.callback_query.register(cb_menu, F.data == "menu")
     dp.my_chat_member.register(on_user_left)
+    dp.my_chat_member.register(on_user_unblocked)

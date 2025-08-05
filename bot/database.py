@@ -38,7 +38,17 @@ def _ensure_columns():
     bool_default = "0" if engine.dialect.name == "sqlite" else "FALSE"
     with engine.begin() as conn:
         if "blocked" not in existing:
-            conn.execute(text(f"ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT {bool_default}"))
+            conn.execute(
+                text(
+                    f"ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT {bool_default}"
+                )
+            )
+        if "left_bot" not in existing:
+            conn.execute(
+                text(
+                    f"ALTER TABLE users ADD COLUMN left_bot BOOLEAN DEFAULT {bool_default}"
+                )
+            )
 
     existing = _column_names("meals")
     with engine.begin() as conn:
@@ -52,6 +62,7 @@ class User(Base):
     telegram_id = Column(BigInteger, unique=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     blocked = Column(Boolean, default=False)
+    left_bot = Column(Boolean, default=False)
 
     subscription = relationship(
         'Subscription',
