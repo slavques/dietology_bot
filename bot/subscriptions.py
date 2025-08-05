@@ -26,6 +26,7 @@ from .database import (
     Subscription,
     NotificationStatus,
     ReminderSettings,
+    EngagementStatus,
 )
 
 from .logger import log
@@ -77,6 +78,7 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
             notified_free=True,
         )
         user.reminders = ReminderSettings()
+        user.engagement = EngagementStatus()
         session.add(user)
         session.commit()
     return user
