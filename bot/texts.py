@@ -276,6 +276,7 @@ ADMIN_STATS = (
     "Пробная PRO: {trial_pro}\n"
     "Пробная Старт: {trial_light}\n"
     "Free с запросами: {used}\n"
+    "Вышли из бота: {left}\n"
     "Запросы за сегодня: {req_today}"
 )
 BTN_FEATURES = "Функционал"

@@ -139,6 +139,10 @@ async def user_left(telegram_id: int) -> None:
     await send_alert(f"Пользователь {telegram_id} вышел из бота")
 
 
+async def user_unblocked(telegram_id: int) -> None:
+    await send_alert(f"Пользователь {telegram_id} разблокировал бота")
+
+
 async def gpt_error(message: str) -> None:
     await send_alert(f"Ошибка {message}")
 
