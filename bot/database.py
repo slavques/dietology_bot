@@ -61,6 +61,12 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE subscriptions ADD COLUMN last_request TIMESTAMP"))
 
 
+def _drop_request_logs():
+    """Remove legacy request_logs table if it still exists."""
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS request_logs"))
+
+
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
@@ -364,5 +370,6 @@ def _ensure_cascades():
 
 Base.metadata.create_all(engine)
 _ensure_columns()
+_drop_request_logs()
 _ensure_options()
 _ensure_cascades()
