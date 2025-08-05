@@ -299,6 +299,7 @@ async def admin_stats(query: types.CallbackQuery):
         .filter(Subscription.grade == "free", Subscription.requests_used > 0)
         .count()
     )
+    left = session.query(User).filter_by(left_bot=True).count()
     from ..database import RequestLog
     start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     q_today = session.query(RequestLog).filter(RequestLog.timestamp >= start_today).count()
@@ -310,6 +311,7 @@ async def admin_stats(query: types.CallbackQuery):
         trial_pro=trial_pro,
         trial_light=trial_light,
         used=used,
+        left=left,
         req_today=q_today,
     )
     try:
