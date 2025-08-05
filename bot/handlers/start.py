@@ -6,6 +6,7 @@ from ..subscriptions import ensure_user, days_left, update_limits, notify_trial_
 from ..keyboards import main_menu_kb, menu_inline_kb
 from ..texts import (
     WELCOME_BASE,
+    WELCOME_INTRO,
     BTN_MAIN_MENU,
     BTN_BACK,
     REMAINING_FREE,
@@ -57,6 +58,7 @@ async def cmd_start(message: types.Message):
     if new_user:
         from ..alerts import new_user as alert_new_user
 
+        await message.answer(WELCOME_INTRO)
         await alert_new_user(message.from_user.id)
     # Send a temporary message to update the persistent reply keyboard
     # Send a helper message with the reply keyboard and keep it so the
