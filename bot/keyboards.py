@@ -43,6 +43,7 @@ from .texts import (
     BTN_MORNING,
     BTN_DAY_REM,
     BTN_EVENING,
+    BTN_FEEDBACK,
 )
 from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -226,6 +227,14 @@ def subscribe_button(text: str) -> InlineKeyboardMarkup:
     """Inline keyboard leading to the subscription menu."""
     builder = InlineKeyboardBuilder()
     builder.button(text=text, callback_data="subscribe")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def feedback_button(url: str) -> InlineKeyboardMarkup:
+    """Inline keyboard with a single feedback button."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_FEEDBACK, url=url)
     builder.adjust(1)
     return builder.as_markup()
 

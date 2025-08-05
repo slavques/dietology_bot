@@ -62,6 +62,9 @@ class User(Base):
     reminders = relationship(
         'ReminderSettings', back_populates='user', uselist=False, cascade='all, delete-orphan'
     )
+    engagement = relationship(
+        'EngagementStatus', back_populates='user', uselist=False, cascade='all, delete-orphan'
+    )
     meals = relationship('Meal', back_populates='user')
 
     # convenience proxies for old attribute names
@@ -79,6 +82,11 @@ class User(Base):
         if not self.reminders:
             self.reminders = ReminderSettings()
         return self.reminders
+
+    def _eng(self):
+        if not self.engagement:
+            self.engagement = EngagementStatus()
+        return self.engagement
 
     grade = property(lambda self: self._sub().grade, lambda self, v: setattr(self._sub(), 'grade', v))
     request_limit = property(lambda self: self._sub().request_limit, lambda self, v: setattr(self._sub(), 'request_limit', v))
@@ -149,6 +157,27 @@ class NotificationStatus(Base):
     user = relationship('User', back_populates='notification')
 
 
+class EngagementStatus(Base):
+    __tablename__ = 'engagement_status'
+
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    no_request_15m = Column(Boolean, default=False)
+    no_request_24h = Column(Boolean, default=False)
+    no_request_3d = Column(Boolean, default=False)
+    first_request_sent = Column(Boolean, default=False)
+    three_requests_sent = Column(Boolean, default=False)
+    seven_requests_sent = Column(Boolean, default=False)
+    feedback_10d_sent = Column(Boolean, default=False)
+    five_no_meal_sent = Column(Boolean, default=False)
+    limit_reached_at = Column(DateTime, nullable=True)
+    limit_reminder_sent = Column(Boolean, default=False)
+    inactivity_7d_sent = Column(Boolean, default=False)
+    inactivity_14d_sent = Column(Boolean, default=False)
+    inactivity_30d_sent = Column(Boolean, default=False)
+
+    user = relationship('User', back_populates='engagement')
+
+
 class ReminderSettings(Base):
     __tablename__ = 'reminders'
 
@@ -165,6 +194,8 @@ class ReminderSettings(Base):
     last_evening = Column(DateTime, nullable=True)
 
     user = relationship('User', back_populates='reminders')
+
+
 class Meal(Base):
     __tablename__ = 'meals'
     id = Column(Integer, primary_key=True)
