@@ -55,6 +55,11 @@ def _ensure_columns():
         if "type" not in existing:
             conn.execute(text("ALTER TABLE meals ADD COLUMN type TEXT DEFAULT 'meal'"))
 
+    existing = _column_names("subscriptions")
+    with engine.begin() as conn:
+        if "last_request" not in existing:
+            conn.execute(text("ALTER TABLE subscriptions ADD COLUMN last_request TIMESTAMP"))
+
 
 class User(Base):
     __tablename__ = 'users'
@@ -133,6 +138,7 @@ class User(Base):
     resume_period_end = property(lambda self: self._sub().resume_period_end, lambda self, v: setattr(self._sub(), 'resume_period_end', v))
     daily_used = property(lambda self: self._sub().daily_used, lambda self, v: setattr(self._sub(), 'daily_used', v))
     daily_start = property(lambda self: self._sub().daily_start, lambda self, v: setattr(self._sub(), 'daily_start', v))
+    last_request = property(lambda self: self._sub().last_request, lambda self, v: setattr(self._sub(), 'last_request', v))
     trial = property(lambda self: self._sub().trial, lambda self, v: setattr(self._sub(), 'trial', v))
     trial_used = property(lambda self: self._sub().trial_used, lambda self, v: setattr(self._sub(), 'trial_used', v))
 
@@ -170,6 +176,7 @@ class Subscription(Base):
     resume_period_end = Column(DateTime, nullable=True)
     daily_used = Column(Integer, default=0)
     daily_start = Column(DateTime, default=datetime.utcnow)
+    last_request = Column(DateTime, nullable=True)
     trial = Column(Boolean, default=False)
     trial_used = Column(Boolean, default=False)
 
@@ -267,17 +274,6 @@ class Comment(Base):
     user = relationship('User')
 
 
-class RequestLog(Base):
-    """Timestamp of each GPT request for statistics."""
-
-    __tablename__ = 'request_log'
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    user = relationship('User')
-
-
 class Option(Base):
     __tablename__ = 'options'
 
@@ -355,7 +351,6 @@ def _ensure_cascades():
         "meals": "meals_user_id_fkey",
         "payments": "payments_user_id_fkey",
         "comments": "comments_user_id_fkey",
-        "request_log": "request_log_user_id_fkey",
     }
 
     with engine.begin() as conn:

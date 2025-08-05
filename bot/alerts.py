@@ -4,6 +4,8 @@ import traceback
 from datetime import datetime, timedelta, time
 from aiogram import Bot, Dispatcher, types
 
+from sqlalchemy import func
+
 from .config import ALERT_BOT_TOKEN, ALERT_CHAT_IDS as ALERT_CHAT_IDS_CONFIG
 from .database import (
     SessionLocal,
@@ -11,7 +13,6 @@ from .database import (
     Subscription,
     Payment,
     Meal,
-    RequestLog,
     get_option,
     get_option_int,
     set_option,
@@ -208,6 +209,10 @@ async def user_stats_watcher() -> None:
                 .count()
             )
 
+            requests_total = (
+                session.query(func.sum(Subscription.daily_used)).scalar() or 0
+            )
+
             report = "\n".join(
                 [
                     "Статистика пользователей за сегодня",
@@ -216,13 +221,19 @@ async def user_stats_watcher() -> None:
                     f"Закончилась подписка: {ended}",
                     f"Новых пользователей : {new_users}",
                     f"Пользователей оплативших подписку: {paid_users}",
+                    f"Запросов за сегодня: {requests_total}",
                 ]
             )
             await send_alert(report)
 
             cutoff = datetime.utcnow() - timedelta(days=30)
             session.query(Meal).filter(Meal.timestamp < cutoff).delete()
-            session.query(RequestLog).delete()
+            session.query(Subscription).update(
+                {
+                    "daily_used": 0,
+                    "daily_start": datetime.utcnow(),
+                }
+            )
             session.commit()
         finally:
             session.close()
