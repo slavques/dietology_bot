@@ -1,9 +1,10 @@
+import asyncio
+import time
+from datetime import timedelta
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import StateFilter
-from datetime import timedelta
-import time
 
 from ..services import analyze_text, fatsecret_search
 from ..utils import format_meal_message, parse_serving, to_float
@@ -38,6 +39,7 @@ from ..texts import (
     BTN_REMOVE_LIMITS,
 )
 from ..logger import log
+from ..engagement import process_request_events
 
 
 async def manual_start(query: types.CallbackQuery, state: FSMContext):
@@ -137,6 +139,7 @@ async def process_manual(message: types.Message, state: FSMContext):
         return
     grade = user.grade
     session.close()
+    asyncio.create_task(process_request_events(message.bot, message.from_user.id))
 
     results = await analyze_text(message.text, grade=grade)
     log("prompt", "text analyzed for %s", message.from_user.id)

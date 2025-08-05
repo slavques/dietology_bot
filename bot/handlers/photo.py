@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
-import time
-from aiogram import types, Dispatcher, F
+import asyncio
 import tempfile
+import time
+from datetime import datetime, timedelta
+from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -35,6 +36,7 @@ from ..texts import (
     BTN_REMOVE_LIMITS,
 )
 from ..logger import log
+from ..engagement import process_request_events
 
 
 async def request_photo(message: types.Message):
@@ -124,6 +126,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
     grade = user.grade
     session.close()
+    asyncio.create_task(process_request_events(message.bot, message.from_user.id))
 
     processing_msg = await message.reply(PHOTO_ANALYZING)
     photo = message.photo[-1]
