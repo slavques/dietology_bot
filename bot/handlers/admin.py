@@ -7,9 +7,10 @@ from typing import Optional
 
 from sqlalchemy import func
 
-from ..database import SessionLocal, User, Comment
+from ..database import SessionLocal, User, Comment, EngagementStatus
 from ..states import AdminState
 from ..config import ADMIN_COMMAND, ADMIN_PASSWORD
+from ..keyboards import subscribe_button
 from ..texts import (
     BTN_BROADCAST,
     BTN_BROADCAST_TEXT,
@@ -19,6 +20,9 @@ from ..texts import (
     BTN_DAYS,
     BTN_ONE,
     BTN_ALL,
+    BTN_DISCOUNT,
+    BTN_FREE_NO_REQ,
+    BTN_FREE_WITH_REQ,
     BTN_BLOCK,
     BTN_BLOCKED_USERS,
     BTN_FEATURES,
@@ -45,6 +49,8 @@ from ..texts import (
     BTN_GRADE,
     BTN_USER,
     BTN_COMMENT,
+    BTN_CONFIRM,
+    BTN_REMOVE_LIMITS,
     ADMIN_GRADE_DONE,
     ADMIN_MODE,
     ADMIN_UNAVAILABLE,
@@ -68,7 +74,11 @@ from ..texts import (
     ADMIN_GRADES_TITLE,
     ADMIN_SETTINGS_TITLE,
     ADMIN_TRIAL_DONE,
+    ADMIN_DISCOUNT_PROMPT,
+    ADMIN_DISCOUNT_DONE,
     ADMIN_STATS,
+    DISCOUNT_MESSAGE,
+    format_date_ru,
 )
 from ..subscriptions import PAID_LIMIT
 
@@ -119,6 +129,7 @@ def build_user_info(session: SessionLocal, user: User) -> str:
 def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_BROADCAST, callback_data="admin:broadcast")
+    builder.button(text=BTN_DISCOUNT, callback_data="admin:discount")
     builder.button(text=BTN_DAYS, callback_data="admin:days")
     builder.button(text=BTN_FEATURES, callback_data="admin:features")
     builder.button(text=BTN_TRIAL, callback_data="admin:trial")
@@ -152,6 +163,24 @@ def days_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_ONE, callback_data="admin:days_one")
     builder.button(text=BTN_ALL, callback_data="admin:days_all")
     builder.button(text=BTN_BACK, callback_data="admin:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def discount_menu_kb() -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_FREE_NO_REQ, callback_data="admin:discount_no")
+    builder.button(text=BTN_FREE_WITH_REQ, callback_data="admin:discount_with")
+    builder.button(text=BTN_ONE, callback_data="admin:discount_one")
+    builder.button(text=BTN_BACK, callback_data="admin:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def discount_confirm_kb() -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_CONFIRM, callback_data="admin:discount_confirm")
+    builder.button(text=BTN_BACK, callback_data="admin:discount")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -241,12 +270,138 @@ async def admin_broadcast_prompt(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
 
 
-async def admin_broadcast_support_prompt(query: types.CallbackQuery, state: FSMContext):
+async def admin_discount_menu(query: types.CallbackQuery):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
         return
-    await state.set_state(AdminState.waiting_broadcast_support)
-    await query.message.edit_text(BROADCAST_SUPPORT_PROMPT, reply_markup=admin_back_kb())
+    await query.message.edit_text(ADMIN_CHOOSE_ACTION, reply_markup=discount_menu_kb())
+    await query.answer()
+
+
+async def admin_discount_free_no(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await state.update_data(discount_target=("no", None))
+    await state.set_state(AdminState.waiting_discount_confirm)
+    await query.message.edit_text(ADMIN_DISCOUNT_PROMPT, reply_markup=discount_confirm_kb())
+    await query.answer()
+
+
+async def admin_discount_free_with(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await state.update_data(discount_target=("with", None))
+    await state.set_state(AdminState.waiting_discount_confirm)
+    await query.message.edit_text(ADMIN_DISCOUNT_PROMPT, reply_markup=discount_confirm_kb())
+    await query.answer()
+
+
+async def admin_discount_one(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await state.set_state(AdminState.waiting_discount_id)
+    await query.message.edit_text(ADMIN_ENTER_ID, reply_markup=admin_back_kb())
+    await query.answer()
+
+
+async def process_discount_user_id(message: types.Message, state: FSMContext):
+    if message.from_user.id not in admins:
+        return
+    try:
+        tg_id = int(message.text.strip())
+    except ValueError:
+        await message.answer(ADMIN_ENTER_ID)
+        return
+    await state.update_data(discount_target=("one", tg_id))
+    await state.set_state(AdminState.waiting_discount_confirm)
+    await message.answer(ADMIN_DISCOUNT_PROMPT, reply_markup=discount_confirm_kb())
+
+
+async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    data = await state.get_data()
+    target, tg_id = data.get("discount_target", (None, None))
+    session = SessionLocal()
+    expire = datetime.utcnow() + timedelta(hours=24)
+    text = DISCOUNT_MESSAGE.format(
+        date=format_date_ru(expire.date()), time=expire.strftime("%H:%M")
+    )
+    count = 0
+    if target == "no":
+        users = (
+            session.query(User)
+            .filter(User.grade == "free", User.requests_total == 0)
+            .all()
+        )
+        for u in users:
+            eng = u.engagement or EngagementStatus()
+            if eng.discount_sent:
+                continue
+            if not u.engagement:
+                u.engagement = eng
+            try:
+                await query.bot.send_message(
+                    u.telegram_id,
+                    text,
+                    parse_mode="HTML",
+                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                )
+            except Exception:
+                pass
+            eng.discount_sent = True
+            eng.discount_expires = expire
+            count += 1
+    elif target == "with":
+        users = (
+            session.query(User)
+            .filter(User.grade == "free", User.requests_total > 0)
+            .all()
+        )
+        for u in users:
+            eng = u.engagement or EngagementStatus()
+            if eng.discount_sent:
+                continue
+            if not u.engagement:
+                u.engagement = eng
+            try:
+                await query.bot.send_message(
+                    u.telegram_id,
+                    text,
+                    parse_mode="HTML",
+                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                )
+            except Exception:
+                pass
+            eng.discount_sent = True
+            eng.discount_expires = expire
+            count += 1
+    elif target == "one" and tg_id:
+        user = session.query(User).filter_by(telegram_id=int(tg_id)).first()
+        if user:
+            eng = user.engagement or EngagementStatus()
+            if not user.engagement:
+                user.engagement = eng
+            try:
+                await query.bot.send_message(
+                    user.telegram_id,
+                    text,
+                    parse_mode="HTML",
+                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                )
+            except Exception:
+                pass
+            eng.discount_sent = True
+            eng.discount_expires = expire
+            count += 1
+    session.commit()
+    session.close()
+    await state.clear()
+    await query.message.edit_text(ADMIN_DISCOUNT_DONE, reply_markup=admin_menu_kb())
     await query.answer()
 
 
@@ -1014,9 +1169,12 @@ async def admin_toggle(query: types.CallbackQuery):
 
 def register(dp: Dispatcher):
     dp.message.register(admin_login, F.text.startswith(f"/{ADMIN_COMMAND}"))
-    dp.callback_query.register(admin_broadcast_menu, F.data == "admin:broadcast")
-    dp.callback_query.register(admin_broadcast_prompt, F.data == "admin:broadcast:text")
-    dp.callback_query.register(admin_broadcast_support_prompt, F.data == "admin:broadcast:support")
+    dp.callback_query.register(admin_broadcast_prompt, F.data == "admin:broadcast")
+    dp.callback_query.register(admin_discount_menu, F.data == "admin:discount")
+    dp.callback_query.register(admin_discount_free_no, F.data == "admin:discount_no")
+    dp.callback_query.register(admin_discount_free_with, F.data == "admin:discount_with")
+    dp.callback_query.register(admin_discount_one, F.data == "admin:discount_one")
+    dp.callback_query.register(admin_discount_confirm, F.data == "admin:discount_confirm")
     dp.callback_query.register(admin_days_menu, F.data == "admin:days")
     dp.callback_query.register(admin_days_one, F.data == "admin:days_one")
     dp.callback_query.register(admin_days_all, F.data == "admin:days_all")
@@ -1057,3 +1215,4 @@ def register(dp: Dispatcher):
     dp.message.register(process_grade_user_id, AdminState.waiting_grade_user_id, F.text)
     dp.message.register(process_view_id, AdminState.waiting_view_id, F.text)
     dp.message.register(process_comment_text, AdminState.waiting_comment_text, F.text)
+    dp.message.register(process_discount_user_id, AdminState.waiting_discount_id, F.text)

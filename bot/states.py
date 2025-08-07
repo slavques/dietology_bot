@@ -30,6 +30,8 @@ class AdminState(StatesGroup):
     waiting_grade_user_id = State()
     waiting_view_id = State()
     waiting_comment_text = State()
+    waiting_discount_id = State()
+    waiting_discount_confirm = State()
 
 
 class ReminderState(StatesGroup):
