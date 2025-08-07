@@ -126,7 +126,6 @@ async def handle_photo(message: types.Message, state: FSMContext):
         return
     grade = user.grade
     session.close()
-    asyncio.create_task(process_request_events(message.bot, message.from_user.id))
 
     processing_msg = await message.reply(PHOTO_ANALYZING)
     photo = message.photo[-1]
@@ -147,6 +146,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
     log("prompt", "photo analyzed for %s", message.from_user.id)
     if isinstance(results, list) and results and results[0].get("error"):
         await processing_msg.edit_text(RECOGNITION_ERROR)
+        asyncio.create_task(process_request_events(message.bot, message.from_user.id))
         return
     if not isinstance(results, list):
         results = [results]
@@ -155,6 +155,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
     all_names = [r.get("name") for r in valid if r.get("name")]
     if not valid:
         await processing_msg.edit_text(NO_FOOD_ERROR)
+        asyncio.create_task(process_request_events(message.bot, message.from_user.id))
         return
 
     for idx, res in enumerate(valid, 1):
@@ -247,6 +248,8 @@ async def handle_photo(message: types.Message, state: FSMContext):
             )
             pending_meals[meal_id]["message_id"] = msg.message_id
             pending_meals[meal_id]["chat_id"] = msg.chat.id
+
+    asyncio.create_task(process_request_events(message.bot, message.from_user.id))
 
 
 async def handle_document(message: types.Message):
