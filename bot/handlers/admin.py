@@ -509,6 +509,12 @@ async def admin_stats(query: types.CallbackQuery):
         .filter(Subscription.grade == "free", Subscription.requests_used > 0)
         .count()
     )
+    unused = (
+        session.query(User)
+        .join(Subscription)
+        .filter(Subscription.grade == "free", Subscription.requests_used == 0)
+        .count()
+    )
     left = session.query(User).filter_by(left_bot=True).count()
     start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     q_today = (
@@ -525,6 +531,7 @@ async def admin_stats(query: types.CallbackQuery):
         trial_pro=trial_pro,
         trial_light=trial_light,
         used=used,
+        unused=unused,
         left=left,
         req_today=q_today,
     )
