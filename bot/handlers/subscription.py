@@ -1,18 +1,17 @@
-from ..settings import PLAN_PRICES, PRO_PLAN_PRICES
+from ..settings import PLAN_PRICES, PRO_PLAN_PRICES, DISCOUNT_PLAN_PRICES
 from aiogram import types, Dispatcher, F, Bot
 from aiogram.fsm.context import FSMContext
+from datetime import datetime
 
 from ..database import SessionLocal, Payment
 from ..subscriptions import ensure_user, process_payment_success, notify_trial_end
 from ..alerts import subscription_paid as alert_subscription_paid
 from ..keyboards import (
-    subscription_plans_kb,
     pay_kb,
     back_menu_kb,
     payment_method_inline,
     subscription_plans_inline_kb,
     subscription_grades_inline_kb,
-    menu_inline_kb,
 )
 from ..config import YOOKASSA_TOKEN
 from aiogram.types import LabeledPrice
@@ -24,10 +23,6 @@ from ..texts import (
     SUB_SUCCESS,
     SUB_CANCELLED,
     BTN_SUBSCRIPTION,
-    BTN_BACK_TEXT,
-    BTN_PLAN_1M,
-    BTN_PLAN_3M,
-    BTN_PLAN_6M,
     PLAN_TITLE_1M,
     PLAN_TITLE_3M,
     PLAN_TITLE_6M,
@@ -38,17 +33,6 @@ from ..texts import (
 )
 from ..logger import log
 
-# map subscription plans to invoice details
-LIGHT_PLAN_MAP = {
-    "1m": (PLAN_TITLE_1M, PLAN_PRICES['1m'] * 100, 1),
-    "3m": (PLAN_TITLE_3M, PLAN_PRICES['3m'] * 100, 3),
-    "6m": (PLAN_TITLE_6M, PLAN_PRICES['6m'] * 100, 6),
-}
-PRO_PLAN_MAP = {
-    "1m": (PLAN_TITLE_1M, PRO_PLAN_PRICES['1m'] * 100, 1),
-    "3m": (PLAN_TITLE_3M, PRO_PLAN_PRICES['3m'] * 100, 3),
-    "6m": (PLAN_TITLE_6M, PRO_PLAN_PRICES['6m'] * 100, 6),
-}
 
 
 def build_intro_text(user) -> str:
@@ -78,8 +62,22 @@ async def cb_pay(query: types.CallbackQuery):
         )
         await query.answer()
         return
-    plan_map = LIGHT_PLAN_MAP if tier == "light" else PRO_PLAN_MAP
-    title, amount, months = plan_map[code]
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    discount = (
+        user.engagement
+        and user.engagement.discount_expires
+        and user.engagement.discount_expires > datetime.utcnow()
+    )
+    session.close()
+    title_map = {"1m": PLAN_TITLE_1M, "3m": PLAN_TITLE_3M, "6m": PLAN_TITLE_6M}
+    price_map = (
+        DISCOUNT_PLAN_PRICES
+        if discount and tier == "light"
+        else (PLAN_PRICES if tier == "light" else PRO_PLAN_PRICES)
+    )
+    title = title_map[code]
+    amount = price_map[code] * 100
     payload = f"{tier}:{code}"
     price = LabeledPrice(label=INVOICE_LABEL, amount=amount)
     await query.bot.send_invoice(
@@ -122,10 +120,18 @@ async def cb_subscribe(query: types.CallbackQuery, state: FSMContext):
 
 async def cb_grade(query: types.CallbackQuery):
     tier = query.data.split(":", 1)[1]
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    discount = (
+        user.engagement
+        and user.engagement.discount_expires
+        and user.engagement.discount_expires > datetime.utcnow()
+    )
+    session.close()
     grade = "🔸 Старт" if tier == "light" else "⚡ Pro-режим"
     await query.message.edit_text(
         PLAN_TEXT.format(grade=grade),
-        reply_markup=subscription_plans_inline_kb(tier),
+        reply_markup=subscription_plans_inline_kb(tier, discount=discount),
         parse_mode="HTML",
     )
     await query.answer()
@@ -169,10 +175,18 @@ async def cb_method_back(query: types.CallbackQuery):
 
 async def cb_plan_back(query: types.CallbackQuery):
     tier = query.data.split(":", 1)[1]
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    discount = (
+        user.engagement
+        and user.engagement.discount_expires
+        and user.engagement.discount_expires > datetime.utcnow()
+    )
+    session.close()
     grade = "🔸 Старт" if tier == "light" else "⚡ Pro-режим"
     await query.message.edit_text(
         PLAN_TEXT.format(grade=grade),
-        reply_markup=subscription_plans_inline_kb(tier),
+        reply_markup=subscription_plans_inline_kb(tier, discount=discount),
         parse_mode="HTML",
     )
     await query.answer()

@@ -156,6 +156,11 @@ async def process_manual(message: types.Message, state: FSMContext):
         asyncio.create_task(process_request_events(message.bot, message.from_user.id))
         return
 
+    # suppress reminders for previous pending meals from this user
+    for mid, meal in pending_meals.items():
+        if mid.startswith(f"{message.from_user.id}_"):
+            meal["reminded"] = True
+
     for idx, res in enumerate(valid, 1):
         meal_id = f"{message.from_user.id}_{message.message_id}_{idx}"
         timestamp = time.time()
