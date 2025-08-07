@@ -74,7 +74,20 @@ async def process_request_events(bot: Bot, telegram_id: int) -> None:
         and session.query(Meal).filter_by(user_id=user.id).count() == 0
     ):
         try:
-            await bot.send_message(user.telegram_id, NO_MEAL_AFTER_REQUESTS)
+            meals = [
+                m
+                for m in pending_meals.values()
+                if m.get("chat_id") == user.telegram_id and m.get("message_id")
+            ]
+            msg_id = None
+            if meals:
+                latest = max(meals, key=lambda m: m.get("timestamp", 0))
+                msg_id = latest.get("message_id")
+            await bot.send_message(
+                user.telegram_id,
+                NO_MEAL_AFTER_REQUESTS,
+                reply_to_message_id=msg_id,
+            )
         except Exception:
             pass
         eng.five_no_meal_sent = True
