@@ -7,7 +7,7 @@ from typing import Optional
 
 from sqlalchemy import func
 
-from ..database import SessionLocal, User, Comment, EngagementStatus
+from ..database import SessionLocal, User, Comment, EngagementStatus, Subscription
 from ..states import AdminState
 from ..config import ADMIN_COMMAND, ADMIN_PASSWORD
 from ..keyboards import subscribe_button
@@ -335,7 +335,11 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
     if target == "no":
         users = (
             session.query(User)
-            .filter(User.grade == "free", User.requests_total == 0)
+            .join(Subscription)
+            .filter(
+                Subscription.grade == "free",
+                Subscription.requests_total == 0,
+            )
             .all()
         )
         for u in users:
@@ -359,7 +363,11 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
     elif target == "with":
         users = (
             session.query(User)
-            .filter(User.grade == "free", User.requests_total > 0)
+            .join(Subscription)
+            .filter(
+                Subscription.grade == "free",
+                Subscription.requests_total > 0,
+            )
             .all()
         )
         for u in users:

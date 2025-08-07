@@ -3,7 +3,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
-from .settings import PLAN_PRICES, PRO_PLAN_PRICES
+from .settings import PLAN_PRICES, PRO_PLAN_PRICES, DISCOUNT_PLAN_PRICES
 from .texts import (
     BTN_EDIT,
     BTN_DELETE,
@@ -293,12 +293,39 @@ def back_to_reminder_settings_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def subscription_plans_inline_kb(tier: str) -> InlineKeyboardMarkup:
+def _strike(text: str) -> str:
+    return "".join(f"{c}\u0336" for c in text)
+
+
+def subscription_plans_inline_kb(tier: str, discount: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    prices = PLAN_PRICES if tier == "light" else PRO_PLAN_PRICES
-    builder.button(text=BTN_PLAN_1M.format(price=prices['1m']), callback_data=f"plan:{tier}:1m")
-    builder.button(text=BTN_PLAN_3M.format(price=prices['3m']), callback_data=f"plan:{tier}:3m")
-    builder.button(text=BTN_PLAN_6M.format(price=prices['6m']), callback_data=f"plan:{tier}:6m")
+    if tier == "light" and discount:
+        builder.button(
+            text=f"🚶‍♂️1 месяц — {_strike(str(PLAN_PRICES['1m']) + '₽')} {DISCOUNT_PLAN_PRICES['1m']}₽",
+            callback_data="plan:light:1m",
+        )
+        builder.button(
+            text=f"🏃‍♂️3 месяца — {_strike(str(PLAN_PRICES['3m']) + '₽')} {DISCOUNT_PLAN_PRICES['3m']}₽",
+            callback_data="plan:light:3m",
+        )
+        builder.button(
+            text=f"🧘‍♂️6 месяцев — {_strike(str(PLAN_PRICES['6m']) + '₽')} {DISCOUNT_PLAN_PRICES['6m']}₽",
+            callback_data="plan:light:6m",
+        )
+    else:
+        prices = PLAN_PRICES if tier == "light" else PRO_PLAN_PRICES
+        builder.button(
+            text=BTN_PLAN_1M.format(price=prices['1m']),
+            callback_data=f"plan:{tier}:1m",
+        )
+        builder.button(
+            text=BTN_PLAN_3M.format(price=prices['3m']),
+            callback_data=f"plan:{tier}:3m",
+        )
+        builder.button(
+            text=BTN_PLAN_6M.format(price=prices['6m']),
+            callback_data=f"plan:{tier}:6m",
+        )
     builder.button(text=BTN_BACK_TEXT, callback_data="sub_grades")
     builder.adjust(1)
     return builder.as_markup()

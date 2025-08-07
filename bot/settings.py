@@ -10,6 +10,13 @@ PLAN_PRICES = {
     "6m": 799,
 }
 
+# Discounted prices for promotions in RUB
+DISCOUNT_PLAN_PRICES = {
+    "1m": 119,
+    "3m": 299,
+    "6m": 549,
+}
+
 # Prices for PRO subscription in RUB
 PRO_PLAN_PRICES = {
     "1m": 500,
