@@ -60,6 +60,17 @@ def _ensure_columns():
         if "last_request" not in existing:
             conn.execute(text("ALTER TABLE subscriptions ADD COLUMN last_request TIMESTAMP"))
 
+    existing = _column_names("engagement_status")
+    with engine.begin() as conn:
+        if "discount_sent" not in existing:
+            conn.execute(
+                text(
+                    f"ALTER TABLE engagement_status ADD COLUMN discount_sent BOOLEAN DEFAULT {bool_default}"
+                )
+            )
+        if "discount_expires" not in existing:
+            conn.execute(text("ALTER TABLE engagement_status ADD COLUMN discount_expires TIMESTAMP"))
+
 
 def _drop_request_logs():
     """Remove legacy request_logs table if it still exists."""
@@ -219,6 +230,8 @@ class EngagementStatus(Base):
     inactivity_7d_sent = Column(Boolean, default=False)
     inactivity_14d_sent = Column(Boolean, default=False)
     inactivity_30d_sent = Column(Boolean, default=False)
+    discount_sent = Column(Boolean, default=False)
+    discount_expires = Column(DateTime, nullable=True)
 
     user = relationship('User', back_populates='engagement')
 
