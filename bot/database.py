@@ -137,11 +137,6 @@ class User(Base):
             self.reminders = ReminderSettings()
         return self.reminders
 
-    def _eng(self):
-        if not self.engagement:
-            self.engagement = EngagementStatus()
-        return self.engagement
-
     grade = property(lambda self: self._sub().grade, lambda self, v: setattr(self._sub(), 'grade', v))
     request_limit = property(lambda self: self._sub().request_limit, lambda self, v: setattr(self._sub(), 'request_limit', v))
     requests_used = property(lambda self: self._sub().requests_used, lambda self, v: setattr(self._sub(), 'requests_used', v))

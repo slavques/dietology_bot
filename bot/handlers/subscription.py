@@ -21,7 +21,6 @@ from ..texts import (
     SUB_INVALID_PLAN,
     SUB_METHOD_TEXT,
     SUB_SUCCESS,
-    SUB_CANCELLED,
     BTN_SUBSCRIPTION,
     PLAN_TITLE_1M,
     PLAN_TITLE_3M,

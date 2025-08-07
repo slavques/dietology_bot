@@ -10,20 +10,18 @@ from ..services import analyze_photo, fatsecret_search
 from ..utils import format_meal_message, parse_serving, to_float
 from ..keyboards import (
     meal_actions_kb,
-    back_menu_kb,
     subscribe_button,
     choose_product_kb,
     weight_back_kb,
     add_delete_back_kb,
 )
-from ..subscriptions import consume_request, ensure_user, has_request_quota, notify_trial_end
+from ..subscriptions import consume_request, ensure_user, notify_trial_end
 from ..database import SessionLocal
 from ..states import EditMeal, LookupMeal
 from ..storage import pending_meals
 from ..texts import (
     LIMIT_REACHED_TEXT,
     format_date_ru,
-    REQUEST_PHOTO,
     PHOTO_ANALYZING,
     MULTI_PHOTO_ERROR,
     RECOGNITION_ERROR,
@@ -37,45 +35,6 @@ from ..texts import (
 )
 from ..logger import log
 from ..engagement import process_request_events
-
-
-async def request_photo(message: types.Message):
-    session = SessionLocal()
-    user = ensure_user(session, message.from_user.id)
-    await notify_trial_end(message.bot, session, user)
-    if user.blocked:
-        from ..settings import SUPPORT_HANDLE
-        from ..texts import BLOCKED_TEXT
-
-        await message.answer(BLOCKED_TEXT.format(support=SUPPORT_HANDLE))
-        session.close()
-        return
-    if not has_request_quota(session, user):
-        reset = (
-            user.period_end.date()
-            if user.period_end
-            else (user.period_start + timedelta(days=30)).date()
-        )
-        text = LIMIT_REACHED_TEXT.format(date=format_date_ru(reset))
-        await message.answer(
-            text,
-            reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
-            parse_mode="HTML",
-        )
-        log(
-            "notification",
-            "limit reached message sent to %s",
-            message.from_user.id,
-        )
-        session.close()
-        return
-    session.close()
-    await message.answer(REQUEST_PHOTO, reply_markup=back_menu_kb())
-    log(
-        "notification", "photo request prompt sent to %s", message.from_user.id
-    )
-
-
 async def handle_photo(message: types.Message, state: FSMContext):
     if message.media_group_id:
         await message.answer(MULTI_PHOTO_ERROR)

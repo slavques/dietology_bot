@@ -181,31 +181,6 @@ def pay_kb(code: Optional[str] = None, tier: str = "light", include_back: bool =
         builder.button(text=BTN_BACK_TEXT, callback_data=f"method_back:{tier}:{code}")
     builder.adjust(1)
     return builder.as_markup()
-
-
-def subscription_plans_kb() -> ReplyKeyboardMarkup:
-    """Keyboard with subscription duration options."""
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=BTN_PLAN_1M.format(price=PLAN_PRICES['1m']))],
-            [KeyboardButton(text=BTN_PLAN_3M.format(price=PLAN_PRICES['3m']))],
-            [KeyboardButton(text=BTN_PLAN_6M.format(price=PLAN_PRICES['6m']))],
-            [KeyboardButton(text=BTN_MAIN_MENU)],
-        ],
-        resize_keyboard=True,
-    )
-
-
-def payment_methods_kb() -> ReplyKeyboardMarkup:
-    """Keyboard with payment method choices."""
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=BTN_BACK_TEXT)],
-        ],
-        resize_keyboard=True,
-    )
-
-
 def payment_method_inline(code: str, tier: str, include_back: bool = False) -> InlineKeyboardMarkup:
     """Inline keyboard with payment methods, filtered by admin settings."""
     from .database import get_option_bool

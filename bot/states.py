@@ -18,7 +18,6 @@ class LookupMeal(StatesGroup):
 
 class AdminState(StatesGroup):
     waiting_broadcast = State()
-    waiting_broadcast_support = State()
     waiting_user_id = State()
     waiting_days = State()
     waiting_days_all = State()

@@ -74,6 +74,7 @@ if __name__ == '__main__':
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     formatter.converter = lambda ts: datetime.fromtimestamp(ts, MSK).timetuple()
+    _ = formatter.converter  # ensure attribute is referenced
 
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()

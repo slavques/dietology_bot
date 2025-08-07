@@ -14,11 +14,7 @@ from .config import OPENAI_API_KEY
 from .utils import parse_serving, to_float
 from .prompts import (
     PRO_PHOTO_PROMPT,
-    LIGHT_PHOTO_PROMPT,
-    FREE_PHOTO_PROMPT,
     PRO_TEXT_PROMPT,
-    LIGHT_TEXT_PROMPT,
-    FREE_TEXT_PROMPT,
     PRO_HINT_PROMPT_BASE,
     LIGHT_HINT_PROMPT_BASE,
     FREE_HINT_PROMPT_BASE,
@@ -28,8 +24,7 @@ from .alerts import token_monitor, gpt_error
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 GPT_SEMAPHORE = asyncio.Semaphore(3)
 
-# Model names for different API methods
-MODEL_NAME = "gpt-4.1-mini"
+# Model name for the chat completion API
 COMPLETION_MODEL = "gpt-4.1-mini"
 
 
@@ -205,79 +200,6 @@ async def _chat_completion(
                     top_p=0.7,
                 )
             content = resp.choices[0].message.content
-            log("response", "%s", content)
-            usage = getattr(resp, "usage", None)
-            tokens_in = tokens_out = 0
-            if usage:
-                tokens_in = getattr(
-                    usage,
-                    "prompt_tokens",
-                    getattr(usage, "input_tokens", None),
-                ) or 0
-                tokens_out = getattr(
-                    usage,
-                    "completion_tokens",
-                    getattr(usage, "output_tokens", None),
-                ) or 0
-                log(
-                    "tokens",
-                    "in=%s out=%s total=%s",
-                    tokens_in,
-                    tokens_out,
-                    usage.total_tokens,
-                )
-            return content, tokens_in, tokens_out
-        except RateLimitError as exc:
-            if attempt < retries - 1:
-                await asyncio.sleep(backoff * (2**attempt))
-                continue
-            await gpt_error(str(exc))
-            return "__RATE_LIMIT__", 0, 0
-        except BadRequestError as exc:
-            await gpt_error(str(exc))
-            return "__BAD_REQUEST__", 0, 0
-        except Exception as exc:
-            await gpt_error(str(exc))
-            return "__ERROR__", 0, 0
-
-
-async def _completion(
-    messages: List[Dict],
-    model: str = COMPLETION_MODEL,
-    retries: int = 3,
-    backoff: float = 0.5,
-) -> tuple[str, int, int]:
-    """Call the legacy Completions API for non‑PRO tiers."""
-    if not client.api_key:
-        return "", 0, 0
-    try:
-        system_msg = next(
-            m["content"] for m in messages if m.get("role") == "system"
-        )
-        log("prompt", "%s", system_msg)
-    except Exception:
-        system_msg = None
-    prompt_parts = []
-    for m in messages:
-        c = m.get("content")
-        if isinstance(c, list):
-            for part in c:
-                if part.get("type") == "text":
-                    prompt_parts.append(part["text"])
-        elif isinstance(c, str):
-            prompt_parts.append(c)
-    prompt = "\n".join(prompt_parts)
-    for attempt in range(retries):
-        try:
-            async with GPT_SEMAPHORE:
-                resp = await client.completions.create(
-                    model=model,
-                    prompt=prompt,
-                    temperature=0.2,
-                    max_tokens=1000,
-                    top_p=0.7,
-                )
-            content = resp.choices[0].text
             log("response", "%s", content)
             usage = getattr(resp, "usage", None)
             tokens_in = tokens_out = 0

@@ -13,9 +13,6 @@ from ..config import ADMIN_COMMAND, ADMIN_PASSWORD
 from ..keyboards import subscribe_button
 from ..texts import (
     BTN_BROADCAST,
-    BTN_BROADCAST_TEXT,
-    BTN_BROADCAST_SUPPORT,
-    BTN_SUPPORT,
     BTN_BACK,
     BTN_DAYS,
     BTN_ONE,
@@ -54,11 +51,9 @@ from ..texts import (
     ADMIN_GRADE_DONE,
     ADMIN_MODE,
     ADMIN_UNAVAILABLE,
-    BROADCAST_CHOOSE,
     BROADCAST_PROMPT,
     BROADCAST_ERROR,
     BROADCAST_DONE,
-    BROADCAST_SUPPORT_PROMPT,
     ADMIN_CHOOSE_ACTION,
     ADMIN_ENTER_ID,
     ADMIN_ENTER_DAYS,
@@ -138,15 +133,6 @@ def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_BLOCKED_USERS, callback_data="admin:blocked")
     builder.button(text=BTN_USER, callback_data="admin:user")
     builder.button(text=BTN_STATS_ADMIN, callback_data="admin:stats")
-    builder.adjust(1)
-    return builder.as_markup()
-
-
-def broadcast_menu_kb() -> types.InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_BROADCAST_TEXT, callback_data="admin:broadcast:text")
-    builder.button(text=BTN_BROADCAST_SUPPORT, callback_data="admin:broadcast:support")
-    builder.button(text=BTN_BACK, callback_data="admin:menu")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -250,14 +236,6 @@ async def admin_menu(query: types.CallbackQuery):
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
         return
     await query.message.edit_text(ADMIN_MODE, reply_markup=admin_menu_kb())
-    await query.answer()
-
-
-async def admin_broadcast_menu(query: types.CallbackQuery):
-    if query.from_user.id not in admins:
-        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
-        return
-    await query.message.edit_text(BROADCAST_CHOOSE, reply_markup=broadcast_menu_kb())
     await query.answer()
 
 
@@ -608,34 +586,6 @@ async def process_broadcast(message: types.Message, state: FSMContext):
     for u in users:
         try:
             await message.bot.send_message(u.telegram_id, text)
-        except Exception:
-            error = True
-    session.close()
-    from ..logger import log
-    log("broadcast", "sent broadcast from %s to %s users", message.from_user.id, len(users))
-    await message.answer(
-        BROADCAST_ERROR if error else BROADCAST_DONE,
-        reply_markup=admin_menu_kb(),
-    )
-    await state.clear()
-
-
-async def process_broadcast_support(message: types.Message, state: FSMContext):
-    if message.from_user.id not in admins:
-        return
-    text = message.text
-    session = SessionLocal()
-    users = session.query(User).all()
-    from ..settings import SUPPORT_HANDLE
-    url = f"https://t.me/{SUPPORT_HANDLE.lstrip('@')}"
-    builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_SUPPORT, url=url)
-    builder.adjust(1)
-    kb = builder.as_markup()
-    error = False
-    for u in users:
-        try:
-            await message.bot.send_message(u.telegram_id, text, reply_markup=kb)
         except Exception:
             error = True
     session.close()
@@ -1211,7 +1161,6 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_stats, F.data == "admin:stats")
     dp.callback_query.register(admin_menu, F.data == "admin:menu")
     dp.message.register(process_broadcast, AdminState.waiting_broadcast, F.text)
-    dp.message.register(process_broadcast_support, AdminState.waiting_broadcast_support, F.text)
     dp.message.register(process_user_id, AdminState.waiting_user_id, F.text)
     dp.message.register(process_days, AdminState.waiting_days, F.text)
     dp.message.register(process_days_all, AdminState.waiting_days_all, F.text)

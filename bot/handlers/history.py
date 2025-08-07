@@ -37,7 +37,6 @@ def build_history_text(user_id: int, offset: int, header: bool = False):
     
     if not header:
         text_lines = []
-    any_data = False
     for i in range(2):
         day = datetime.utcnow().date() - timedelta(days=offset + i)
         start = datetime.combine(day, datetime.min.time())
@@ -53,7 +52,6 @@ def build_history_text(user_id: int, offset: int, header: bool = False):
             text_lines.append(HISTORY_NO_MEALS)
             text_lines.append("")
             continue
-        any_data = True
         totals = {"calories": 0.0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
         for m in meals:
             totals["calories"] += m.calories
