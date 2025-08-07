@@ -25,4 +25,6 @@ LOG_FLAGS = {
     'block': True,
     # Google Programmable Search lookups
     'google': True,
+    # Utility helper functions
+    'utils': True,
 }
