@@ -270,6 +270,19 @@ async def admin_broadcast_prompt(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
 
 
+async def admin_broadcast_support_prompt(
+    query: types.CallbackQuery, state: FSMContext
+):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await state.set_state(AdminState.waiting_broadcast_support)
+    await query.message.edit_text(
+        BROADCAST_SUPPORT_PROMPT, reply_markup=admin_back_kb()
+    )
+    await query.answer()
+
+
 async def admin_discount_menu(query: types.CallbackQuery):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
@@ -1177,7 +1190,11 @@ async def admin_toggle(query: types.CallbackQuery):
 
 def register(dp: Dispatcher):
     dp.message.register(admin_login, F.text.startswith(f"/{ADMIN_COMMAND}"))
-    dp.callback_query.register(admin_broadcast_prompt, F.data == "admin:broadcast")
+    dp.callback_query.register(admin_broadcast_menu, F.data == "admin:broadcast")
+    dp.callback_query.register(admin_broadcast_prompt, F.data == "admin:broadcast:text")
+    dp.callback_query.register(
+        admin_broadcast_support_prompt, F.data == "admin:broadcast:support"
+    )
     dp.callback_query.register(admin_discount_menu, F.data == "admin:discount")
     dp.callback_query.register(admin_discount_free_no, F.data == "admin:discount_no")
     dp.callback_query.register(admin_discount_free_with, F.data == "admin:discount_with")
