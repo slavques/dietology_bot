@@ -106,6 +106,7 @@ def build_user_info(session: SessionLocal, user: User) -> str:
         sub = f"платный ({grade_title(user.grade)})"
     return (
         f"ID: {user.telegram_id}\n"
+        f"Дата старта: {user.created_at.date()}\n"
         f"Текущая подписка: {sub}\n"
         f"Остаток дней по текущей подписке: {days if days is not None else '-'}\n"
         f"Замороженная подписка: {frozen}\n"
