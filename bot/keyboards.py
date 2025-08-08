@@ -294,7 +294,7 @@ def back_to_reminder_settings_kb() -> InlineKeyboardMarkup:
 
 
 def _strike(text: str) -> str:
-    return f"<s>{text}</s>"
+    return "".join(ch + "\u0336" for ch in text)
 
 
 def subscription_plans_inline_kb(tier: str, discount: bool = False) -> InlineKeyboardMarkup:
