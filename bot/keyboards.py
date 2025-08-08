@@ -294,22 +294,22 @@ def back_to_reminder_settings_kb() -> InlineKeyboardMarkup:
 
 
 def _strike(text: str) -> str:
-    return "".join(f"{c}\u0336" for c in text)
+    return "".join(ch + "\u0336" for ch in text)
 
 
 def subscription_plans_inline_kb(tier: str, discount: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if tier == "light" and discount:
         builder.button(
-            text=f"🚶‍♂️1 месяц — {_strike(str(PLAN_PRICES['1m']) + '₽')} {DISCOUNT_PLAN_PRICES['1m']}₽",
+            text=f"🚶‍♂️1 месяц — {_strike(str(PLAN_PRICES['1m']))}₽ {DISCOUNT_PLAN_PRICES['1m']}₽",
             callback_data="plan:light:1m",
         )
         builder.button(
-            text=f"🏃‍♂️3 месяца — {_strike(str(PLAN_PRICES['3m']) + '₽')} {DISCOUNT_PLAN_PRICES['3m']}₽",
+            text=f"🏃‍♂️3 месяца — {_strike(str(PLAN_PRICES['3m']))}₽ {DISCOUNT_PLAN_PRICES['3m']}₽",
             callback_data="plan:light:3m",
         )
         builder.button(
-            text=f"🧘‍♂️6 месяцев — {_strike(str(PLAN_PRICES['6m']) + '₽')} {DISCOUNT_PLAN_PRICES['6m']}₽",
+            text=f"🧘‍♂️6 месяцев — {_strike(str(PLAN_PRICES['6m']))}₽ {DISCOUNT_PLAN_PRICES['6m']}₽",
             callback_data="plan:light:6m",
         )
     else:
