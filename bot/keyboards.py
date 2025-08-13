@@ -3,6 +3,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
+from urllib.parse import quote_plus
 from .settings import PLAN_PRICES, PRO_PLAN_PRICES, DISCOUNT_PLAN_PRICES
 from .texts import (
     BTN_EDIT,
@@ -44,6 +45,10 @@ from .texts import (
     BTN_DAY_REM,
     BTN_EVENING,
     BTN_FEEDBACK,
+    BTN_BONUSES,
+    BTN_MY_INVITES,
+    BTN_SHARE_LINK,
+    REFERRAL_SHARE,
 )
 from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -262,8 +267,21 @@ def menu_inline_kb() -> InlineKeyboardMarkup:
         builder.button(text=BTN_MANUAL, callback_data="manual")
     builder.button(text=BTN_STATS, callback_data="stats_menu")
     builder.button(text=BTN_SUBSCRIPTION, callback_data="subscribe")
+    if get_option_bool("feat_referral"):
+        builder.button(text=BTN_BONUSES, callback_data="referral")
     if get_option_bool("feat_settings"):
         builder.button(text=BTN_SETTINGS, callback_data="settings")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def referral_inline_kb(link: str) -> InlineKeyboardMarkup:
+    """Inline keyboard for referral message."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_MY_INVITES, callback_data="referral:stats")
+    share_url = f"https://t.me/share/url?url={quote_plus(link)}&text={quote_plus(REFERRAL_SHARE.format(link=link))}"
+    builder.button(text=BTN_SHARE_LINK, url=share_url)
+    builder.button(text=BTN_BACK, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()
 

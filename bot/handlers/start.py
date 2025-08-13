@@ -12,6 +12,7 @@ from ..texts import (
     REMAINING_FREE,
     REMAINING_DAYS,
     TRIAL_STARTED,
+    REFERRAL_WELCOME,
 )
 from ..utils import plural_ru_day
 
@@ -36,15 +37,36 @@ def get_welcome_text(user: User) -> str:
     return f"{BASE_TEXT}{grade_line}\n{extra}"
 
 async def cmd_start(message: types.Message):
+    args = message.text.split(maxsplit=1)
+    payload = args[1] if len(args) > 1 else ""
+    referrer_id = None
+    if payload.startswith("ref_"):
+        try:
+            referrer_id = int(payload[4:])
+        except ValueError:
+            referrer_id = None
     session = SessionLocal()
     existed = session.query(User).filter_by(telegram_id=message.from_user.id).first()
     new_user = existed is None
     user = ensure_user(session, message.from_user.id)
     await notify_trial_end(message.bot, session, user)
-    from ..subscriptions import check_start_trial
-    from ..texts import TRIAL_STARTED
+    from ..subscriptions import check_start_trial, start_trial
+    from ..database import get_option_bool
 
-    trial = check_start_trial(session, user)
+    trial = None
+    referral_msg = None
+    if (
+        new_user
+        and referrer_id
+        and referrer_id != message.from_user.id
+        and get_option_bool("feat_referral")
+    ):
+        user.referrer_id = referrer_id
+        user.trial_used = True
+        start_trial(session, user, 5, "light")
+        referral_msg = REFERRAL_WELCOME
+    else:
+        trial = check_start_trial(session, user)
     if user.blocked:
         from ..settings import SUPPORT_HANDLE
         from ..texts import BLOCKED_TEXT
@@ -66,7 +88,9 @@ async def cmd_start(message: types.Message):
     from ..texts import MENU_STUB
 
     stub = await message.answer(MENU_STUB, reply_markup=main_menu_kb())
-    if trial:
+    if referral_msg:
+        await message.answer(referral_msg, parse_mode="HTML")
+    elif trial:
         grade, days = trial
         grade_name = "⚡ Pro-режим" if grade == "pro" else "🔸 Старт"
         await message.answer(
