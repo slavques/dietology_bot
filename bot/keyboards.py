@@ -267,7 +267,8 @@ def menu_inline_kb() -> InlineKeyboardMarkup:
         builder.button(text=BTN_MANUAL, callback_data="manual")
     builder.button(text=BTN_STATS, callback_data="stats_menu")
     builder.button(text=BTN_SUBSCRIPTION, callback_data="subscribe")
-    builder.button(text=BTN_BONUSES, callback_data="referral")
+    if get_option_bool("feat_referral"):
+        builder.button(text=BTN_BONUSES, callback_data="referral")
     if get_option_bool("feat_settings"):
         builder.button(text=BTN_SETTINGS, callback_data="settings")
     builder.adjust(1)
