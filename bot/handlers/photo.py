@@ -18,6 +18,7 @@ from ..keyboards import (
 )
 from ..subscriptions import consume_request, ensure_user, has_request_quota, notify_trial_end
 from ..database import SessionLocal
+from .referral import reward_first_analysis
 from ..states import EditMeal, LookupMeal
 from ..storage import pending_meals
 from ..texts import (
@@ -124,6 +125,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
             )
         session.close()
         return
+    await reward_first_analysis(message.bot, session, user)
     grade = user.grade
     session.close()
 
