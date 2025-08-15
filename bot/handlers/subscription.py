@@ -5,6 +5,7 @@ from datetime import datetime
 
 from ..database import SessionLocal, Payment
 from ..subscriptions import ensure_user, process_payment_success, notify_trial_end
+from .referral import reward_subscription
 from ..alerts import subscription_paid as alert_subscription_paid
 from ..keyboards import (
     pay_kb,
@@ -216,6 +217,7 @@ async def handle_successful_payment(message: types.Message):
     await notify_trial_end(message.bot, session, user)
     process_payment_success(session, user, months, grade=tier)
     count = session.query(Payment).filter_by(user_id=user.id).count()
+    await reward_subscription(message.bot, session, user, count)
     session.close()
     grade_name = "🔸 Старт" if tier == "light" else "⚡ Pro-режим"
     await alert_subscription_paid(user.telegram_id, count, grade_name, months)
