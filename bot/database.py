@@ -49,6 +49,8 @@ def _ensure_columns():
                     f"ALTER TABLE users ADD COLUMN left_bot BOOLEAN DEFAULT {bool_default}"
                 )
             )
+        if "referrer_id" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN referrer_id BIGINT"))
 
     existing = _column_names("meals")
     with engine.begin() as conn:
@@ -85,6 +87,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     blocked = Column(Boolean, default=False)
     left_bot = Column(Boolean, default=False)
+    referrer_id = Column(BigInteger, nullable=True)
 
     subscription = relationship(
         'Subscription',
@@ -344,6 +347,7 @@ def _ensure_options():
         "feat_settings": "1",
         "feat_reminders": "1",
         "feat_goals": "1",
+        "feat_referral": "1",
         "trial_pro_enabled": "0",
         "trial_pro_days": "0",
         "trial_light_enabled": "0",

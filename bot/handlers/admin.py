@@ -28,6 +28,7 @@ from ..texts import (
     BTN_FEATURES,
     BTN_METHODS,
     BTN_GRADES,
+    BTN_REFERRAL,
     BTN_BANK_CARD,
     BTN_TELEGRAM_STARS,
     BTN_CRYPTO,
@@ -77,6 +78,8 @@ from ..texts import (
     ADMIN_DISCOUNT_PROMPT,
     ADMIN_DISCOUNT_DONE,
     ADMIN_STATS,
+    ADMIN_REFERRAL_TITLE,
+    ADMIN_REFERRAL_EMPTY,
     DISCOUNT_MESSAGE,
     format_date_ru,
 )
@@ -134,6 +137,7 @@ def admin_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_FEATURES, callback_data="admin:features")
     builder.button(text=BTN_TRIAL, callback_data="admin:trial")
     builder.button(text=BTN_GRADE, callback_data="admin:grade")
+    builder.button(text=BTN_REFERRAL, callback_data="admin:referral")
     builder.button(text=BTN_BLOCK, callback_data="admin:block")
     builder.button(text=BTN_BLOCKED_USERS, callback_data="admin:blocked")
     builder.button(text=BTN_USER, callback_data="admin:user")
@@ -156,6 +160,59 @@ def admin_back_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_BACK, callback_data="admin:menu")
     builder.adjust(1)
     return builder.as_markup()
+
+
+async def admin_referral_list(query: types.CallbackQuery, page: Optional[int] = None):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    session = SessionLocal()
+    results = (
+        session.query(User.referrer_id, func.count(User.id))
+        .filter(User.referrer_id.isnot(None))
+        .group_by(User.referrer_id)
+        .order_by(func.count(User.id).desc())
+        .all()
+    )
+    per_page = 6
+    total = len(results)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    if page is None:
+        parts = query.data.split(":")
+        try:
+            page = int(parts[2])
+        except (IndexError, ValueError):
+            page = 0
+    if page >= total_pages:
+        page = total_pages - 1
+    start = page * per_page
+    chunk = results[start : start + per_page]
+    lines = [f"{tg_id} — ({cnt})" for tg_id, cnt in chunk]
+    text = (
+        "\n".join(lines) if lines else ADMIN_REFERRAL_EMPTY
+    )
+    text = f"{ADMIN_REFERRAL_TITLE}\n{text}" if lines else ADMIN_REFERRAL_EMPTY
+    builder = InlineKeyboardBuilder()
+    nav = []
+    if total_pages > 1:
+        if page > 0:
+            nav.append(
+                types.InlineKeyboardButton(
+                    text=BTN_PREV, callback_data=f"admin:referral:{page-1}"
+                )
+            )
+        if page < total_pages - 1:
+            nav.append(
+                types.InlineKeyboardButton(
+                    text=BTN_NEXT, callback_data=f"admin:referral:{page+1}"
+                )
+            )
+    if nav:
+        builder.row(*nav)
+    builder.row(types.InlineKeyboardButton(text=BTN_BACK, callback_data="admin:menu"))
+    await query.message.edit_text(text, reply_markup=builder.as_markup())
+    session.close()
+    await query.answer()
 
 
 def days_menu_kb() -> types.InlineKeyboardMarkup:
@@ -1082,9 +1139,13 @@ def features_menu_kb() -> types.InlineKeyboardMarkup:
     builder.button(text=BTN_METHODS, callback_data="admin:methods")
     builder.button(text=BTN_GRADES, callback_data="admin:grades")
     manual = "🟢" if get_option_bool("feat_manual") else "🔴"
+    referral = "🟢" if get_option_bool("feat_referral") else "🔴"
     builder.button(text=BTN_SETTINGS, callback_data="admin:settings")
     builder.button(
         text=f"{BTN_MANUAL} {manual}", callback_data="admin:toggle:feat_manual"
+    )
+    builder.button(
+        text=f"{BTN_REFERRAL} {referral}", callback_data="admin:toggle:feat_referral"
     )
     builder.button(text=BTN_BACK, callback_data="admin:menu")
     builder.adjust(1)
@@ -1233,6 +1294,7 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_unblock_prompt, F.data.startswith("admin:unblock:"))
     dp.callback_query.register(admin_unblock, F.data.startswith("admin:unblock_yes:"))
     dp.callback_query.register(admin_stats, F.data == "admin:stats")
+    dp.callback_query.register(admin_referral_list, F.data.startswith("admin:referral"))
     dp.callback_query.register(admin_menu, F.data == "admin:menu")
     dp.message.register(process_broadcast, AdminState.waiting_broadcast, F.text)
     dp.message.register(process_broadcast_support, AdminState.waiting_broadcast_support, F.text)
