@@ -55,16 +55,20 @@ async def cmd_start(message: types.Message):
 
     trial = None
     referral_msg = None
-    if (
-        new_user
-        and referrer_id
-        and referrer_id != message.from_user.id
-        and get_option_bool("feat_referral")
-    ):
-        user.referrer_id = referrer_id
-        user.trial_used = True
-        start_trial(session, user, 5, "light")
-        referral_msg = REFERRAL_WELCOME
+    if new_user and referrer_id:
+        if (
+            referrer_id != message.from_user.id
+            and get_option_bool("feat_referral")
+        ):
+            user.referrer_id = referrer_id
+            user.trial_used = True
+            start_trial(session, user, 5, "light")
+            referral_msg = REFERRAL_WELCOME
+        elif referrer_id == message.from_user.id:
+            # self-referral: ignore without granting start trials
+            pass
+        else:
+            trial = check_start_trial(session, user)
     else:
         trial = check_start_trial(session, user)
     if user.blocked:
