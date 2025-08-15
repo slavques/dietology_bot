@@ -1,4 +1,5 @@
 from aiogram import types, Dispatcher, F
+from sqlalchemy import func
 
 from ..texts import (
     REFERRAL_INTRO,
@@ -7,7 +8,7 @@ from ..texts import (
     REFERRAL_FRIEND_PAID,
 )
 from ..keyboards import referral_inline_kb
-from ..database import get_option_bool, SessionLocal
+from ..database import get_option_bool, SessionLocal, User, Payment
 from ..subscriptions import ensure_user, add_subscription_days, start_trial
 
 
@@ -17,6 +18,24 @@ def _grant_days(session: SessionLocal, user, days: int) -> None:
         add_subscription_days(session, user, days)
     else:
         start_trial(session, user, days, "light")
+
+
+def get_referral_stats(session: SessionLocal, referrer_tg: int) -> tuple[int, int]:
+    """Return total invited friends and bonus days earned."""
+    invites = session.query(User).filter_by(referrer_id=referrer_tg).all()
+    total = len(invites)
+    if not total:
+        return 0, 0
+    activated = sum(1 for u in invites if u.requests_total >= 1)
+    paid = (
+        session.query(func.count(func.distinct(Payment.user_id)))
+        .join(User, Payment.user_id == User.id)
+        .filter(User.referrer_id == referrer_tg)
+        .scalar()
+        or 0
+    )
+    days = activated * 5 + paid * 30
+    return total, days
 
 
 async def reward_first_analysis(bot, session: SessionLocal, user) -> None:
@@ -61,9 +80,9 @@ async def cb_referral(query: types.CallbackQuery):
 
 async def cb_referral_stats(query: types.CallbackQuery):
     link = await _referral_link(query.bot, query.from_user.id)
-    # placeholders for future implementation
-    count = 0
-    days = 0
+    session = SessionLocal()
+    count, days = get_referral_stats(session, query.from_user.id)
+    session.close()
     text = REFERRAL_STATS.format(count=count, days=days)
     await query.message.edit_text(text, parse_mode="HTML")
     await query.message.edit_reply_markup(reply_markup=referral_inline_kb(link))
