@@ -13,6 +13,7 @@ from ..keyboards import (
     payment_method_inline,
     subscription_plans_inline_kb,
     subscription_grades_inline_kb,
+    tariffs_menu_inline_kb,
 )
 from ..config import YOOKASSA_TOKEN
 from aiogram.types import LabeledPrice
@@ -24,6 +25,7 @@ from ..texts import (
     SUB_SUCCESS,
     SUB_CANCELLED,
     BTN_SUBSCRIPTION,
+    BTN_TARIFFS,
     PLAN_TITLE_1M,
     PLAN_TITLE_3M,
     PLAN_TITLE_6M,
@@ -31,6 +33,7 @@ from ..texts import (
     BTN_LIGHT_MODE,
     INVOICE_LABEL,
     INVOICE_TITLE,
+    RATES_MENU_TEXT,
 )
 from ..logger import log
 
@@ -52,6 +55,16 @@ def build_intro_text(user) -> str:
     if get_option_bool("grade_pro"):
         lines.append("<b>⚡ Pro-режим</b>\nУлучшенная модель, высокая точность, \nумный расчёт")
     return "\n".join(lines)
+
+
+async def show_rates_menu(message: types.Message):
+    await message.answer(RATES_MENU_TEXT, reply_markup=tariffs_menu_inline_kb(), parse_mode="HTML")
+
+
+async def cb_rates_menu(query: types.CallbackQuery):
+    await query.message.edit_text(RATES_MENU_TEXT, parse_mode="HTML")
+    await query.message.edit_reply_markup(reply_markup=tariffs_menu_inline_kb())
+    await query.answer()
 
 
 async def cb_pay(query: types.CallbackQuery):
@@ -231,7 +244,9 @@ async def handle_successful_payment(message: types.Message):
 
 
 def register(dp: Dispatcher):
-    dp.message.register(show_subscription_menu, F.text == BTN_SUBSCRIPTION)
+    dp.message.register(show_rates_menu, F.text == BTN_SUBSCRIPTION)
+    dp.callback_query.register(cb_rates_menu, F.data == "tariffs_menu")
+    dp.message.register(show_subscription_menu, F.text == BTN_TARIFFS)
     dp.callback_query.register(cb_subscribe, F.data == "subscribe")
     dp.callback_query.register(cb_grade, F.data.startswith("grade:"))
     dp.callback_query.register(cb_plan, F.data.startswith("plan:"))
