@@ -22,6 +22,7 @@ from .texts import (
     BTN_MY_MEALS,
     BTN_STATS,
     BTN_SUBSCRIPTION,
+    BTN_TARIFFS,
     BTN_FAQ,
     BTN_MAIN_MENU,
     BTN_LEFT_HISTORY,
@@ -266,9 +267,7 @@ def menu_inline_kb() -> InlineKeyboardMarkup:
     if get_option_bool("feat_manual"):
         builder.button(text=BTN_MANUAL, callback_data="manual")
     builder.button(text=BTN_STATS, callback_data="stats_menu")
-    builder.button(text=BTN_SUBSCRIPTION, callback_data="subscribe")
-    if get_option_bool("feat_referral"):
-        builder.button(text=BTN_BONUSES, callback_data="referral")
+    builder.button(text=BTN_SUBSCRIPTION, callback_data="tariffs_menu")
     if get_option_bool("feat_settings"):
         builder.button(text=BTN_SETTINGS, callback_data="settings")
     builder.adjust(1)
@@ -287,9 +286,25 @@ def referral_inline_kb(link: str) -> InlineKeyboardMarkup:
 
 
 def stats_menu_inline_kb() -> InlineKeyboardMarkup:
+    from .database import get_option_bool
+
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_REPORT_DAY, callback_data="report_day")
     builder.button(text=BTN_MY_MEALS, callback_data="my_meals")
+    if get_option_bool("feat_goals"):
+        builder.button(text=BTN_GOALS, callback_data="goals")
+    builder.button(text=BTN_BACK, callback_data="menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def tariffs_menu_inline_kb() -> InlineKeyboardMarkup:
+    from .database import get_option_bool
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_TARIFFS, callback_data="subscribe")
+    if get_option_bool("feat_referral"):
+        builder.button(text=BTN_BONUSES, callback_data="referral")
     builder.button(text=BTN_BACK, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -355,8 +370,6 @@ def settings_menu_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if get_option_bool("feat_reminders"):
         builder.button(text=BTN_REMINDERS, callback_data="reminders")
-    if get_option_bool("feat_goals"):
-        builder.button(text=BTN_GOALS, callback_data="goals")
     builder.button(text=BTN_BACK, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()
