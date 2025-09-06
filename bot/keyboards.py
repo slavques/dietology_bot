@@ -75,7 +75,6 @@ from .texts import (
     BTN_GAIN_PROTEIN_CARB,
     BTN_GOAL_SAVE,
     BTN_GOAL_RESTART,
-    BTN_MY_GOAL,
     BTN_TRENDS,
     BTN_GOAL_REMINDERS,
     BTN_WEIGHT,
@@ -524,7 +523,6 @@ def goal_confirm_kb() -> InlineKeyboardMarkup:
 
 def goals_main_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_MY_GOAL, callback_data="goal_edit_menu")
     builder.button(text=BTN_TRENDS, callback_data="goal_trends:7")
     builder.button(text=BTN_GOAL_REMINDERS, callback_data="goal_reminders")
     builder.button(text=BTN_GOAL_STOP, callback_data="goal_stop")
@@ -586,6 +584,5 @@ def goal_stop_confirm_kb() -> InlineKeyboardMarkup:
 def goal_progress_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_TRENDS, callback_data="goal_trends:7")
-    builder.button(text=BTN_MY_GOAL, callback_data="goals_main")
-    builder.adjust(2)
+    builder.adjust(1)
     return builder.as_markup()

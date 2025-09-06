@@ -518,11 +518,6 @@ async def goal_restart(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
 
 
-async def goal_edit_menu(query: types.CallbackQuery):
-    await query.message.edit_text(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
-    await query.answer()
-
-
 async def goal_edit_param(query: types.CallbackQuery, state: FSMContext):
     param = query.data.split(":")[1]
     await state.update_data(editing=True, msg_id=query.message.message_id)
@@ -673,7 +668,6 @@ def register(dp: Dispatcher):
     dp.callback_query.register(goal_back, F.data.startswith("goal_back:"))
     dp.callback_query.register(goal_confirm_save, F.data == "goal_save")
     dp.callback_query.register(goal_restart, F.data == "goal_restart")
-    dp.callback_query.register(goal_edit_menu, F.data == "goal_edit_menu")
     dp.callback_query.register(goal_edit_param, F.data.startswith("goal_edit:"))
     dp.callback_query.register(goal_recalc, F.data == "goal_recalc")
     dp.callback_query.register(goal_trends, F.data.startswith("goal_trends:"))

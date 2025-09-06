@@ -164,7 +164,6 @@ BTN_GAIN_BALANCED = "⚖️ Сбалансированное"
 BTN_GAIN_PROTEIN_CARB = "🥩 Белково-углеводное"
 BTN_GOAL_SAVE = "✅ Сохранить"
 BTN_GOAL_RESTART = "✏️Начать сначала"
-BTN_MY_GOAL = "📝 Моя цель"
 BTN_TRENDS = "📈 Тенденции"
 BTN_GOAL_REMINDERS = "⏰ Напоминания"
 BTN_WEIGHT = "⚖️ Вес"
@@ -299,7 +298,7 @@ GOAL_REMIND_FIRST_EVENING = (
     "🌙 Первый день подходит к концу.\nТвоя цель была: {kcal} ккал\nБ: {p} г • Ж: {f} г • У: {c} г\nДаже если не всё отметил — это начало. Завтра продолжим 👣"
 )
 
-GOAL_REMIND_KB = "📈 Тенденции | 🎯 Моя цель | ⚙️ Напоминания"
+GOAL_REMIND_KB = "📈 Тенденции | ⚙️ Напоминания"
 
 DEV_FEATURE = "🤖 Функционал в разработке"
 FEATURE_DISABLED = "🤖 Функционал временно недоступен"
