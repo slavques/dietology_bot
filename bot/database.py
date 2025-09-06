@@ -124,6 +124,14 @@ class User(Base):
         passive_deletes=True,
     )
 
+    goal = relationship(
+        'Goal',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+
     # convenience proxies for old attribute names
     def _sub(self):
         if not self.subscription:
@@ -257,6 +265,26 @@ class ReminderSettings(Base):
     user = relationship('User', back_populates='reminders')
 
 
+class Goal(Base):
+    __tablename__ = 'goals'
+
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    gender = Column(String, nullable=True)
+    age = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
+    weight = Column(Float, nullable=True)
+    activity = Column(String, nullable=True)
+    target = Column(String, nullable=True)
+    calories = Column(Integer, nullable=True)
+    protein = Column(Integer, nullable=True)
+    fat = Column(Integer, nullable=True)
+    carbs = Column(Integer, nullable=True)
+    reminder_morning = Column(Boolean, default=False)
+    reminder_evening = Column(Boolean, default=False)
+
+    user = relationship('User', back_populates='goal')
+
+
 class Meal(Base):
     __tablename__ = 'meals'
     id = Column(Integer, primary_key=True)
@@ -370,6 +398,7 @@ def _ensure_cascades():
         "subscriptions": "subscriptions_user_id_fkey",
         "notification_status": "notification_status_user_id_fkey",
         "reminders": "reminders_user_id_fkey",
+        "goals": "goals_user_id_fkey",
         "engagement_status": "engagement_status_user_id_fkey",
         "meals": "meals_user_id_fkey",
         "payments": "payments_user_id_fkey",
