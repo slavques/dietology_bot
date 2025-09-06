@@ -73,6 +73,13 @@ def _ensure_columns():
         if "discount_expires" not in existing:
             conn.execute(text("ALTER TABLE engagement_status ADD COLUMN discount_expires TIMESTAMP"))
 
+    existing = _column_names("goals")
+    with engine.begin() as conn:
+        if "body_fat" not in existing:
+            conn.execute(text("ALTER TABLE goals ADD COLUMN body_fat FLOAT"))
+        if "plan" not in existing:
+            conn.execute(text("ALTER TABLE goals ADD COLUMN plan TEXT"))
+
 
 def _drop_request_logs():
     """Remove legacy request_logs table if it still exists."""
@@ -273,8 +280,10 @@ class Goal(Base):
     age = Column(Integer, nullable=True)
     height = Column(Integer, nullable=True)
     weight = Column(Float, nullable=True)
+    body_fat = Column(Float, nullable=True)
     activity = Column(String, nullable=True)
     target = Column(String, nullable=True)
+    plan = Column(String, nullable=True)
     calories = Column(Integer, nullable=True)
     protein = Column(Integer, nullable=True)
     fat = Column(Integer, nullable=True)

@@ -9,8 +9,10 @@ from ..keyboards import (
     goal_start_kb,
     goal_gender_kb,
     goal_back_kb,
+    goal_body_fat_kb,
     goal_activity_kb,
     goal_target_kb,
+    goal_plan_kb,
     goal_confirm_kb,
     goals_main_kb,
     goal_edit_kb,
@@ -26,8 +28,11 @@ from ..texts import (
     GOAL_ENTER_AGE,
     GOAL_ENTER_HEIGHT,
     GOAL_ENTER_WEIGHT,
+    GOAL_CHOOSE_BODY_FAT,
     GOAL_CHOOSE_ACTIVITY,
     GOAL_CHOOSE_TARGET,
+    GOAL_CHOOSE_LOSS_PLAN,
+    GOAL_CHOOSE_GAIN_PLAN,
     GOAL_CALC_PROGRESS,
     GOAL_RESULT,
     GOAL_CURRENT,
@@ -48,23 +53,49 @@ def calculate_goal(data: dict) -> tuple[int, int, int, int]:
     age = int(data.get("age", 0))
     height = int(data.get("height", 0))
     weight = float(data.get("weight", 0))
-    activity = data.get("activity", "low")
+    body_fat = data.get("body_fat")
+    activity = data.get("activity", "sedentary")
     target = data.get("target", "maintain")
+    plan = data.get("plan")
 
-    if gender == "male":
-        bmr = 10 * weight + 6.25 * height - 5 * age + 5
+    if body_fat is not None:
+        lbm = weight * (1 - float(body_fat) / 100)
+        bmr = 370 + 21.6 * lbm
     else:
-        bmr = 10 * weight + 6.25 * height - 5 * age - 161
-    factors = {"low": 1.2, "med": 1.55, "high": 1.725}
-    calories = bmr * factors.get(activity, 1.2)
+        if gender == "male":
+            bmr = 10 * weight + 6.25 * height - 5 * age + 5
+        else:
+            bmr = 10 * weight + 6.25 * height - 5 * age - 161
+    factors = {
+        "sedentary": 1.2,
+        "low": 1.375,
+        "med": 1.55,
+        "high": 1.725,
+        "very_high": 1.9,
+    }
+    maintenance = bmr * factors.get(activity, 1.2)
+    calories = maintenance
+    ratios = (0.3, 0.3, 0.4)
     if target == "loss":
-        calories -= 500
+        if plan == "fast":
+            calories = maintenance * 0.8
+        elif plan == "protein":
+            calories = maintenance * 0.85
+            ratios = (0.4, 0.3, 0.3)
+        else:
+            calories = maintenance * 0.85
     elif target == "gain":
-        calories += 500
+        if plan == "fast":
+            calories = maintenance * 1.2
+        elif plan == "protein_carb":
+            calories = maintenance * 1.15
+            ratios = (0.3, 0.2, 0.5)
+        else:
+            calories = maintenance * 1.15
     calories = int(calories)
-    protein = int(calories * 0.3 / 4)
-    fat = int(calories * 0.3 / 9)
-    carbs = int(calories * 0.4 / 4)
+    protein = int(calories * ratios[0] / 4)
+    fat = int(calories * ratios[1] / 9)
+    carbs = int(calories * ratios[2] / 4)
     return calories, protein, fat, carbs
 
 
@@ -202,14 +233,37 @@ async def process_weight(message: types.Message, state: FSMContext):
     else:
         if msg_id:
             await message.bot.edit_message_text(
-                GOAL_CHOOSE_ACTIVITY,
+                GOAL_CHOOSE_BODY_FAT,
                 chat_id=message.chat.id,
                 message_id=msg_id,
-                reply_markup=goal_activity_kb(),
+                reply_markup=goal_body_fat_kb(),
             )
         else:
-            await message.answer(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
+            await message.answer(GOAL_CHOOSE_BODY_FAT, reply_markup=goal_body_fat_kb())
+        await state.set_state(GoalState.body_fat)
+
+
+async def goal_set_body_fat(query: types.CallbackQuery, state: FSMContext):
+    value = query.data.split(":")[1]
+    if value != "unknown":
+        await state.update_data(body_fat=int(value))
+    else:
+        await state.update_data(body_fat=None)
+    data = await state.get_data()
+    if data.get("editing"):
+        session = SessionLocal()
+        user = ensure_user(session, query.from_user.id)
+        goal = user.goal or Goal()
+        user.goal = goal
+        goal.body_fat = int(value) if value != "unknown" else None
+        session.commit()
+        session.close()
+        await state.clear()
+        await query.message.edit_text(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
+    else:
+        await query.message.edit_text(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
         await state.set_state(GoalState.activity)
+    await query.answer()
 
 
 async def goal_set_activity(query: types.CallbackQuery, state: FSMContext):
@@ -237,18 +291,73 @@ async def goal_set_target(query: types.CallbackQuery, state: FSMContext):
     await state.update_data(target=value)
     data = await state.get_data()
     if data.get("editing"):
+        if value == "maintain":
+            session = SessionLocal()
+            user = ensure_user(session, query.from_user.id)
+            goal = user.goal or Goal()
+            user.goal = goal
+            goal.target = value
+            goal.plan = None
+            calc = {
+                "gender": goal.gender,
+                "age": goal.age,
+                "height": goal.height,
+                "weight": goal.weight,
+                "body_fat": goal.body_fat,
+                "activity": goal.activity,
+                "target": goal.target,
+                "plan": goal.plan,
+            }
+            cal, p, f, c = calculate_goal(calc)
+            goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
+            session.commit()
+            session.close()
+            await state.clear()
+            await query.message.edit_text(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
+        else:
+            await state.update_data(editing=True)
+            if value == "loss":
+                await query.message.edit_text(GOAL_CHOOSE_LOSS_PLAN, reply_markup=goal_plan_kb("loss"))
+            else:
+                await query.message.edit_text(GOAL_CHOOSE_GAIN_PLAN, reply_markup=goal_plan_kb("gain"))
+            await state.set_state(GoalState.plan)
+    else:
+        if value == "maintain":
+            cal, p, f, c = calculate_goal(data)
+            await state.update_data(calories=cal, protein=p, fat=f, carbs=c)
+            await query.message.edit_text(GOAL_CALC_PROGRESS)
+            await query.message.edit_text(
+                GOAL_RESULT.format(calories=cal, protein=p, fat=f, carbs=c),
+                reply_markup=goal_confirm_kb(),
+            )
+        else:
+            if value == "loss":
+                await query.message.edit_text(GOAL_CHOOSE_LOSS_PLAN, reply_markup=goal_plan_kb("loss"))
+            else:
+                await query.message.edit_text(GOAL_CHOOSE_GAIN_PLAN, reply_markup=goal_plan_kb("gain"))
+            await state.set_state(GoalState.plan)
+    await query.answer()
+
+
+async def goal_set_plan(query: types.CallbackQuery, state: FSMContext):
+    value = query.data.split(":")[1]
+    await state.update_data(plan=value)
+    data = await state.get_data()
+    if data.get("editing"):
         session = SessionLocal()
         user = ensure_user(session, query.from_user.id)
         goal = user.goal or Goal()
         user.goal = goal
-        goal.target = value
+        goal.plan = value
         calc = {
             "gender": goal.gender,
             "age": goal.age,
             "height": goal.height,
             "weight": goal.weight,
+            "body_fat": goal.body_fat,
             "activity": goal.activity,
             "target": goal.target,
+            "plan": goal.plan,
         }
         cal, p, f, c = calculate_goal(calc)
         goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
@@ -283,10 +392,18 @@ async def goal_back(query: types.CallbackQuery, state: FSMContext):
         await query.message.edit_text(GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height"))
         await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.weight)
+    elif step == "body_fat":
+        await query.message.edit_text(GOAL_CHOOSE_BODY_FAT, reply_markup=goal_body_fat_kb())
+        await state.update_data(msg_id=query.message.message_id)
+        await state.set_state(GoalState.body_fat)
     elif step == "activity":
         await query.message.edit_text(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
         await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.activity)
+    elif step == "target":
+        await query.message.edit_text(GOAL_CHOOSE_TARGET, reply_markup=goal_target_kb())
+        await state.update_data(msg_id=query.message.message_id)
+        await state.set_state(GoalState.target)
     elif step == "edit":
         await state.clear()
         await query.message.edit_text(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
@@ -305,8 +422,10 @@ async def goal_confirm_save(query: types.CallbackQuery, state: FSMContext):
     goal.age = data.get("age")
     goal.height = data.get("height")
     goal.weight = data.get("weight")
+    goal.body_fat = data.get("body_fat")
     goal.activity = data.get("activity")
     goal.target = data.get("target")
+    goal.plan = data.get("plan")
     goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
     if is_new:
         goal.reminder_morning = True
@@ -363,8 +482,10 @@ async def goal_recalc(query: types.CallbackQuery):
             "age": goal.age,
             "height": goal.height,
             "weight": goal.weight,
+            "body_fat": goal.body_fat,
             "activity": goal.activity,
             "target": goal.target,
+            "plan": goal.plan,
         }
         cal, p, f, c = calculate_goal(data)
         goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
@@ -470,8 +591,10 @@ def register(dp: Dispatcher):
     dp.message.register(process_age, StateFilter(GoalState.age))
     dp.message.register(process_height, StateFilter(GoalState.height))
     dp.message.register(process_weight, StateFilter(GoalState.weight))
+    dp.callback_query.register(goal_set_body_fat, F.data.startswith("goal_bodyfat:"))
     dp.callback_query.register(goal_set_activity, F.data.startswith("goal_activity:"))
     dp.callback_query.register(goal_set_target, F.data.startswith("goal_target:"))
+    dp.callback_query.register(goal_set_plan, F.data.startswith("goal_plan:"))
     dp.callback_query.register(goal_back, F.data.startswith("goal_back:"))
     dp.callback_query.register(goal_confirm_save, F.data == "goal_save")
     dp.callback_query.register(goal_restart, F.data == "goal_restart")

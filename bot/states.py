@@ -48,7 +48,9 @@ class GoalState(StatesGroup):
     age = State()
     height = State()
     weight = State()
+    body_fat = State()
     activity = State()
     target = State()
+    plan = State()
 
 
