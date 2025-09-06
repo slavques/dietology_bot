@@ -222,7 +222,9 @@ async def process_manual(message: types.Message, state: FSMContext):
             await state.set_state(EditMeal.waiting_input)
             continue
         msg = await message.answer(
-            format_meal_message(name, serving, macros),
+            format_meal_message(
+                name, serving, macros, user_id=message.from_user.id
+            ),
             reply_markup=meal_actions_kb(meal_id),
         )
         pending_meals[meal_id]["message_id"] = msg.message_id

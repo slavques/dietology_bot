@@ -1,9 +1,8 @@
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
-from aiogram.exceptions import TelegramBadRequest
 
-from ..database import SessionLocal, Goal, get_option_bool
+from ..database import SessionLocal, Goal, Meal, get_option_bool
 from ..subscriptions import ensure_user
 from ..keyboards import (
     goal_start_kb,
@@ -18,10 +17,13 @@ from ..keyboards import (
     goal_edit_kb,
     goal_trends_kb,
     goal_reminders_kb,
+    goal_reminders_settings_kb,
     goal_stop_confirm_kb,
     main_menu_kb,
+    back_to_goal_reminders_kb,
+    back_to_goal_reminders_settings_kb,
 )
-from ..states import GoalState
+from ..states import GoalState, GoalReminderState
 from ..texts import (
     GOAL_INTRO_TEXT,
     GOAL_CHOOSE_GENDER,
@@ -39,13 +41,20 @@ from ..texts import (
     GOAL_EDIT_PROMPT,
     GOAL_TRENDS,
     GOAL_REMINDERS_TEXT,
+    TZ_PROMPT,
     GOAL_STOP_PROMPT,
     GOAL_STOP_DONE,
     INPUT_NUMBER_PROMPT,
     INPUT_RANGE_ERROR,
     FEATURE_DISABLED,
+    INVALID_TIME,
+    TIME_CURRENT,
+    SET_TIME_PROMPT,
+    BTN_MORNING,
+    BTN_EVENING,
 )
 from datetime import datetime, timedelta
+from sqlalchemy import func
 
 
 def calculate_goal(data: dict) -> tuple[int, int, int, int]:
@@ -110,6 +119,77 @@ def goal_summary_text(goal: Goal) -> str:
         p_eaten=p_eaten,
         f_eaten=f_eaten,
         c_eaten=c_eaten,
+    )
+
+
+def goal_progress_text(goal: Goal, totals: dict) -> str:
+    """Return dynamic progress card text after saving a meal."""
+    cal = int(totals.get("calories", 0))
+    p = int(totals.get("protein", 0))
+    f = int(totals.get("fat", 0))
+    c = int(totals.get("carbs", 0))
+    remain = (goal.calories or 0) - cal
+    lines = [
+        "📊 Текущий прогресс",
+        f"Ккал: {cal} / {goal.calories or 0} (осталось {remain})",
+    ]
+    pct = lambda val, goal_val: int(val / goal_val * 100) if goal_val else 0
+    lines.append(
+        f"Б: {pct(p, goal.protein)}% • Ж: {pct(f, goal.fat)}% • У: {pct(c, goal.carbs)}%"
+    )
+    if goal.calories:
+        ratio = cal / goal.calories
+        if ratio > 1.10:
+            lines.append(f"Превышение на {cal - goal.calories} ккал")
+        elif ratio < 0.90:
+            lines.append(
+                "До цели {dc} ккал и {dp} б, {df} ж, {du} у".format(
+                    dc=goal.calories - cal,
+                    dp=max(0, goal.protein - p),
+                    df=max(0, goal.fat - f),
+                    du=max(0, goal.carbs - c),
+                )
+            )
+    return "\n".join(lines)
+
+
+def goal_trends_report(user, days: int, session) -> str:
+    """Return trend statistics for the given user over ``days`` days."""
+    goal = getattr(user, "goal", None)
+    if not goal:
+        return GOAL_TRENDS.format(
+            days=days, balance=0, p=0, p_goal=0, f=0, f_goal=0, c=0, c_goal=0
+        )
+    start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    start -= timedelta(days=days - 1)
+    end = start + timedelta(days=days)
+    totals = session.query(
+        func.coalesce(func.sum(Meal.calories), 0),
+        func.coalesce(func.sum(Meal.protein), 0),
+        func.coalesce(func.sum(Meal.fat), 0),
+        func.coalesce(func.sum(Meal.carbs), 0),
+        func.count(func.distinct(func.date(Meal.timestamp))),
+    ).filter(
+        Meal.user_id == user.id,
+        Meal.timestamp >= start,
+        Meal.timestamp < end,
+    ).one()
+    total_cal, total_p, total_f, total_c, day_count = totals
+    denom = day_count or 1
+    avg_cal = total_cal / denom
+    avg_p = total_p / denom
+    avg_f = total_f / denom
+    avg_c = total_c / denom
+    balance = int(round(avg_cal - (goal.calories or 0)))
+    return GOAL_TRENDS.format(
+        days=days,
+        balance=balance,
+        p=int(avg_p),
+        p_goal=int(goal.protein or 0),
+        f=int(avg_f),
+        f_goal=int(goal.fat or 0),
+        c=int(avg_c),
+        c_goal=int(goal.carbs or 0),
     )
 
 
@@ -446,11 +526,6 @@ async def goal_restart(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
 
 
-async def goal_edit_menu(query: types.CallbackQuery):
-    await query.message.edit_text(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
-    await query.answer()
-
-
 async def goal_edit_param(query: types.CallbackQuery, state: FSMContext):
     param = query.data.split(":")[1]
     await state.update_data(editing=True, msg_id=query.message.message_id)
@@ -499,8 +574,11 @@ async def goal_recalc(query: types.CallbackQuery):
 
 async def goal_trends(query: types.CallbackQuery):
     days = int(query.data.split(":")[1])
-    text = GOAL_TRENDS.format(days=days, balance=0, p=0, p_goal=0, f=0, f_goal=0, c=0, c_goal=0)
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    text = goal_trends_report(user, days, session)
     await query.message.edit_text(text, reply_markup=goal_trends_kb(days))
+    session.close()
     await query.answer()
 
 
@@ -536,19 +614,142 @@ async def goal_toggle(query: types.CallbackQuery):
     await query.answer()
 
 
-async def goal_time(query: types.CallbackQuery):
+async def goal_time(query: types.CallbackQuery, state: FSMContext):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
-    goal = user.goal or Goal()
-    now = datetime.utcnow() + timedelta(minutes=user.timezone or 0)
-    text = GOAL_REMINDERS_TEXT.format(time=now.strftime("%H:%M"))
-    try:
-        await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
-    except TelegramBadRequest:
-        await query.answer("Время обновлено")
-    else:
-        await query.answer()
+    utc = datetime.utcnow().strftime("%H:%M")
+    await query.message.edit_text(
+        TZ_PROMPT.format(utc_time=utc),
+        reply_markup=back_to_goal_reminders_settings_kb(),
+    )
+    await state.update_data(prompt_id=query.message.message_id)
+    await state.set_state(GoalReminderState.waiting_timezone)
+    await query.answer()
     session.close()
+
+
+async def goal_timezone(message: types.Message, state: FSMContext):
+    try:
+        parts = message.text.strip().split(":")
+        hours = int(parts[0])
+        minutes = int(parts[1]) if len(parts) > 1 else 0
+        if not (0 <= hours < 24 and 0 <= minutes < 60):
+            raise ValueError
+    except Exception:
+        await message.answer(INVALID_TIME)
+        return
+    user_time = hours * 60 + minutes
+    utc_now = datetime.utcnow()
+    server_minutes = utc_now.hour * 60 + utc_now.minute
+    diff = user_time - server_minutes
+    if diff <= -720:
+        diff += 1440
+    if diff >= 720:
+        diff -= 1440
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    user.timezone = diff
+    session.commit()
+    data = await state.get_data()
+    prompt_id = data.get("prompt_id")
+    await state.clear()
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    local = (
+        datetime.utcnow() + timedelta(minutes=user.timezone or 0)
+    ).strftime("%H:%M")
+    text = TIME_CURRENT.format(local_time=local)
+    if prompt_id:
+        await message.bot.edit_message_text(
+            text,
+            chat_id=message.chat.id,
+            message_id=prompt_id,
+            reply_markup=goal_reminders_settings_kb(user),
+        )
+    else:
+        await message.answer(text, reply_markup=goal_reminders_settings_kb(user))
+    session.close()
+
+
+async def goal_reminder_settings(query: types.CallbackQuery):
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    local = (datetime.utcnow() + timedelta(minutes=user.timezone or 0)).strftime("%H:%M")
+    await query.message.edit_text(
+        TIME_CURRENT.format(local_time=local),
+        reply_markup=goal_reminders_settings_kb(user),
+    )
+    session.close()
+    await query.answer()
+
+
+async def goal_set_time_prompt(
+    query: types.CallbackQuery, state: FSMContext, field: str, name: str
+):
+    await query.message.edit_text(SET_TIME_PROMPT.format(name=name))
+    await query.message.edit_reply_markup(
+        reply_markup=back_to_goal_reminders_settings_kb()
+    )
+    await state.update_data(prompt_id=query.message.message_id)
+    await state.set_state(getattr(GoalReminderState, field))
+    await query.answer()
+
+
+async def goal_set_morning_prompt(query: types.CallbackQuery, state: FSMContext):
+    await goal_set_time_prompt(query, state, "set_morning", BTN_MORNING)
+
+
+async def goal_set_evening_prompt(query: types.CallbackQuery, state: FSMContext):
+    await goal_set_time_prompt(query, state, "set_evening", BTN_EVENING)
+
+
+async def goal_process_time(
+    message: types.Message, state: FSMContext, attr: str
+):
+    try:
+        parts = message.text.strip().split(":")
+        hours = int(parts[0])
+        minutes = int(parts[1]) if len(parts) > 1 else 0
+        if not (0 <= hours < 24 and 0 <= minutes < 60):
+            raise ValueError
+    except Exception:
+        await message.answer(INVALID_TIME)
+        return
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    setattr(user, attr, f"{hours:02d}:{minutes:02d}")
+    session.commit()
+    data = await state.get_data()
+    prompt_id = data.get("prompt_id")
+    await state.clear()
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    local = (
+        datetime.utcnow() + timedelta(minutes=user.timezone or 0)
+    ).strftime("%H:%M")
+    text = TIME_CURRENT.format(local_time=local)
+    if prompt_id:
+        await message.bot.edit_message_text(
+            text,
+            chat_id=message.chat.id,
+            message_id=prompt_id,
+            reply_markup=goal_reminders_settings_kb(user),
+        )
+    else:
+        await message.answer(text, reply_markup=goal_reminders_settings_kb(user))
+    session.close()
+
+
+async def goal_process_morning_time(message: types.Message, state: FSMContext):
+    await goal_process_time(message, state, "morning_time")
+
+
+async def goal_process_evening_time(message: types.Message, state: FSMContext):
+    await goal_process_time(message, state, "evening_time")
 
 
 async def goal_stop(query: types.CallbackQuery):
@@ -598,13 +799,25 @@ def register(dp: Dispatcher):
     dp.callback_query.register(goal_back, F.data.startswith("goal_back:"))
     dp.callback_query.register(goal_confirm_save, F.data == "goal_save")
     dp.callback_query.register(goal_restart, F.data == "goal_restart")
-    dp.callback_query.register(goal_edit_menu, F.data == "goal_edit_menu")
     dp.callback_query.register(goal_edit_param, F.data.startswith("goal_edit:"))
     dp.callback_query.register(goal_recalc, F.data == "goal_recalc")
     dp.callback_query.register(goal_trends, F.data.startswith("goal_trends:"))
-    dp.callback_query.register(goal_reminders, F.data == "goal_reminders")
+    dp.callback_query.register(
+        goal_reminders, F.data.in_(["goal_reminders", "goal_reminders_back"])
+    )
+    dp.callback_query.register(goal_reminder_settings, F.data == "goal_reminder_settings")
     dp.callback_query.register(goal_toggle, F.data.startswith("goal_toggle:"))
+    dp.callback_query.register(goal_set_morning_prompt, F.data == "goal_set_morning")
+    dp.callback_query.register(goal_set_evening_prompt, F.data == "goal_set_evening")
     dp.callback_query.register(goal_time, F.data == "goal_time")
     dp.callback_query.register(goal_stop, F.data == "goal_stop")
     dp.callback_query.register(goal_stop_confirm, F.data == "goal_stop_confirm")
     dp.callback_query.register(goals_main, F.data == "goals_main")
+
+    dp.message.register(goal_timezone, StateFilter(GoalReminderState.waiting_timezone))
+    dp.message.register(
+        goal_process_morning_time, StateFilter(GoalReminderState.set_morning)
+    )
+    dp.message.register(
+        goal_process_evening_time, StateFilter(GoalReminderState.set_evening)
+    )

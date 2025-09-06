@@ -54,3 +54,11 @@ class GoalState(StatesGroup):
     plan = State()
 
 
+
+class GoalReminderState(StatesGroup):
+    """States for goal reminder configuration."""
+
+    waiting_timezone = State()
+    set_morning = State()
+    set_evening = State()
+
