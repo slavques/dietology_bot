@@ -69,6 +69,8 @@ from .texts import (
     BTN_CHANGE_ACTIVITY,
     BTN_CHANGE_TARGET,
     BTN_RECALC,
+    BTN_GOAL_STOP,
+    BTN_STOP_CONFIRM,
     REFERRAL_SHARE,
 )
 from typing import Optional
@@ -475,6 +477,7 @@ def goals_main_kb() -> InlineKeyboardMarkup:
     builder.button(text=BTN_MY_GOAL, callback_data="goal_edit_menu")
     builder.button(text=BTN_TRENDS, callback_data="goal_trends:7")
     builder.button(text=BTN_GOAL_REMINDERS, callback_data="goal_reminders")
+    builder.button(text=BTN_GOAL_STOP, callback_data="goal_stop")
     builder.button(text=BTN_BACK, callback_data="stats_menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -517,6 +520,14 @@ def goal_reminders_kb(goal) -> InlineKeyboardMarkup:
         callback_data="goal_toggle:evening",
     )
     builder.button(text=BTN_UPDATE_TIME, callback_data="goal_time")
+    builder.button(text=BTN_BACK, callback_data="goals_main")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_stop_confirm_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_STOP_CONFIRM, callback_data="goal_stop_confirm")
     builder.button(text=BTN_BACK, callback_data="goals_main")
     builder.adjust(1)
     return builder.as_markup()

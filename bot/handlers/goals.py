@@ -15,6 +15,8 @@ from ..keyboards import (
     goal_edit_kb,
     goal_trends_kb,
     goal_reminders_kb,
+    goal_stop_confirm_kb,
+    main_menu_kb,
 )
 from ..states import GoalState
 from ..texts import (
@@ -31,6 +33,10 @@ from ..texts import (
     GOAL_EDIT_PROMPT,
     GOAL_TRENDS,
     GOAL_REMINDERS_TEXT,
+    GOAL_STOP_PROMPT,
+    GOAL_STOP_DONE,
+    INPUT_NUMBER_PROMPT,
+    INPUT_RANGE_ERROR,
     FEATURE_DISABLED,
 )
 from datetime import datetime, timedelta
@@ -114,7 +120,10 @@ async def process_age(message: types.Message, state: FSMContext):
     try:
         age = int(message.text)
     except ValueError:
-        await message.answer("Введите число")
+        await message.answer(INPUT_NUMBER_PROMPT)
+        return
+    if not 14 <= age <= 100:
+        await message.answer(INPUT_RANGE_ERROR)
         return
     await state.update_data(age=age)
     await message.answer(GOAL_ENTER_HEIGHT, reply_markup=goal_back_kb("age"))
@@ -125,7 +134,10 @@ async def process_height(message: types.Message, state: FSMContext):
     try:
         height = int(message.text)
     except ValueError:
-        await message.answer("Введите число")
+        await message.answer(INPUT_NUMBER_PROMPT)
+        return
+    if not 120 <= height <= 230:
+        await message.answer(INPUT_RANGE_ERROR)
         return
     await state.update_data(height=height)
     await message.answer(GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height"))
@@ -136,7 +148,10 @@ async def process_weight(message: types.Message, state: FSMContext):
     try:
         weight = float(message.text.replace(",", "."))
     except ValueError:
-        await message.answer("Введите число")
+        await message.answer(INPUT_NUMBER_PROMPT)
+        return
+    if not 35 <= weight <= 300:
+        await message.answer(INPUT_RANGE_ERROR)
         return
     await state.update_data(weight=weight)
     data = await state.get_data()
@@ -359,6 +374,22 @@ async def goal_time(query: types.CallbackQuery):
     await query.answer()
 
 
+async def goal_stop(query: types.CallbackQuery):
+    await query.message.edit_text(GOAL_STOP_PROMPT, reply_markup=goal_stop_confirm_kb())
+    await query.answer()
+
+
+async def goal_stop_confirm(query: types.CallbackQuery):
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    if user.goal:
+        session.delete(user.goal)
+        session.commit()
+    session.close()
+    await query.message.edit_text(GOAL_STOP_DONE, reply_markup=main_menu_kb())
+    await query.answer()
+
+
 async def goals_main(query: types.CallbackQuery):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
@@ -391,4 +422,6 @@ def register(dp: Dispatcher):
     dp.callback_query.register(goal_reminders, F.data == "goal_reminders")
     dp.callback_query.register(goal_toggle, F.data.startswith("goal_toggle:"))
     dp.callback_query.register(goal_time, F.data == "goal_time")
+    dp.callback_query.register(goal_stop, F.data == "goal_stop")
+    dp.callback_query.register(goal_stop_confirm, F.data == "goal_stop_confirm")
     dp.callback_query.register(goals_main, F.data == "goals_main")
