@@ -432,7 +432,11 @@ async def goal_stop_confirm(query: types.CallbackQuery):
         session.delete(user.goal)
         session.commit()
     session.close()
-    await query.message.edit_text(GOAL_STOP_DONE, reply_markup=main_menu_kb())
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    await query.message.answer(GOAL_STOP_DONE, reply_markup=main_menu_kb())
     await query.answer()
 
 
