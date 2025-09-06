@@ -49,6 +49,26 @@ from .texts import (
     BTN_BONUSES,
     BTN_MY_INVITES,
     BTN_SHARE_LINK,
+    BTN_GOAL_START,
+    BTN_GENDER_MALE,
+    BTN_GENDER_FEMALE,
+    BTN_ACTIVITY_LOW,
+    BTN_ACTIVITY_MED,
+    BTN_ACTIVITY_HIGH,
+    BTN_TARGET_LOSS,
+    BTN_TARGET_MAINTAIN,
+    BTN_TARGET_GAIN,
+    BTN_GOAL_SAVE,
+    BTN_GOAL_RESTART,
+    BTN_MY_GOAL,
+    BTN_TRENDS,
+    BTN_GOAL_REMINDERS,
+    BTN_WEIGHT,
+    BTN_HEIGHT,
+    BTN_AGE,
+    BTN_CHANGE_ACTIVITY,
+    BTN_CHANGE_TARGET,
+    BTN_RECALC,
     REFERRAL_SHARE,
 )
 from typing import Optional
@@ -395,5 +415,108 @@ def reminders_settings_kb(user) -> InlineKeyboardMarkup:
     builder.button(text=f"{BTN_EVENING} - {user.evening_time}", callback_data="set_evening")
     builder.button(text=BTN_UPDATE_TIME, callback_data="update_tz")
     builder.button(text=BTN_BACK, callback_data="reminders_back")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_start_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_GOAL_START, callback_data="goal_start")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_gender_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_GENDER_MALE, callback_data="goal_gender:male")
+    builder.button(text=BTN_GENDER_FEMALE, callback_data="goal_gender:female")
+    builder.button(text=BTN_BACK, callback_data="goal_cancel")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+
+def goal_back_kb(step: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data=f"goal_back:{step}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_activity_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_ACTIVITY_LOW, callback_data="goal_activity:low")
+    builder.button(text=BTN_ACTIVITY_MED, callback_data="goal_activity:med")
+    builder.button(text=BTN_ACTIVITY_HIGH, callback_data="goal_activity:high")
+    builder.button(text=BTN_BACK, callback_data="goal_back:weight")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_target_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_TARGET_LOSS, callback_data="goal_target:loss")
+    builder.button(text=BTN_TARGET_MAINTAIN, callback_data="goal_target:maintain")
+    builder.button(text=BTN_TARGET_GAIN, callback_data="goal_target:gain")
+    builder.button(text=BTN_BACK, callback_data="goal_back:activity")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_confirm_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_GOAL_SAVE, callback_data="goal_save")
+    builder.button(text=BTN_GOAL_RESTART, callback_data="goal_restart")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goals_main_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_MY_GOAL, callback_data="goal_edit_menu")
+    builder.button(text=BTN_TRENDS, callback_data="goal_trends:7")
+    builder.button(text=BTN_GOAL_REMINDERS, callback_data="goal_reminders")
+    builder.button(text=BTN_BACK, callback_data="stats_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_edit_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_WEIGHT, callback_data="goal_edit:weight")
+    builder.button(text=BTN_HEIGHT, callback_data="goal_edit:height")
+    builder.button(text=BTN_AGE, callback_data="goal_edit:age")
+    builder.button(text=BTN_CHANGE_ACTIVITY, callback_data="goal_edit:activity")
+    builder.button(text=BTN_CHANGE_TARGET, callback_data="goal_edit:target")
+    builder.button(text=BTN_RECALC, callback_data="goal_recalc")
+    builder.button(text=BTN_BACK, callback_data="goals_main")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_trends_kb(days: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    if days == 7:
+        builder.button(text="30 дней", callback_data="goal_trends:30")
+    else:
+        builder.button(text="7 дней", callback_data="goal_trends:7")
+    builder.button(text=BTN_BACK, callback_data="goals_main")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_reminders_kb(goal) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    on = "🟢"
+    off = "🔴"
+    builder.button(
+        text=f"☀️ Утро {on if goal.reminder_morning else off}",
+        callback_data="goal_toggle:morning",
+    )
+    builder.button(
+        text=f"🌙 Вечер {on if goal.reminder_evening else off}",
+        callback_data="goal_toggle:evening",
+    )
+    builder.button(text=BTN_UPDATE_TIME, callback_data="goal_time")
+    builder.button(text=BTN_BACK, callback_data="goals_main")
     builder.adjust(1)
     return builder.as_markup()

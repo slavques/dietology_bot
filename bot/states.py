@@ -41,3 +41,14 @@ class ReminderState(StatesGroup):
     set_evening = State()
 
 
+class GoalState(StatesGroup):
+    """States for nutrition goal setup and editing."""
+
+    gender = State()
+    age = State()
+    height = State()
+    weight = State()
+    activity = State()
+    target = State()
+
+
