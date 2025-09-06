@@ -68,15 +68,16 @@ def calculate_goal(data: dict) -> tuple[int, int, int, int]:
 
 
 def goal_summary_text(goal: Goal) -> str:
-    eaten = 0
-    remain = (goal.calories or 0) - eaten
+    eaten = p_eaten = f_eaten = c_eaten = 0
     return GOAL_CURRENT.format(
         cal=goal.calories or 0,
         p=goal.protein or 0,
         f=goal.fat or 0,
         c=goal.carbs or 0,
         eaten=eaten,
-        remain=remain,
+        p_eaten=p_eaten,
+        f_eaten=f_eaten,
+        c_eaten=c_eaten,
     )
 
 
