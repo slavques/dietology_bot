@@ -370,6 +370,23 @@ def back_to_goal_reminders_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def goal_reminders_settings_kb(user) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"{BTN_MORNING} - {user.morning_time}", callback_data="goal_set_morning")
+    builder.button(text=f"{BTN_EVENING} - {user.evening_time}", callback_data="goal_set_evening")
+    builder.button(text=BTN_UPDATE_TIME, callback_data="goal_time")
+    builder.button(text=BTN_BACK, callback_data="goal_reminders_back")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def back_to_goal_reminders_settings_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_BACK, callback_data="goal_reminder_settings")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def _strike(text: str) -> str:
     return "".join(ch + "\u0336" for ch in text)
 
@@ -575,7 +592,7 @@ def goal_reminders_kb(goal) -> InlineKeyboardMarkup:
         text=f"🌙 Вечер {on if goal.reminder_evening else off}",
         callback_data="goal_toggle:evening",
     )
-    builder.button(text=BTN_UPDATE_TIME, callback_data="goal_time")
+    builder.button(text=BTN_SETTINGS, callback_data="goal_reminder_settings")
     builder.button(text=BTN_BACK, callback_data="goals_main")
     builder.adjust(1)
     return builder.as_markup()

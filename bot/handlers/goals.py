@@ -17,9 +17,11 @@ from ..keyboards import (
     goal_edit_kb,
     goal_trends_kb,
     goal_reminders_kb,
+    goal_reminders_settings_kb,
     goal_stop_confirm_kb,
     main_menu_kb,
     back_to_goal_reminders_kb,
+    back_to_goal_reminders_settings_kb,
 )
 from ..states import GoalState, GoalReminderState
 from ..texts import (
@@ -46,6 +48,10 @@ from ..texts import (
     INPUT_RANGE_ERROR,
     FEATURE_DISABLED,
     INVALID_TIME,
+    TIME_CURRENT,
+    SET_TIME_PROMPT,
+    BTN_MORNING,
+    BTN_EVENING,
 )
 from datetime import datetime, timedelta
 from sqlalchemy import func
@@ -614,7 +620,7 @@ async def goal_time(query: types.CallbackQuery, state: FSMContext):
     utc = datetime.utcnow().strftime("%H:%M")
     await query.message.edit_text(
         TZ_PROMPT.format(utc_time=utc),
-        reply_markup=back_to_goal_reminders_kb(),
+        reply_markup=back_to_goal_reminders_settings_kb(),
     )
     await state.update_data(prompt_id=query.message.message_id)
     await state.set_state(GoalReminderState.waiting_timezone)
@@ -651,21 +657,99 @@ async def goal_timezone(message: types.Message, state: FSMContext):
         await message.delete()
     except Exception:
         pass
-    goal = user.goal or Goal()
     local = (
         datetime.utcnow() + timedelta(minutes=user.timezone or 0)
     ).strftime("%H:%M")
-    text = GOAL_REMINDERS_TEXT.format(time=local)
+    text = TIME_CURRENT.format(local_time=local)
     if prompt_id:
         await message.bot.edit_message_text(
             text,
             chat_id=message.chat.id,
             message_id=prompt_id,
-            reply_markup=goal_reminders_kb(goal),
+            reply_markup=goal_reminders_settings_kb(user),
         )
     else:
-        await message.answer(text, reply_markup=goal_reminders_kb(goal))
+        await message.answer(text, reply_markup=goal_reminders_settings_kb(user))
     session.close()
+
+
+async def goal_reminder_settings(query: types.CallbackQuery):
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    local = (datetime.utcnow() + timedelta(minutes=user.timezone or 0)).strftime("%H:%M")
+    await query.message.edit_text(
+        TIME_CURRENT.format(local_time=local),
+        reply_markup=goal_reminders_settings_kb(user),
+    )
+    session.close()
+    await query.answer()
+
+
+async def goal_set_time_prompt(
+    query: types.CallbackQuery, state: FSMContext, field: str, name: str
+):
+    await query.message.edit_text(SET_TIME_PROMPT.format(name=name))
+    await query.message.edit_reply_markup(
+        reply_markup=back_to_goal_reminders_settings_kb()
+    )
+    await state.update_data(prompt_id=query.message.message_id)
+    await state.set_state(getattr(GoalReminderState, field))
+    await query.answer()
+
+
+async def goal_set_morning_prompt(query: types.CallbackQuery, state: FSMContext):
+    await goal_set_time_prompt(query, state, "set_morning", BTN_MORNING)
+
+
+async def goal_set_evening_prompt(query: types.CallbackQuery, state: FSMContext):
+    await goal_set_time_prompt(query, state, "set_evening", BTN_EVENING)
+
+
+async def goal_process_time(
+    message: types.Message, state: FSMContext, attr: str
+):
+    try:
+        parts = message.text.strip().split(":")
+        hours = int(parts[0])
+        minutes = int(parts[1]) if len(parts) > 1 else 0
+        if not (0 <= hours < 24 and 0 <= minutes < 60):
+            raise ValueError
+    except Exception:
+        await message.answer(INVALID_TIME)
+        return
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    setattr(user, attr, f"{hours:02d}:{minutes:02d}")
+    session.commit()
+    data = await state.get_data()
+    prompt_id = data.get("prompt_id")
+    await state.clear()
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    local = (
+        datetime.utcnow() + timedelta(minutes=user.timezone or 0)
+    ).strftime("%H:%M")
+    text = TIME_CURRENT.format(local_time=local)
+    if prompt_id:
+        await message.bot.edit_message_text(
+            text,
+            chat_id=message.chat.id,
+            message_id=prompt_id,
+            reply_markup=goal_reminders_settings_kb(user),
+        )
+    else:
+        await message.answer(text, reply_markup=goal_reminders_settings_kb(user))
+    session.close()
+
+
+async def goal_process_morning_time(message: types.Message, state: FSMContext):
+    await goal_process_time(message, state, "morning_time")
+
+
+async def goal_process_evening_time(message: types.Message, state: FSMContext):
+    await goal_process_time(message, state, "evening_time")
 
 
 async def goal_stop(query: types.CallbackQuery):
@@ -718,11 +802,22 @@ def register(dp: Dispatcher):
     dp.callback_query.register(goal_edit_param, F.data.startswith("goal_edit:"))
     dp.callback_query.register(goal_recalc, F.data == "goal_recalc")
     dp.callback_query.register(goal_trends, F.data.startswith("goal_trends:"))
-    dp.callback_query.register(goal_reminders, F.data == "goal_reminders")
+    dp.callback_query.register(
+        goal_reminders, F.data.in_(["goal_reminders", "goal_reminders_back"])
+    )
+    dp.callback_query.register(goal_reminder_settings, F.data == "goal_reminder_settings")
     dp.callback_query.register(goal_toggle, F.data.startswith("goal_toggle:"))
+    dp.callback_query.register(goal_set_morning_prompt, F.data == "goal_set_morning")
+    dp.callback_query.register(goal_set_evening_prompt, F.data == "goal_set_evening")
     dp.callback_query.register(goal_time, F.data == "goal_time")
     dp.callback_query.register(goal_stop, F.data == "goal_stop")
     dp.callback_query.register(goal_stop_confirm, F.data == "goal_stop_confirm")
     dp.callback_query.register(goals_main, F.data == "goals_main")
 
     dp.message.register(goal_timezone, StateFilter(GoalReminderState.waiting_timezone))
+    dp.message.register(
+        goal_process_morning_time, StateFilter(GoalReminderState.set_morning)
+    )
+    dp.message.register(
+        goal_process_evening_time, StateFilter(GoalReminderState.set_evening)
+    )
