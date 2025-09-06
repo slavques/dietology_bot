@@ -1,7 +1,6 @@
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
-from aiogram.exceptions import TelegramBadRequest
 
 from ..database import SessionLocal, Goal, Meal, get_option_bool
 from ..subscriptions import ensure_user
@@ -20,8 +19,9 @@ from ..keyboards import (
     goal_reminders_kb,
     goal_stop_confirm_kb,
     main_menu_kb,
+    back_to_goal_reminders_kb,
 )
-from ..states import GoalState
+from ..states import GoalState, GoalReminderState
 from ..texts import (
     GOAL_INTRO_TEXT,
     GOAL_CHOOSE_GENDER,
@@ -39,11 +39,13 @@ from ..texts import (
     GOAL_EDIT_PROMPT,
     GOAL_TRENDS,
     GOAL_REMINDERS_TEXT,
+    TZ_PROMPT,
     GOAL_STOP_PROMPT,
     GOAL_STOP_DONE,
     INPUT_NUMBER_PROMPT,
     INPUT_RANGE_ERROR,
     FEATURE_DISABLED,
+    INVALID_TIME,
 )
 from datetime import datetime, timedelta
 from sqlalchemy import func
@@ -606,18 +608,63 @@ async def goal_toggle(query: types.CallbackQuery):
     await query.answer()
 
 
-async def goal_time(query: types.CallbackQuery):
+async def goal_time(query: types.CallbackQuery, state: FSMContext):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
-    goal = user.goal or Goal()
-    now = datetime.utcnow() + timedelta(minutes=user.timezone or 0)
-    text = GOAL_REMINDERS_TEXT.format(time=now.strftime("%H:%M"))
+    utc = datetime.utcnow().strftime("%H:%M")
+    await query.message.edit_text(
+        TZ_PROMPT.format(utc_time=utc),
+        reply_markup=back_to_goal_reminders_kb(),
+    )
+    await state.update_data(prompt_id=query.message.message_id)
+    await state.set_state(GoalReminderState.waiting_timezone)
+    await query.answer()
+    session.close()
+
+
+async def goal_timezone(message: types.Message, state: FSMContext):
     try:
-        await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
-    except TelegramBadRequest:
-        await query.answer("Время обновлено")
+        parts = message.text.strip().split(":")
+        hours = int(parts[0])
+        minutes = int(parts[1]) if len(parts) > 1 else 0
+        if not (0 <= hours < 24 and 0 <= minutes < 60):
+            raise ValueError
+    except Exception:
+        await message.answer(INVALID_TIME)
+        return
+    user_time = hours * 60 + minutes
+    utc_now = datetime.utcnow()
+    server_minutes = utc_now.hour * 60 + utc_now.minute
+    diff = user_time - server_minutes
+    if diff <= -720:
+        diff += 1440
+    if diff >= 720:
+        diff -= 1440
+    session = SessionLocal()
+    user = ensure_user(session, message.from_user.id)
+    user.timezone = diff
+    session.commit()
+    data = await state.get_data()
+    prompt_id = data.get("prompt_id")
+    await state.clear()
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    goal = user.goal or Goal()
+    local = (
+        datetime.utcnow() + timedelta(minutes=user.timezone or 0)
+    ).strftime("%H:%M")
+    text = GOAL_REMINDERS_TEXT.format(time=local)
+    if prompt_id:
+        await message.bot.edit_message_text(
+            text,
+            chat_id=message.chat.id,
+            message_id=prompt_id,
+            reply_markup=goal_reminders_kb(goal),
+        )
     else:
-        await query.answer()
+        await message.answer(text, reply_markup=goal_reminders_kb(goal))
     session.close()
 
 
@@ -677,3 +724,5 @@ def register(dp: Dispatcher):
     dp.callback_query.register(goal_stop, F.data == "goal_stop")
     dp.callback_query.register(goal_stop_confirm, F.data == "goal_stop_confirm")
     dp.callback_query.register(goals_main, F.data == "goals_main")
+
+    dp.message.register(goal_timezone, StateFilter(GoalReminderState.waiting_timezone))
