@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 from aiogram.exceptions import TelegramBadRequest
 
-from ..database import SessionLocal, Goal, get_option_bool
+from ..database import SessionLocal, Goal, Meal, get_option_bool
 from ..subscriptions import ensure_user
 from ..keyboards import (
     goal_start_kb,
@@ -46,6 +46,7 @@ from ..texts import (
     FEATURE_DISABLED,
 )
 from datetime import datetime, timedelta
+from sqlalchemy import func
 
 
 def calculate_goal(data: dict) -> tuple[int, int, int, int]:
@@ -110,6 +111,77 @@ def goal_summary_text(goal: Goal) -> str:
         p_eaten=p_eaten,
         f_eaten=f_eaten,
         c_eaten=c_eaten,
+    )
+
+
+def goal_progress_text(goal: Goal, totals: dict) -> str:
+    """Return dynamic progress card text after saving a meal."""
+    cal = int(totals.get("calories", 0))
+    p = int(totals.get("protein", 0))
+    f = int(totals.get("fat", 0))
+    c = int(totals.get("carbs", 0))
+    remain = (goal.calories or 0) - cal
+    lines = [
+        "📊 Текущий прогресс",
+        f"Ккал: {cal} / {goal.calories or 0} (осталось {remain})",
+    ]
+    pct = lambda val, goal_val: int(val / goal_val * 100) if goal_val else 0
+    lines.append(
+        f"Б: {pct(p, goal.protein)}% • Ж: {pct(f, goal.fat)}% • У: {pct(c, goal.carbs)}%"
+    )
+    if goal.calories:
+        ratio = cal / goal.calories
+        if ratio > 1.10:
+            lines.append(f"Превышение на {cal - goal.calories} ккал")
+        elif ratio < 0.90:
+            lines.append(
+                "До цели {dc} ккал и {dp} б, {df} ж, {du} у".format(
+                    dc=goal.calories - cal,
+                    dp=max(0, goal.protein - p),
+                    df=max(0, goal.fat - f),
+                    du=max(0, goal.carbs - c),
+                )
+            )
+    return "\n".join(lines)
+
+
+def goal_trends_report(user, days: int, session) -> str:
+    """Return trend statistics for the given user over ``days`` days."""
+    goal = getattr(user, "goal", None)
+    if not goal:
+        return GOAL_TRENDS.format(
+            days=days, balance=0, p=0, p_goal=0, f=0, f_goal=0, c=0, c_goal=0
+        )
+    start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    start -= timedelta(days=days - 1)
+    end = start + timedelta(days=days)
+    totals = session.query(
+        func.coalesce(func.sum(Meal.calories), 0),
+        func.coalesce(func.sum(Meal.protein), 0),
+        func.coalesce(func.sum(Meal.fat), 0),
+        func.coalesce(func.sum(Meal.carbs), 0),
+        func.count(func.distinct(func.date(Meal.timestamp))),
+    ).filter(
+        Meal.user_id == user.id,
+        Meal.timestamp >= start,
+        Meal.timestamp < end,
+    ).one()
+    total_cal, total_p, total_f, total_c, day_count = totals
+    denom = day_count or 1
+    avg_cal = total_cal / denom
+    avg_p = total_p / denom
+    avg_f = total_f / denom
+    avg_c = total_c / denom
+    balance = int(round(avg_cal - (goal.calories or 0)))
+    return GOAL_TRENDS.format(
+        days=days,
+        balance=balance,
+        p=int(avg_p),
+        p_goal=int(goal.protein or 0),
+        f=int(avg_f),
+        f_goal=int(goal.fat or 0),
+        c=int(avg_c),
+        c_goal=int(goal.carbs or 0),
     )
 
 
@@ -499,8 +571,11 @@ async def goal_recalc(query: types.CallbackQuery):
 
 async def goal_trends(query: types.CallbackQuery):
     days = int(query.data.split(":")[1])
-    text = GOAL_TRENDS.format(days=days, balance=0, p=0, p_goal=0, f=0, f_goal=0, c=0, c_goal=0)
+    session = SessionLocal()
+    user = ensure_user(session, query.from_user.id)
+    text = goal_trends_report(user, days, session)
     await query.message.edit_text(text, reply_markup=goal_trends_kb(days))
+    session.close()
     await query.answer()
 
 
