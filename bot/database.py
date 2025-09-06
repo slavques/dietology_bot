@@ -73,6 +73,11 @@ def _ensure_columns():
         if "discount_expires" not in existing:
             conn.execute(text("ALTER TABLE engagement_status ADD COLUMN discount_expires TIMESTAMP"))
 
+    existing = _column_names("goals")
+    with engine.begin() as conn:
+        if "body_fat" not in existing:
+            conn.execute(text("ALTER TABLE goals ADD COLUMN body_fat FLOAT"))
+
 
 def _drop_request_logs():
     """Remove legacy request_logs table if it still exists."""
