@@ -1,9 +1,11 @@
 from aiogram import types, Dispatcher, F
 import os
 import time
+from datetime import datetime, timedelta
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 from aiogram.exceptions import TelegramBadRequest
+from sqlalchemy import func
 
 from ..database import SessionLocal, User, Meal
 from ..services import (
@@ -24,6 +26,7 @@ from ..keyboards import (
     choose_product_kb,
     weight_back_kb,
     add_delete_back_kb,
+    goal_progress_kb,
 )
 from ..states import EditMeal, LookupMeal
 from ..storage import pending_meals, remove_photo_if_unused
@@ -44,6 +47,7 @@ from ..texts import (
     LOOKUP_REFINE,
 )
 from ..logger import log
+from .goals import goal_progress_text
 
 
 async def cb_refine(query: types.CallbackQuery, state: FSMContext):
@@ -84,7 +88,9 @@ async def cb_pick(query: types.CallbackQuery, state: FSMContext):
         })
         await state.clear()
         await query.message.edit_text(
-            format_meal_message(meal['name'], item['serving'], macros),
+            format_meal_message(
+                meal['name'], item['serving'], macros, user_id=query.from_user.id
+            ),
             reply_markup=add_delete_back_kb(meal_id),
         )
     else:
@@ -251,7 +257,9 @@ async def process_edit(message: types.Message, state: FSMContext):
             pass
         try:
             await message.bot.edit_message_text(
-                text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
+                text=format_meal_message(
+                    meal['name'], meal['serving'], meal['macros'], user_id=message.from_user.id
+                ),
                 chat_id=meal['chat_id'],
                 message_id=meal['message_id'],
                 reply_markup=meal_actions_kb(meal_id)
@@ -285,7 +293,9 @@ async def process_edit(message: types.Message, state: FSMContext):
     await message.delete()
     try:
         await message.bot.edit_message_text(
-            text=format_meal_message(meal['name'], meal['serving'], meal['macros']),
+            text=format_meal_message(
+                meal['name'], meal['serving'], meal['macros'], user_id=message.from_user.id
+            ),
             chat_id=meal['chat_id'],
             message_id=meal['message_id'],
             reply_markup=meal_actions_kb(meal_id)
@@ -351,6 +361,28 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
     session.add(new_meal)
     session.commit()
     log("meal_save", "meal saved for %s: %s %s g", query.from_user.id, name, serving)
+
+    progress_text = None
+    if user.goal and user.goal.calories:
+        start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        totals = session.query(
+            func.coalesce(func.sum(Meal.calories), 0),
+            func.coalesce(func.sum(Meal.protein), 0),
+            func.coalesce(func.sum(Meal.fat), 0),
+            func.coalesce(func.sum(Meal.carbs), 0),
+        ).filter(
+            Meal.user_id == user.id,
+            Meal.timestamp >= start,
+            Meal.timestamp < end,
+        ).one()
+        totals_dict = {
+            "calories": totals[0],
+            "protein": totals[1],
+            "fat": totals[2],
+            "carbs": totals[3],
+        }
+        progress_text = goal_progress_text(user.goal, totals_dict)
     session.close()
     path = meal.get("photo_path")
     remove_photo_if_unused(path, meal_id)
@@ -358,7 +390,10 @@ async def _final_save(query: types.CallbackQuery, meal_id: str, fraction: float 
         await query.message.delete()
     except Exception:
         pass
-    await query.message.answer(SAVE_DONE, reply_markup=main_menu_kb())
+    if progress_text:
+        await query.message.answer(progress_text, reply_markup=goal_progress_kb())
+    else:
+        await query.message.answer(SAVE_DONE, reply_markup=main_menu_kb())
     await query.answer()
 
 
@@ -419,7 +454,9 @@ async def process_weight(message: types.Message, state: FSMContext):
     await message.delete()
     try:
         await message.bot.edit_message_text(
-            format_meal_message(meal['name'], grams, macros),
+            format_meal_message(
+                meal['name'], grams, macros, user_id=message.from_user.id
+            ),
             chat_id=meal['chat_id'],
             message_id=meal['message_id'],
             reply_markup=add_delete_back_kb(meal_id),
@@ -444,7 +481,9 @@ async def cb_save_full(query: types.CallbackQuery):
     meal['serving'] = serving
     meal['macros'] = macros
     await query.message.edit_text(
-        format_meal_message(meal['name'], serving, macros),
+        format_meal_message(
+            meal['name'], serving, macros, user_id=query.from_user.id
+        ),
         reply_markup=confirm_save_kb(meal_id),
     )
     await query.answer()
@@ -465,7 +504,9 @@ async def cb_save_half(query: types.CallbackQuery):
     meal['serving'] = serving
     meal['macros'] = macros
     await query.message.edit_text(
-        format_meal_message(meal['name'], serving, macros),
+        format_meal_message(
+            meal['name'], serving, macros, user_id=query.from_user.id
+        ),
         reply_markup=confirm_save_kb(meal_id),
     )
     await query.answer()
@@ -486,7 +527,9 @@ async def cb_save_quarter(query: types.CallbackQuery):
     meal['serving'] = serving
     meal['macros'] = macros
     await query.message.edit_text(
-        format_meal_message(meal['name'], serving, macros),
+        format_meal_message(
+            meal['name'], serving, macros, user_id=query.from_user.id
+        ),
         reply_markup=confirm_save_kb(meal_id),
     )
     await query.answer()
@@ -507,7 +550,9 @@ async def cb_save_threeq(query: types.CallbackQuery):
     meal['serving'] = serving
     meal['macros'] = macros
     await query.message.edit_text(
-        format_meal_message(meal['name'], serving, macros),
+        format_meal_message(
+            meal['name'], serving, macros, user_id=query.from_user.id
+        ),
         reply_markup=confirm_save_kb(meal_id),
     )
     await query.answer()
@@ -522,12 +567,16 @@ async def cb_save_back(query: types.CallbackQuery):
             meal['serving'] = meal.get('orig_serving', meal['serving'])
             meal['macros'] = meal.get('orig_macros', meal['macros'])
             await query.message.edit_text(
-                format_meal_message(meal['name'], meal['serving'], meal['macros']),
+                format_meal_message(
+                    meal['name'], meal['serving'], meal['macros'], user_id=query.from_user.id
+                ),
                 reply_markup=save_options_kb(meal_id),
             )
         else:
             await query.message.edit_text(
-                format_meal_message(meal['name'], meal['serving'], meal['macros']),
+                format_meal_message(
+                    meal['name'], meal['serving'], meal['macros'], user_id=query.from_user.id
+                ),
                 reply_markup=meal_actions_kb(meal_id),
             )
     await query.answer()
