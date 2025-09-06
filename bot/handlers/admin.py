@@ -7,7 +7,14 @@ from typing import Optional
 
 from sqlalchemy import func
 
-from ..database import SessionLocal, User, Comment, EngagementStatus, Subscription
+from ..database import (
+    SessionLocal,
+    User,
+    Comment,
+    EngagementStatus,
+    Subscription,
+    Payment,
+)
 from ..states import AdminState
 from ..config import ADMIN_COMMAND, ADMIN_PASSWORD
 from ..keyboards import subscribe_button
@@ -23,6 +30,7 @@ from ..texts import (
     BTN_DISCOUNT,
     BTN_FREE_NO_REQ,
     BTN_FREE_WITH_REQ,
+    BTN_PAID_NO_SUB,
     BTN_BLOCK,
     BTN_BLOCKED_USERS,
     BTN_FEATURES,
@@ -81,6 +89,7 @@ from ..texts import (
     ADMIN_REFERRAL_TITLE,
     ADMIN_REFERRAL_EMPTY,
     DISCOUNT_MESSAGE,
+    RETURN_DISCOUNT_MESSAGE,
     format_date_ru,
 )
 from ..subscriptions import PAID_LIMIT
@@ -228,6 +237,7 @@ def discount_menu_kb() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_FREE_NO_REQ, callback_data="admin:discount_no")
     builder.button(text=BTN_FREE_WITH_REQ, callback_data="admin:discount_with")
+    builder.button(text=BTN_PAID_NO_SUB, callback_data="admin:discount_paid")
     builder.button(text=BTN_ONE, callback_data="admin:discount_one")
     builder.button(text=BTN_BACK, callback_data="admin:menu")
     builder.adjust(1)
@@ -368,6 +378,16 @@ async def admin_discount_free_with(query: types.CallbackQuery, state: FSMContext
     await query.answer()
 
 
+async def admin_discount_paid(query: types.CallbackQuery, state: FSMContext):
+    if query.from_user.id not in admins:
+        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
+        return
+    await state.update_data(discount_target=("paid", None))
+    await state.set_state(AdminState.waiting_discount_confirm)
+    await query.message.edit_text(ADMIN_DISCOUNT_PROMPT, reply_markup=discount_confirm_kb())
+    await query.answer()
+
+
 async def admin_discount_one(query: types.CallbackQuery, state: FSMContext):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
@@ -398,7 +418,10 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
     target, tg_id = data.get("discount_target", (None, None))
     session = SessionLocal()
     expire = datetime.utcnow() + timedelta(hours=24)
-    text = DISCOUNT_MESSAGE.format(
+    template = (
+        RETURN_DISCOUNT_MESSAGE if target == "paid" else DISCOUNT_MESSAGE
+    )
+    text = template.format(
         date=format_date_ru(expire.date()), time=expire.strftime("%H:%M")
     )
     count = 0
@@ -414,7 +437,13 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
         )
         for u in users:
             eng = u.engagement or EngagementStatus()
-            if eng.discount_sent:
+            if eng.discount_sent and (
+                not eng.discount_expires
+                or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
+            ):
+                continue
+            paid = session.query(Payment).filter_by(user_id=u.id).first()
+            if paid:
                 continue
             if not u.engagement:
                 u.engagement = eng
@@ -442,7 +471,55 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
         )
         for u in users:
             eng = u.engagement or EngagementStatus()
-            if eng.discount_sent:
+            if eng.discount_sent and (
+                not eng.discount_expires
+                or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
+            ):
+                continue
+            paid = session.query(Payment).filter_by(user_id=u.id).first()
+            if paid:
+                continue
+            if not u.engagement:
+                u.engagement = eng
+            try:
+                await query.bot.send_message(
+                    u.telegram_id,
+                    text,
+                    parse_mode="HTML",
+                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                )
+            except Exception:
+                pass
+            eng.discount_sent = True
+            eng.discount_expires = expire
+            count += 1
+    elif target == "paid":
+        users = (
+            session.query(User)
+            .join(Subscription)
+            .filter(Subscription.grade == "free")
+            .all()
+        )
+        for u in users:
+            last_payment = (
+                session.query(Payment)
+                .filter_by(user_id=u.id)
+                .order_by(Payment.timestamp.desc())
+                .first()
+            )
+            if not last_payment:
+                continue
+            if last_payment.timestamp > datetime.utcnow() - timedelta(days=3):
+                continue
+            if not u.subscription.period_end or (
+                u.subscription.period_end > datetime.utcnow() - timedelta(days=3)
+            ):
+                continue
+            eng = u.engagement or EngagementStatus()
+            if eng.discount_sent and (
+                not eng.discount_expires
+                or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
+            ):
                 continue
             if not u.engagement:
                 u.engagement = eng
@@ -1266,6 +1343,7 @@ def register(dp: Dispatcher):
     dp.callback_query.register(admin_discount_menu, F.data == "admin:discount")
     dp.callback_query.register(admin_discount_free_no, F.data == "admin:discount_no")
     dp.callback_query.register(admin_discount_free_with, F.data == "admin:discount_with")
+    dp.callback_query.register(admin_discount_paid, F.data == "admin:discount_paid")
     dp.callback_query.register(admin_discount_one, F.data == "admin:discount_one")
     dp.callback_query.register(admin_discount_confirm, F.data == "admin:discount_confirm")
     dp.callback_query.register(admin_days_menu, F.data == "admin:days")
