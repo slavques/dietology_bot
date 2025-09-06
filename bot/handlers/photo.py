@@ -243,14 +243,18 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
         if idx == 1:
             await processing_msg.edit_text(
-                format_meal_message(name, serving, macros),
+                format_meal_message(
+                    name, serving, macros, user_id=message.from_user.id
+                ),
                 reply_markup=meal_actions_kb(meal_id),
             )
             pending_meals[meal_id]["message_id"] = processing_msg.message_id
             pending_meals[meal_id]["chat_id"] = processing_msg.chat.id
         else:
             msg = await message.answer(
-                format_meal_message(name, serving, macros),
+                format_meal_message(
+                    name, serving, macros, user_id=message.from_user.id
+                ),
                 reply_markup=meal_actions_kb(meal_id),
             )
             pending_meals[meal_id]["message_id"] = msg.message_id

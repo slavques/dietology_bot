@@ -113,6 +113,37 @@ def goal_summary_text(goal: Goal) -> str:
     )
 
 
+def goal_progress_text(goal: Goal, totals: dict) -> str:
+    """Return dynamic progress card text after saving a meal."""
+    cal = int(totals.get("calories", 0))
+    p = int(totals.get("protein", 0))
+    f = int(totals.get("fat", 0))
+    c = int(totals.get("carbs", 0))
+    remain = (goal.calories or 0) - cal
+    lines = [
+        "📊 Текущий прогресс",
+        f"Ккал: {cal} / {goal.calories or 0} (осталось {remain})",
+    ]
+    pct = lambda val, goal_val: int(val / goal_val * 100) if goal_val else 0
+    lines.append(
+        f"Б: {pct(p, goal.protein)}% • Ж: {pct(f, goal.fat)}% • У: {pct(c, goal.carbs)}%"
+    )
+    if goal.calories:
+        ratio = cal / goal.calories
+        if ratio > 1.10:
+            lines.append(f"Превышение на {cal - goal.calories} ккал")
+        elif ratio < 0.90:
+            lines.append(
+                "До цели {dc} ккал и {dp} б, {df} ж, {du} у".format(
+                    dc=goal.calories - cal,
+                    dp=max(0, goal.protein - p),
+                    df=max(0, goal.fat - f),
+                    du=max(0, goal.carbs - c),
+                )
+            )
+    return "\n".join(lines)
+
+
 async def open_goals(query: types.CallbackQuery, state: FSMContext):
     if not get_option_bool("feat_goals"):
         await query.answer(FEATURE_DISABLED, show_alert=True)
