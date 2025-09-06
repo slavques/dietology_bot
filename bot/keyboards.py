@@ -52,12 +52,27 @@ from .texts import (
     BTN_GOAL_START,
     BTN_GENDER_MALE,
     BTN_GENDER_FEMALE,
+    BTN_BODYFAT_5,
+    BTN_BODYFAT_10,
+    BTN_BODYFAT_15,
+    BTN_BODYFAT_20,
+    BTN_BODYFAT_25,
+    BTN_BODYFAT_30,
+    BTN_BODYFAT_UNKNOWN,
+    BTN_ACTIVITY_SEDENTARY,
     BTN_ACTIVITY_LOW,
     BTN_ACTIVITY_MED,
     BTN_ACTIVITY_HIGH,
+    BTN_ACTIVITY_VERY_HIGH,
     BTN_TARGET_LOSS,
     BTN_TARGET_MAINTAIN,
     BTN_TARGET_GAIN,
+    BTN_LOSS_FAST,
+    BTN_LOSS_BALANCED,
+    BTN_LOSS_PROTEIN,
+    BTN_GAIN_FAST,
+    BTN_GAIN_BALANCED,
+    BTN_GAIN_PROTEIN_CARB,
     BTN_GOAL_SAVE,
     BTN_GOAL_RESTART,
     BTN_MY_GOAL,
@@ -445,12 +460,31 @@ def goal_back_kb(step: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def goal_body_fat_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for percent, text in [
+        (5, BTN_BODYFAT_5),
+        (10, BTN_BODYFAT_10),
+        (15, BTN_BODYFAT_15),
+        (20, BTN_BODYFAT_20),
+        (25, BTN_BODYFAT_25),
+        (30, BTN_BODYFAT_30),
+    ]:
+        builder.button(text=text, callback_data=f"goal_bodyfat:{percent}")
+    builder.button(text=BTN_BODYFAT_UNKNOWN, callback_data="goal_bodyfat:unknown")
+    builder.button(text=BTN_BACK, callback_data="goal_back:weight")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def goal_activity_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_ACTIVITY_SEDENTARY, callback_data="goal_activity:sedentary")
     builder.button(text=BTN_ACTIVITY_LOW, callback_data="goal_activity:low")
     builder.button(text=BTN_ACTIVITY_MED, callback_data="goal_activity:med")
     builder.button(text=BTN_ACTIVITY_HIGH, callback_data="goal_activity:high")
-    builder.button(text=BTN_BACK, callback_data="goal_back:weight")
+    builder.button(text=BTN_ACTIVITY_VERY_HIGH, callback_data="goal_activity:very_high")
+    builder.button(text=BTN_BACK, callback_data="goal_back:body_fat")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -461,6 +495,21 @@ def goal_target_kb() -> InlineKeyboardMarkup:
     builder.button(text=BTN_TARGET_MAINTAIN, callback_data="goal_target:maintain")
     builder.button(text=BTN_TARGET_GAIN, callback_data="goal_target:gain")
     builder.button(text=BTN_BACK, callback_data="goal_back:activity")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_plan_kb(target: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    if target == "loss":
+        builder.button(text=BTN_LOSS_FAST, callback_data="goal_plan:fast")
+        builder.button(text=BTN_LOSS_BALANCED, callback_data="goal_plan:balanced")
+        builder.button(text=BTN_LOSS_PROTEIN, callback_data="goal_plan:protein")
+    elif target == "gain":
+        builder.button(text=BTN_GAIN_FAST, callback_data="goal_plan:fast")
+        builder.button(text=BTN_GAIN_BALANCED, callback_data="goal_plan:balanced")
+        builder.button(text=BTN_GAIN_PROTEIN_CARB, callback_data="goal_plan:protein_carb")
+    builder.button(text=BTN_BACK, callback_data="goal_back:target")
     builder.adjust(1)
     return builder.as_markup()
 
