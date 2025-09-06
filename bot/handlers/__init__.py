@@ -1,4 +1,17 @@
-from . import start, photo, history, stats, callbacks, faq, admin, subscription, manual, reminders, referral
+from . import (
+    start,
+    photo,
+    history,
+    stats,
+    callbacks,
+    faq,
+    admin,
+    subscription,
+    manual,
+    reminders,
+    referral,
+    goals,
+)
 
 __all__ = [
     'start',
@@ -12,4 +25,5 @@ __all__ = [
     'manual',
     'reminders',
     'referral',
+    'goals',
 ]
