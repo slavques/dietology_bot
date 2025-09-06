@@ -77,6 +77,8 @@ def _ensure_columns():
     with engine.begin() as conn:
         if "body_fat" not in existing:
             conn.execute(text("ALTER TABLE goals ADD COLUMN body_fat FLOAT"))
+        if "plan" not in existing:
+            conn.execute(text("ALTER TABLE goals ADD COLUMN plan TEXT"))
 
 
 def _drop_request_logs():
