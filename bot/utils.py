@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import re
 
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ from .database import SessionLocal, User, Meal
 
 
 def format_meal_message(
-    name: str, serving: float, macros: Dict[str, float], user_id: int | None = None
+    name: str, serving: float, macros: Dict[str, float], user_id: Optional[int] = None
 ) -> str:
     """Format meal info using the new template.
 
