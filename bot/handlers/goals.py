@@ -1,6 +1,7 @@
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
+from aiogram.exceptions import TelegramBadRequest
 
 from ..database import SessionLocal, Goal, get_option_bool
 from ..subscriptions import ensure_user
@@ -297,6 +298,7 @@ async def goal_confirm_save(query: types.CallbackQuery, state: FSMContext):
     cal, p, f, c = data["calories"], data["protein"], data["fat"], data["carbs"]
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
+    is_new = user.goal is None
     goal = user.goal or Goal()
     user.goal = goal
     goal.gender = data.get("gender")
@@ -306,6 +308,9 @@ async def goal_confirm_save(query: types.CallbackQuery, state: FSMContext):
     goal.activity = data.get("activity")
     goal.target = data.get("target")
     goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
+    if is_new:
+        goal.reminder_morning = True
+        goal.reminder_evening = True
     session.commit()
     session.refresh(goal)
     summary = goal_summary_text(goal)
@@ -383,7 +388,7 @@ async def goal_reminders(query: types.CallbackQuery):
     user = ensure_user(session, query.from_user.id)
     goal = user.goal or Goal()
     user.goal = goal
-    now = datetime.utcnow() + timedelta(hours=3)
+    now = datetime.utcnow() + timedelta(minutes=user.timezone or 0)
     text = GOAL_REMINDERS_TEXT.format(time=now.strftime("%H:%M"))
     await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
     session.commit()
@@ -403,7 +408,7 @@ async def goal_toggle(query: types.CallbackQuery):
         goal.reminder_evening = not goal.reminder_evening
     session.commit()
     text = GOAL_REMINDERS_TEXT.format(
-        time=(datetime.utcnow() + timedelta(hours=3)).strftime("%H:%M")
+        time=(datetime.utcnow() + timedelta(minutes=user.timezone or 0)).strftime("%H:%M")
     )
     await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
     session.close()
@@ -414,11 +419,15 @@ async def goal_time(query: types.CallbackQuery):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
     goal = user.goal or Goal()
-    now = datetime.utcnow() + timedelta(hours=3)
+    now = datetime.utcnow() + timedelta(minutes=user.timezone or 0)
     text = GOAL_REMINDERS_TEXT.format(time=now.strftime("%H:%M"))
-    await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
+    try:
+        await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
+    except TelegramBadRequest:
+        await query.answer("Время обновлено")
+    else:
+        await query.answer()
     session.close()
-    await query.answer()
 
 
 async def goal_stop(query: types.CallbackQuery):
