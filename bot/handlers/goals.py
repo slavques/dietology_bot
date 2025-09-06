@@ -1,6 +1,7 @@
 from aiogram import types, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
+from aiogram.exceptions import TelegramBadRequest
 
 from ..database import SessionLocal, Goal, get_option_bool
 from ..subscriptions import ensure_user
@@ -68,15 +69,16 @@ def calculate_goal(data: dict) -> tuple[int, int, int, int]:
 
 
 def goal_summary_text(goal: Goal) -> str:
-    eaten = 0
-    remain = (goal.calories or 0) - eaten
+    eaten = p_eaten = f_eaten = c_eaten = 0
     return GOAL_CURRENT.format(
         cal=goal.calories or 0,
         p=goal.protein or 0,
         f=goal.fat or 0,
         c=goal.carbs or 0,
         eaten=eaten,
-        remain=remain,
+        p_eaten=p_eaten,
+        f_eaten=f_eaten,
+        c_eaten=c_eaten,
     )
 
 
@@ -110,8 +112,8 @@ async def goal_cancel(query: types.CallbackQuery, state: FSMContext):
 
 async def goal_set_gender(query: types.CallbackQuery, state: FSMContext):
     value = query.data.split(":")[1]
-    await state.update_data(gender=value)
     await query.message.edit_text(GOAL_ENTER_AGE, reply_markup=goal_back_kb("gender"))
+    await state.update_data(gender=value, msg_id=query.message.message_id)
     await state.set_state(GoalState.age)
     await query.answer()
 
@@ -125,8 +127,19 @@ async def process_age(message: types.Message, state: FSMContext):
     if not 14 <= age <= 100:
         await message.answer(INPUT_RANGE_ERROR)
         return
+    data = await state.get_data()
+    msg_id = data.get("msg_id")
     await state.update_data(age=age)
-    await message.answer(GOAL_ENTER_HEIGHT, reply_markup=goal_back_kb("age"))
+    await message.delete()
+    if msg_id:
+        await message.bot.edit_message_text(
+            GOAL_ENTER_HEIGHT,
+            chat_id=message.chat.id,
+            message_id=msg_id,
+            reply_markup=goal_back_kb("age"),
+        )
+    else:
+        await message.answer(GOAL_ENTER_HEIGHT, reply_markup=goal_back_kb("age"))
     await state.set_state(GoalState.height)
 
 
@@ -139,8 +152,19 @@ async def process_height(message: types.Message, state: FSMContext):
     if not 120 <= height <= 230:
         await message.answer(INPUT_RANGE_ERROR)
         return
+    data = await state.get_data()
+    msg_id = data.get("msg_id")
     await state.update_data(height=height)
-    await message.answer(GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height"))
+    await message.delete()
+    if msg_id:
+        await message.bot.edit_message_text(
+            GOAL_ENTER_WEIGHT,
+            chat_id=message.chat.id,
+            message_id=msg_id,
+            reply_markup=goal_back_kb("height"),
+        )
+    else:
+        await message.answer(GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height"))
     await state.set_state(GoalState.weight)
 
 
@@ -153,8 +177,10 @@ async def process_weight(message: types.Message, state: FSMContext):
     if not 35 <= weight <= 300:
         await message.answer(INPUT_RANGE_ERROR)
         return
-    await state.update_data(weight=weight)
     data = await state.get_data()
+    msg_id = data.get("msg_id")
+    await state.update_data(weight=weight)
+    await message.delete()
     if data.get("editing"):
         session = SessionLocal()
         user = ensure_user(session, message.from_user.id)
@@ -164,9 +190,25 @@ async def process_weight(message: types.Message, state: FSMContext):
         session.commit()
         session.close()
         await state.clear()
-        await message.answer(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
+        if msg_id:
+            await message.bot.edit_message_text(
+                GOAL_EDIT_PROMPT,
+                chat_id=message.chat.id,
+                message_id=msg_id,
+                reply_markup=goal_edit_kb(),
+            )
+        else:
+            await message.answer(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
     else:
-        await message.answer(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
+        if msg_id:
+            await message.bot.edit_message_text(
+                GOAL_CHOOSE_ACTIVITY,
+                chat_id=message.chat.id,
+                message_id=msg_id,
+                reply_markup=goal_activity_kb(),
+            )
+        else:
+            await message.answer(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
         await state.set_state(GoalState.activity)
 
 
@@ -231,15 +273,19 @@ async def goal_back(query: types.CallbackQuery, state: FSMContext):
         await goal_start(query, state)
     elif step == "age":
         await query.message.edit_text(GOAL_ENTER_AGE, reply_markup=goal_back_kb("gender"))
+        await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.age)
     elif step == "height":
         await query.message.edit_text(GOAL_ENTER_HEIGHT, reply_markup=goal_back_kb("age"))
+        await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.height)
     elif step == "weight":
         await query.message.edit_text(GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height"))
+        await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.weight)
     elif step == "activity":
         await query.message.edit_text(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
+        await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.activity)
     elif step == "edit":
         await state.clear()
@@ -252,6 +298,7 @@ async def goal_confirm_save(query: types.CallbackQuery, state: FSMContext):
     cal, p, f, c = data["calories"], data["protein"], data["fat"], data["carbs"]
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
+    is_new = user.goal is None
     goal = user.goal or Goal()
     user.goal = goal
     goal.gender = data.get("gender")
@@ -261,10 +308,15 @@ async def goal_confirm_save(query: types.CallbackQuery, state: FSMContext):
     goal.activity = data.get("activity")
     goal.target = data.get("target")
     goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
+    if is_new:
+        goal.reminder_morning = True
+        goal.reminder_evening = True
     session.commit()
+    session.refresh(goal)
+    summary = goal_summary_text(goal)
     session.close()
     await state.clear()
-    await query.message.edit_text(goal_summary_text(goal), reply_markup=goals_main_kb())
+    await query.message.edit_text(summary, reply_markup=goals_main_kb())
     await query.answer()
 
 
@@ -282,7 +334,7 @@ async def goal_edit_menu(query: types.CallbackQuery):
 
 async def goal_edit_param(query: types.CallbackQuery, state: FSMContext):
     param = query.data.split(":")[1]
-    await state.update_data(editing=True)
+    await state.update_data(editing=True, msg_id=query.message.message_id)
     if param == "weight":
         await query.message.edit_text(GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("edit"))
         await state.set_state(GoalState.weight)
@@ -336,7 +388,7 @@ async def goal_reminders(query: types.CallbackQuery):
     user = ensure_user(session, query.from_user.id)
     goal = user.goal or Goal()
     user.goal = goal
-    now = datetime.utcnow() + timedelta(hours=3)
+    now = datetime.utcnow() + timedelta(minutes=user.timezone or 0)
     text = GOAL_REMINDERS_TEXT.format(time=now.strftime("%H:%M"))
     await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
     session.commit()
@@ -356,7 +408,7 @@ async def goal_toggle(query: types.CallbackQuery):
         goal.reminder_evening = not goal.reminder_evening
     session.commit()
     text = GOAL_REMINDERS_TEXT.format(
-        time=(datetime.utcnow() + timedelta(hours=3)).strftime("%H:%M")
+        time=(datetime.utcnow() + timedelta(minutes=user.timezone or 0)).strftime("%H:%M")
     )
     await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
     session.close()
@@ -367,11 +419,15 @@ async def goal_time(query: types.CallbackQuery):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
     goal = user.goal or Goal()
-    now = datetime.utcnow() + timedelta(hours=3)
+    now = datetime.utcnow() + timedelta(minutes=user.timezone or 0)
     text = GOAL_REMINDERS_TEXT.format(time=now.strftime("%H:%M"))
-    await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
+    try:
+        await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
+    except TelegramBadRequest:
+        await query.answer("Время обновлено")
+    else:
+        await query.answer()
     session.close()
-    await query.answer()
 
 
 async def goal_stop(query: types.CallbackQuery):
@@ -386,7 +442,11 @@ async def goal_stop_confirm(query: types.CallbackQuery):
         session.delete(user.goal)
         session.commit()
     session.close()
-    await query.message.edit_text(GOAL_STOP_DONE, reply_markup=main_menu_kb())
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    await query.message.answer(GOAL_STOP_DONE, reply_markup=main_menu_kb())
     await query.answer()
 
 
