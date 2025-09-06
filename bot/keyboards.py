@@ -424,6 +424,7 @@ def reminders_settings_kb(user) -> InlineKeyboardMarkup:
 def goal_start_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_GOAL_START, callback_data="goal_start")
+    builder.button(text=BTN_BACK, callback_data="stats_menu")
     builder.adjust(1)
     return builder.as_markup()
 
