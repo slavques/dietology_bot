@@ -1,14 +1,22 @@
 from typing import Dict, Any
 import re
 
+from datetime import datetime, timedelta
+from sqlalchemy import func
+
 from .texts import MEAL_TEMPLATE
 from .logger import log
+from .database import SessionLocal, User, Meal
 
 
 def format_meal_message(
-    name: str, serving: float, macros: Dict[str, float]
+    name: str, serving: float, macros: Dict[str, float], user_id: int | None = None
 ) -> str:
-    """Format meal info using the new template."""
+    """Format meal info using the new template.
+
+    If ``user_id`` is provided and the user has an active goal, a warning is
+    appended when the given meal would push the user over the daily goal.
+    """
     log("utils", f"Formatting meal message for {name}")
     message = MEAL_TEMPLATE.format(
         name=name,
@@ -18,6 +26,38 @@ def format_meal_message(
         fat=macros["fat"],
         carbs=macros["carbs"],
     )
+
+    if user_id is not None:
+        session = SessionLocal()
+        user = session.query(User).filter_by(telegram_id=user_id).first()
+        if user and user.goal and user.goal.calories:
+            start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            end = start + timedelta(days=1)
+            totals = session.query(
+                func.coalesce(func.sum(Meal.calories), 0),
+                func.coalesce(func.sum(Meal.protein), 0),
+                func.coalesce(func.sum(Meal.fat), 0),
+                func.coalesce(func.sum(Meal.carbs), 0),
+            ).filter(
+                Meal.user_id == user.id,
+                Meal.timestamp >= start,
+                Meal.timestamp < end,
+            ).one()
+            cal_forecast = totals[0] + macros["calories"]
+            p_forecast = totals[1] + macros["protein"]
+            f_forecast = totals[2] + macros["fat"]
+            c_forecast = totals[3] + macros["carbs"]
+            cal_ex = max(0, round(cal_forecast - (user.goal.calories or 0), 1))
+            p_ex = max(0, round(p_forecast - (user.goal.protein or 0), 1))
+            f_ex = max(0, round(f_forecast - (user.goal.fat or 0), 1))
+            c_ex = max(0, round(c_forecast - (user.goal.carbs or 0), 1))
+            if cal_ex or p_ex or f_ex or c_ex:
+                message += (
+                    "\n\n"
+                    f"⚠️ Добавив это блюдо, ты превысишь дневную цель на "
+                    f"{int(cal_ex)} ккал и {int(p_ex)} б, {int(f_ex)} ж, {int(c_ex)} у"
+                )
+        session.close()
     log("utils", f"Formatted meal message: {message}")
     return message
 

@@ -581,3 +581,11 @@ def goal_stop_confirm_kb() -> InlineKeyboardMarkup:
     builder.button(text=BTN_BACK, callback_data="goals_main")
     builder.adjust(1)
     return builder.as_markup()
+
+
+def goal_progress_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_TRENDS, callback_data="goal_trends:7")
+    builder.button(text=BTN_MY_GOAL, callback_data="goals_main")
+    builder.adjust(2)
+    return builder.as_markup()
