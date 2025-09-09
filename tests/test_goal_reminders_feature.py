@@ -2,7 +2,9 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
+import asyncio
 
 import pytest
 
@@ -12,6 +14,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from bot.handlers import goals  # noqa: E402
 from bot.database import Goal  # noqa: E402
+from bot import reminders  # noqa: E402
 
 
 @pytest.mark.asyncio
@@ -281,3 +284,106 @@ async def test_goal_process_morning_time(monkeypatch):
     session.commit.assert_called_once()
     state.clear.assert_awaited_once()
 
+
+@pytest.mark.asyncio
+async def test_goal_morning_notification_sent(monkeypatch):
+    user = MagicMock()
+    goal = Goal(target="loss", calories=2000, protein=100, fat=50, carbs=250, reminder_morning=True)
+    user.goal = goal
+    user.id = 1
+    user.telegram_id = 123
+    user.timezone = 0
+    user.morning_time = "08:00"
+    user.evening_time = None
+    user.last_morning = None
+    user.morning_enabled = False
+    user.day_enabled = False
+    user.evening_enabled = False
+
+    query_users = MagicMock()
+    query_users.join.return_value.filter.return_value.all.return_value = [user]
+    query_meals = MagicMock()
+    query_meals.filter.return_value.all.return_value = []
+
+    session = MagicMock()
+    session.query.side_effect = lambda model: query_users if model.__name__ == "User" else query_meals
+    monkeypatch.setattr(reminders, "SessionLocal", MagicMock(return_value=session))
+
+    monkeypatch.setattr(reminders, "_chat_completion", AsyncMock(return_value=("hi", 1, 1)))
+    tm = SimpleNamespace(add=AsyncMock())
+    monkeypatch.setattr(reminders, "token_monitor", tm)
+
+    fake_now = datetime(2025, 1, 1, 8, 0)
+    monkeypatch.setattr(
+        reminders,
+        "datetime",
+        SimpleNamespace(utcnow=lambda: fake_now, combine=datetime.combine),
+    )
+
+    async def fake_sleep(_):
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(reminders, "asyncio", SimpleNamespace(sleep=fake_sleep))
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+
+    with pytest.raises(asyncio.CancelledError):
+        await reminders.reminder_watcher(check_interval=0)(bot)
+
+    bot.send_message.assert_awaited_once_with(123, "hi")
+
+
+@pytest.mark.asyncio
+async def test_goal_evening_notification_sent(monkeypatch):
+    user = MagicMock()
+    goal = Goal(target="gain", calories=1800, protein=90, fat=60, carbs=210, reminder_evening=True)
+    user.goal = goal
+    user.id = 1
+    user.telegram_id = 123
+    user.timezone = 0
+    user.morning_time = None
+    user.evening_time = "20:00"
+    user.last_evening = None
+    user.morning_enabled = False
+    user.day_enabled = False
+    user.evening_enabled = False
+
+    query_users = MagicMock()
+    query_users.join.return_value.filter.return_value.all.return_value = [user]
+    meal = MagicMock()
+    meal.calories = 100
+    meal.protein = 10
+    meal.fat = 5
+    meal.carbs = 20
+    meal.name = "Салат"
+    query_meals = MagicMock()
+    query_meals.filter.return_value.all.return_value = [meal]
+
+    session = MagicMock()
+    session.query.side_effect = lambda model: query_users if model.__name__ == "User" else query_meals
+    monkeypatch.setattr(reminders, "SessionLocal", MagicMock(return_value=session))
+
+    monkeypatch.setattr(reminders, "_chat_completion", AsyncMock(return_value=("ok", 1, 1)))
+    tm = SimpleNamespace(add=AsyncMock())
+    monkeypatch.setattr(reminders, "token_monitor", tm)
+
+    fake_now = datetime(2025, 1, 1, 20, 0)
+    monkeypatch.setattr(
+        reminders,
+        "datetime",
+        SimpleNamespace(utcnow=lambda: fake_now, combine=datetime.combine),
+    )
+
+    async def fake_sleep(_):
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(reminders, "asyncio", SimpleNamespace(sleep=fake_sleep))
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+
+    with pytest.raises(asyncio.CancelledError):
+        await reminders.reminder_watcher(check_interval=0)(bot)
+
+    bot.send_message.assert_awaited_once_with(123, "ok")
