@@ -8,6 +8,7 @@ from .logger import log
 from .texts import REM_TEXT_MORNING, REM_TEXT_DAY, REM_TEXT_EVENING
 from .alerts import token_monitor
 from .services import _chat_completion
+from .prompts import GOAL_REMINDER_MORNING_PROMPT, GOAL_REMINDER_EVENING_PROMPT
 
 TARGET_MAP = {"loss": "похудение", "gain": "набор", "maintain": "поддержка"}
 
@@ -81,14 +82,16 @@ def reminder_watcher(check_interval: int = 60):
                             .all()
                         )
                         cal, prot, fat, carb, _ = _meal_stats(meals)
-                        prompt = (
-                            "Сформируй короткое дружелюбное сообщение для пользователя по питанию. "
-                            "Дай наставление на день и сводку по вчерашнему итогу: цель "
-                            f"({TARGET_MAP.get(goal.target, goal.target)}), "
-                            f"целевые КБЖУ {goal.calories}/{goal.protein}/{goal.fat}/{goal.carbs}, "
-                            f"фактические КБЖУ за вчера {int(cal)}/{int(prot)}/{int(fat)}/{int(carb)}. "
-                            "Формат: 1 предложение-наставление + 1 предложение со сводкой. "
-                            "Тон: добрый, поддерживающий, без морали. ≤250 символов."
+                        prompt = GOAL_REMINDER_MORNING_PROMPT.format(
+                            goal=TARGET_MAP.get(goal.target, goal.target),
+                            plan_kcal=goal.calories,
+                            plan_P=goal.protein,
+                            plan_F=goal.fat,
+                            plan_C=goal.carbs,
+                            yday_kcal=int(cal),
+                            yday_P=int(prot),
+                            yday_F=int(fat),
+                            yday_C=int(carb),
                         )
                         log("notification", "morning prompt for %s: %s", user.telegram_id, prompt)
                         content, tokens_in, tokens_out = await _chat_completion([
@@ -133,12 +136,17 @@ def reminder_watcher(check_interval: int = 60):
                         )
                         cal, prot, fat, carb, names = _meal_stats(meals)
                         names_str = ", ".join(names) if names else ""
-                        prompt = (
-                            f"Сформируй короткое дружелюбное сообщение для пользователя по питанию на вечер {local_now.strftime('%H:%M')}. "
-                            f"Используй: названия добавленных блюд за день {names_str}, цель ({TARGET_MAP.get(goal.target, goal.target)}), "
-                            f"целевые КБЖУ {goal.calories}/{goal.protein}/{goal.fat}/{goal.carbs} и текущие КБЖУ на сегодня {int(cal)}/{int(prot)}/{int(fat)}/{int(carb)}. "
-                            "Подведи итоги дня и сделай короткую сводку. Формат: 1 предложение-итог + 1 предложение-совет. "
-                            "Тон: добрый, поддерживающий, без морали. ≤300 символов."
+                        prompt = GOAL_REMINDER_EVENING_PROMPT.format(
+                            goal=TARGET_MAP.get(goal.target, goal.target),
+                            plan_kcal=goal.calories,
+                            plan_P=goal.protein,
+                            plan_F=goal.fat,
+                            plan_C=goal.carbs,
+                            kcal=int(cal),
+                            P=int(prot),
+                            F=int(fat),
+                            C=int(carb),
+                            meals_list=names_str,
                         )
                         log("notification", "evening prompt for %s: %s", user.telegram_id, prompt)
                         content, tokens_in, tokens_out = await _chat_completion([
