@@ -324,6 +324,7 @@ async def test_goal_morning_notification_sent(monkeypatch):
         return meal_queries.pop(0)
 
     session.query.side_effect = query_side_effect
+
     monkeypatch.setattr(reminders, "SessionLocal", MagicMock(return_value=session))
 
     monkeypatch.setattr(reminders, "_chat_completion", AsyncMock(return_value=("hi", 1, 1)))
