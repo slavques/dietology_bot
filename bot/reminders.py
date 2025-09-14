@@ -5,7 +5,12 @@ from aiogram import Bot
 
 from .database import SessionLocal, User, Meal
 from .logger import log
-from .texts import REM_TEXT_MORNING, REM_TEXT_DAY, REM_TEXT_EVENING
+from .texts import (
+    REM_TEXT_MORNING,
+    REM_TEXT_DAY,
+    REM_TEXT_EVENING,
+    GOAL_REMINDERS_DISABLED,
+)
 from .alerts import token_monitor
 from .services import _chat_completion
 from .prompts import GOAL_REMINDER_MORNING_PROMPT, GOAL_REMINDER_EVENING_PROMPT
@@ -68,6 +73,23 @@ def reminder_watcher(check_interval: int = 60):
                 local_now = now + offset
 
                 goal = getattr(user, "goal", None)
+                if goal:
+                    last_meal = (
+                        session.query(Meal)
+                        .filter(Meal.user_id == user.id)
+                        .order_by(Meal.timestamp.desc())
+                        .first()
+                    )
+                    if last_meal and last_meal.timestamp < now - timedelta(days=3):
+                        session.delete(goal)
+                        log(
+                            "notification",
+                            "goal reminders auto-disabled for %s",
+                            user.telegram_id,
+                        )
+                        await _send(bot, user, GOAL_REMINDERS_DISABLED)
+                        continue
+
                 if goal and goal.reminder_morning and user.morning_time:
                     target = _parse_time(user.morning_time)
                     if (
