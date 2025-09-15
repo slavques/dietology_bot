@@ -87,6 +87,9 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
 def update_limits(user: User) -> None:
     update_monthly(user)
     now = datetime.utcnow()
+    if user.grade != "free":
+        user.goal_trial_start = None
+        user.goal_trial_notified = False
     if user.period_start is None:
         user.period_start = now
     if user.daily_start is None:
@@ -127,6 +130,8 @@ def update_limits(user: User) -> None:
                 user.notified_1d = False
                 user.notified_0d = False
                 user.notified_free = True
+                user.goal_trial_start = now
+                user.goal_trial_notified = False
                 log(
                     "notification",
                     "subscription expired for %s",
@@ -141,6 +146,8 @@ def update_limits(user: User) -> None:
             user.period_end = now + timedelta(days=30)
             user.requests_used = 0
             user.notified_free = prev == 0
+            user.goal_trial_start = None
+            user.goal_trial_notified = False
             log("limit", "free requests renewed for %s", user.telegram_id)
 
 
@@ -226,6 +233,8 @@ def process_payment_success(
     user.notified_3d = False
     user.notified_1d = False
     user.notified_0d = False
+    user.goal_trial_start = None
+    user.goal_trial_notified = False
     payment = Payment(user_id=user.id, months=months, tier=grade)
     session.add(payment)
     session.commit()

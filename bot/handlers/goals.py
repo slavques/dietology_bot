@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
 from ..database import SessionLocal, Goal, Meal, get_option_bool
-from ..subscriptions import ensure_user
+from ..subscriptions import ensure_user, update_limits
 from ..keyboards import (
     goal_start_kb,
     goal_gender_kb,
@@ -22,10 +22,13 @@ from ..keyboards import (
     main_menu_kb,
     back_to_goal_reminders_kb,
     back_to_goal_reminders_settings_kb,
+    goal_trial_paywall_kb,
+    subscribe_button,
 )
 from ..states import GoalState, GoalReminderState
 from ..texts import (
     GOAL_INTRO_TEXT,
+    GOAL_FREE_TRIAL_NOTE,
     GOAL_CHOOSE_GENDER,
     GOAL_ENTER_AGE,
     GOAL_ENTER_HEIGHT,
@@ -52,6 +55,9 @@ from ..texts import (
     SET_TIME_PROMPT,
     BTN_MORNING,
     BTN_EVENING,
+    BTN_REMOVE_LIMITS,
+    GOAL_TRIAL_EXPIRED_NOTICE,
+    GOAL_TRIAL_PAYWALL_TEXT,
 )
 from datetime import datetime, timedelta
 from sqlalchemy import func
@@ -199,9 +205,48 @@ async def open_goals(query: types.CallbackQuery, state: FSMContext):
         return
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
+    update_limits(user)
+    session.commit()
+    now = datetime.utcnow()
+    show_trial_note = False
+
+    if user.grade != "free":
+        if user.goal_trial_start or user.goal_trial_notified:
+            user.goal_trial_start = None
+            user.goal_trial_notified = False
+            session.commit()
+    else:
+        start = user.goal_trial_start
+        if start and now >= start + timedelta(days=3):
+            goal = user.goal
+            if goal:
+                session.delete(goal)
+            if not user.goal_trial_notified:
+                await query.message.answer(
+                    GOAL_TRIAL_EXPIRED_NOTICE,
+                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                )
+            user.goal_trial_notified = True
+            session.commit()
+            await query.message.edit_text(
+                GOAL_TRIAL_PAYWALL_TEXT,
+                reply_markup=goal_trial_paywall_kb(),
+            )
+            session.close()
+            await query.answer()
+            return
+        if start is None:
+            user.goal_trial_start = now
+            user.goal_trial_notified = False
+            show_trial_note = True
+            session.commit()
+
     goal = user.goal
     if not goal or not goal.calories:
-        await query.message.edit_text(GOAL_INTRO_TEXT, reply_markup=goal_start_kb())
+        intro_text = GOAL_INTRO_TEXT
+        if show_trial_note:
+            intro_text = f"{GOAL_INTRO_TEXT}\n\n{GOAL_FREE_TRIAL_NOTE}"
+        await query.message.edit_text(intro_text, reply_markup=goal_start_kb())
     else:
         await query.message.edit_text(goal_summary_text(goal), reply_markup=goals_main_kb())
     session.close()

@@ -468,6 +468,14 @@ def goal_start_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def goal_trial_paywall_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_TARIFFS, callback_data="subscribe")
+    builder.button(text=BTN_BACK, callback_data="stats_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def goal_gender_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_GENDER_MALE, callback_data="goal_gender:male")
