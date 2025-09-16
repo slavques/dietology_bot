@@ -227,6 +227,7 @@ def process_payment_success(
     else:
         user.period_end = add_period(now, months)
     user.grade = grade
+    user.trial_used = True
     user.request_limit = PAID_LIMIT
     user.requests_used = 0
     user.notified_7d = False
