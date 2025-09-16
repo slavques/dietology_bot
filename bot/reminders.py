@@ -4,12 +4,15 @@ from datetime import datetime, timedelta, time
 from aiogram import Bot
 
 from .database import SessionLocal, User, Meal
+from .keyboards import subscribe_button
 from .logger import log
 from .texts import (
     REM_TEXT_MORNING,
     REM_TEXT_DAY,
     REM_TEXT_EVENING,
     GOAL_REMINDERS_DISABLED,
+    GOAL_TRIAL_EXPIRED_NOTICE,
+    BTN_REMOVE_LIMITS,
 )
 from .alerts import token_monitor
 from .services import _chat_completion
@@ -47,9 +50,9 @@ def _parse_time(value: str) -> time:
         return time(hour=0, minute=0)
 
 
-async def _send(bot: Bot, user: User, text: str) -> None:
+async def _send(bot: Bot, user: User, text: str, reply_markup=None) -> None:
     try:
-        await bot.send_message(user.telegram_id, text)
+        await bot.send_message(user.telegram_id, text, reply_markup=reply_markup)
         log("notification", "sent reminder to %s: %s", user.telegram_id, text)
     except Exception:
         pass
@@ -73,6 +76,24 @@ def reminder_watcher(check_interval: int = 60):
                 local_now = now + offset
 
                 goal = getattr(user, "goal", None)
+                if user.grade != "free":
+                    if user.goal_trial_start or user.goal_trial_notified:
+                        user.goal_trial_start = None
+                        user.goal_trial_notified = False
+                else:
+                    start = getattr(user, "goal_trial_start", None)
+                    if start and now >= start + timedelta(days=3):
+                        if goal:
+                            session.delete(goal)
+                        if not user.goal_trial_notified:
+                            await _send(
+                                bot,
+                                user,
+                                GOAL_TRIAL_EXPIRED_NOTICE,
+                                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                            )
+                        user.goal_trial_notified = True
+                        continue
                 if goal:
                     last_meal = (
                         session.query(Meal)

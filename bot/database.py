@@ -61,6 +61,14 @@ def _ensure_columns():
     with engine.begin() as conn:
         if "last_request" not in existing:
             conn.execute(text("ALTER TABLE subscriptions ADD COLUMN last_request TIMESTAMP"))
+        if "goal_trial_start" not in existing:
+            conn.execute(text("ALTER TABLE subscriptions ADD COLUMN goal_trial_start TIMESTAMP"))
+        if "goal_trial_notified" not in existing:
+            conn.execute(
+                text(
+                    f"ALTER TABLE subscriptions ADD COLUMN goal_trial_notified BOOLEAN DEFAULT {bool_default}"
+                )
+            )
 
     existing = _column_names("engagement_status")
     with engine.begin() as conn:
@@ -176,6 +184,14 @@ class User(Base):
     last_request = property(lambda self: self._sub().last_request, lambda self, v: setattr(self._sub(), 'last_request', v))
     trial = property(lambda self: self._sub().trial, lambda self, v: setattr(self._sub(), 'trial', v))
     trial_used = property(lambda self: self._sub().trial_used, lambda self, v: setattr(self._sub(), 'trial_used', v))
+    goal_trial_start = property(
+        lambda self: self._sub().goal_trial_start,
+        lambda self, v: setattr(self._sub(), 'goal_trial_start', v),
+    )
+    goal_trial_notified = property(
+        lambda self: self._sub().goal_trial_notified,
+        lambda self, v: setattr(self._sub(), 'goal_trial_notified', v),
+    )
 
     notified_7d = property(lambda self: self._notif().notified_7d, lambda self, v: setattr(self._notif(), 'notified_7d', v))
     notified_3d = property(lambda self: self._notif().notified_3d, lambda self, v: setattr(self._notif(), 'notified_3d', v))
@@ -214,6 +230,8 @@ class Subscription(Base):
     last_request = Column(DateTime, nullable=True)
     trial = Column(Boolean, default=False)
     trial_used = Column(Boolean, default=False)
+    goal_trial_start = Column(DateTime, nullable=True)
+    goal_trial_notified = Column(Boolean, default=False)
 
     user = relationship('User', back_populates='subscription')
 

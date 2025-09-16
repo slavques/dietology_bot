@@ -15,7 +15,13 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from bot.handlers import goals  # noqa: E402
 from bot.database import Goal  # noqa: E402
 from bot import reminders  # noqa: E402
-from bot.texts import GOAL_REMINDERS_DISABLED  # noqa: E402
+from bot.texts import (  # noqa: E402
+    GOAL_REMINDERS_DISABLED,
+    GOAL_INTRO_TEXT,
+    GOAL_FREE_TRIAL_NOTE,
+    GOAL_TRIAL_EXPIRED_NOTICE,
+    GOAL_TRIAL_PAYWALL_TEXT,
+)
 
 
 @pytest.mark.asyncio
@@ -187,6 +193,96 @@ async def test_goal_timezone_updates_and_returns(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_open_goals_shows_trial_note_for_free_user(monkeypatch):
+    session = MagicMock()
+    monkeypatch.setattr(goals, "SessionLocal", MagicMock(return_value=session))
+
+    user = MagicMock()
+    user.goal = None
+    user.grade = "free"
+    user.goal_trial_start = None
+    user.goal_trial_notified = False
+    user.timezone = 0
+    monkeypatch.setattr(goals, "ensure_user", MagicMock(return_value=user))
+
+    update_limits_mock = MagicMock()
+    monkeypatch.setattr(goals, "update_limits", update_limits_mock)
+
+    monkeypatch.setattr(goals, "goal_start_kb", MagicMock(return_value="kb"))
+
+    query = MagicMock()
+    query.from_user.id = 1
+    message = MagicMock()
+    message.edit_text = AsyncMock()
+    query.message = message
+    query.answer = AsyncMock()
+
+    state = AsyncMock()
+
+    await goals.open_goals(query, state)
+
+    update_limits_mock.assert_called_once_with(user)
+    assert user.goal_trial_start is not None
+    message.edit_text.assert_awaited_once_with(
+        f"{GOAL_INTRO_TEXT}\n\n{GOAL_FREE_TRIAL_NOTE}",
+        reply_markup="kb",
+    )
+    session.close.assert_called_once()
+    assert session.commit.call_count >= 1
+    query.answer.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_open_goals_shows_paywall_after_trial_expired(monkeypatch):
+    session = MagicMock()
+    monkeypatch.setattr(goals, "SessionLocal", MagicMock(return_value=session))
+
+    goal = Goal()
+    goal.calories = 1500
+    user = MagicMock()
+    user.goal = goal
+    user.grade = "free"
+    user.goal_trial_start = datetime.utcnow() - timedelta(days=4)
+    user.goal_trial_notified = False
+    user.timezone = 0
+    monkeypatch.setattr(goals, "ensure_user", MagicMock(return_value=user))
+
+    update_limits_mock = MagicMock()
+    monkeypatch.setattr(goals, "update_limits", update_limits_mock)
+
+    monkeypatch.setattr(goals, "goal_trial_paywall_kb", MagicMock(return_value="paywall"))
+    subscribe_button_mock = MagicMock(return_value="sub_kb")
+    monkeypatch.setattr(goals, "subscribe_button", subscribe_button_mock)
+
+    query = MagicMock()
+    query.from_user.id = 1
+    message = MagicMock()
+    message.edit_text = AsyncMock()
+    message.answer = AsyncMock()
+    query.message = message
+    query.answer = AsyncMock()
+
+    state = AsyncMock()
+
+    await goals.open_goals(query, state)
+
+    update_limits_mock.assert_called_once_with(user)
+    session.delete.assert_called_once_with(goal)
+    message.answer.assert_awaited_once_with(
+        GOAL_TRIAL_EXPIRED_NOTICE,
+        reply_markup="sub_kb",
+    )
+    message.edit_text.assert_awaited_once_with(
+        GOAL_TRIAL_PAYWALL_TEXT,
+        reply_markup="paywall",
+    )
+    assert user.goal_trial_notified is True
+    session.close.assert_called_once()
+    assert session.commit.call_count >= 1
+    query.answer.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_goal_reminder_settings_shows_local_time(monkeypatch):
     session = MagicMock()
     monkeypatch.setattr(goals, "SessionLocal", MagicMock(return_value=session))
@@ -287,6 +383,82 @@ async def test_goal_process_morning_time(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_goal_trial_expiry_disables_feature(monkeypatch):
+    user = MagicMock()
+    goal = Goal(
+        target="loss",
+        calories=1800,
+        protein=120,
+        fat=50,
+        carbs=200,
+        reminder_morning=True,
+        reminder_evening=True,
+    )
+    user.goal = goal
+    user.id = 1
+    user.telegram_id = 123
+    user.timezone = 0
+    user.morning_time = "08:00"
+    user.evening_time = "20:00"
+    user.morning_enabled = False
+    user.day_enabled = False
+    user.evening_enabled = False
+    user.grade = "free"
+    user.goal_trial_start = datetime(2025, 1, 1, 8, 0)
+    user.goal_trial_notified = False
+
+    fake_now = datetime(2025, 1, 4, 8, 1)
+
+    query_users = MagicMock()
+    query_users.join.return_value.filter.return_value.all.return_value = [user]
+
+    meal_query = MagicMock()
+    meal_query.filter.return_value.order_by.return_value.first.return_value = MagicMock(
+        timestamp=fake_now - timedelta(days=1)
+    )
+
+    session = MagicMock()
+
+    def query_side_effect(model):
+        if model.__name__ == "User":
+            return query_users
+        return meal_query
+
+    session.query.side_effect = query_side_effect
+    monkeypatch.setattr(reminders, "SessionLocal", MagicMock(return_value=session))
+
+    send_mock = AsyncMock()
+    monkeypatch.setattr(reminders, "_send", send_mock)
+    monkeypatch.setattr(reminders, "subscribe_button", MagicMock(return_value="kb"))
+    monkeypatch.setattr(reminders, "_chat_completion", AsyncMock())
+
+    monkeypatch.setattr(
+        reminders,
+        "datetime",
+        SimpleNamespace(utcnow=lambda: fake_now, combine=datetime.combine),
+    )
+
+    async def fake_sleep(_):
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(reminders, "asyncio", SimpleNamespace(sleep=fake_sleep))
+
+    bot = MagicMock()
+
+    with pytest.raises(asyncio.CancelledError):
+        await reminders.reminder_watcher(check_interval=0)(bot)
+
+    session.delete.assert_called_once_with(goal)
+    send_mock.assert_awaited_once_with(
+        bot,
+        user,
+        GOAL_TRIAL_EXPIRED_NOTICE,
+        reply_markup="kb",
+    )
+    assert user.goal_trial_notified is True
+
+
+@pytest.mark.asyncio
 async def test_goal_morning_notification_sent(monkeypatch):
     user = MagicMock()
     goal = Goal(target="loss", calories=2000, protein=100, fat=50, carbs=250, reminder_morning=True)
@@ -324,7 +496,6 @@ async def test_goal_morning_notification_sent(monkeypatch):
         return meal_queries.pop(0)
 
     session.query.side_effect = query_side_effect
-
     monkeypatch.setattr(reminders, "SessionLocal", MagicMock(return_value=session))
 
     monkeypatch.setattr(reminders, "_chat_completion", AsyncMock(return_value=("hi", 1, 1)))
@@ -348,7 +519,7 @@ async def test_goal_morning_notification_sent(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await reminders.reminder_watcher(check_interval=0)(bot)
 
-    bot.send_message.assert_awaited_once_with(123, "hi")
+    bot.send_message.assert_awaited_once_with(123, "hi", reply_markup=None)
 
 
 @pytest.mark.asyncio
@@ -419,7 +590,7 @@ async def test_goal_evening_notification_sent(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await reminders.reminder_watcher(check_interval=0)(bot)
 
-    bot.send_message.assert_awaited_once_with(123, "ok")
+    bot.send_message.assert_awaited_once_with(123, "ok", reply_markup=None)
 
 
 @pytest.mark.asyncio
@@ -487,4 +658,4 @@ async def test_goal_auto_stop_after_inactivity(monkeypatch):
         await reminders.reminder_watcher(check_interval=0)(bot)
 
     session.delete.assert_called_once_with(goal)
-    send_mock.assert_awaited_once_with(bot, user, GOAL_REMINDERS_DISABLED)
+    send_mock.assert_awaited_once_with(bot, user, GOAL_REMINDERS_DISABLED, reply_markup=None)
