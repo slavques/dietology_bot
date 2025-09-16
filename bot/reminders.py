@@ -108,7 +108,8 @@ def reminder_watcher(check_interval: int = 60):
                             "goal reminders auto-disabled for %s",
                             user.telegram_id,
                         )
-                        await _send(bot, user, GOAL_REMINDERS_DISABLED)
+                        if user.grade != "free":
+                            await _send(bot, user, GOAL_REMINDERS_DISABLED)
                         continue
 
                 if goal and goal.reminder_morning and user.morning_time:
