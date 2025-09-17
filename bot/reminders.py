@@ -25,10 +25,10 @@ def _meal_stats(meals):
     calories = protein = fat = carbs = 0
     names = []
     for m in meals:
-        calories += m.calories or 0
-        protein += m.protein or 0
-        fat += m.fat or 0
-        carbs += m.carbs or 0
+        calories += float(m.calories or 0)
+        protein += float(m.protein or 0)
+        fat += float(m.fat or 0)
+        carbs += float(m.carbs or 0)
         if m.name:
             names.append(m.name)
     return calories, protein, fat, carbs, names
@@ -48,6 +48,16 @@ def _parse_time(value: str) -> time:
         return time(hour=h, minute=m)
     except Exception:
         return time(hour=0, minute=0)
+
+
+def _format_macro(value) -> str:
+    try:
+        num = round(float(value), 1)
+    except (TypeError, ValueError):
+        return "0"
+    if num == int(num):
+        return str(int(num))
+    return f"{num:.1f}".rstrip("0").rstrip(".")
 
 
 async def _send(bot: Bot, user: User, text: str, reply_markup=None) -> None:
@@ -136,14 +146,14 @@ def reminder_watcher(check_interval: int = 60):
                         cal, prot, fat, carb, _ = _meal_stats(meals)
                         prompt = GOAL_REMINDER_MORNING_PROMPT.format(
                             goal=TARGET_MAP.get(goal.target, goal.target),
-                            plan_kcal=goal.calories,
-                            plan_P=goal.protein,
-                            plan_F=goal.fat,
-                            plan_C=goal.carbs,
-                            yday_kcal=int(cal),
-                            yday_P=int(prot),
-                            yday_F=int(fat),
-                            yday_C=int(carb),
+                            plan_kcal=_format_macro(goal.calories),
+                            plan_P=_format_macro(goal.protein),
+                            plan_F=_format_macro(goal.fat),
+                            plan_C=_format_macro(goal.carbs),
+                            yday_kcal=_format_macro(cal),
+                            yday_P=_format_macro(prot),
+                            yday_F=_format_macro(fat),
+                            yday_C=_format_macro(carb),
                         )
                         log("notification", "morning prompt for %s: %s", user.telegram_id, prompt)
                         content, tokens_in, tokens_out = await _chat_completion([
@@ -190,14 +200,14 @@ def reminder_watcher(check_interval: int = 60):
                         names_str = ", ".join(names) if names else ""
                         prompt = GOAL_REMINDER_EVENING_PROMPT.format(
                             goal=TARGET_MAP.get(goal.target, goal.target),
-                            plan_kcal=goal.calories,
-                            plan_P=goal.protein,
-                            plan_F=goal.fat,
-                            plan_C=goal.carbs,
-                            kcal=int(cal),
-                            P=int(prot),
-                            F=int(fat),
-                            C=int(carb),
+                            plan_kcal=_format_macro(goal.calories),
+                            plan_P=_format_macro(goal.protein),
+                            plan_F=_format_macro(goal.fat),
+                            plan_C=_format_macro(goal.carbs),
+                            kcal=_format_macro(cal),
+                            P=_format_macro(prot),
+                            F=_format_macro(fat),
+                            C=_format_macro(carb),
                             meals_list=names_str,
                         )
                         log("notification", "evening prompt for %s: %s", user.telegram_id, prompt)
