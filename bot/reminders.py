@@ -82,7 +82,13 @@ def reminder_watcher(check_interval: int = 60):
                         user.goal_trial_notified = False
                 else:
                     start = getattr(user, "goal_trial_start", None)
-                    if start and now >= start + timedelta(days=3):
+                    expired = False
+                    if start:
+                        try:
+                            expired = now >= start + timedelta(days=3)
+                        except TypeError:
+                            expired = False
+                    if expired:
                         if goal:
                             session.delete(goal)
                         if not user.goal_trial_notified:
@@ -109,7 +115,7 @@ def reminder_watcher(check_interval: int = 60):
                             user.telegram_id,
                         )
                         if user.grade != "free":
-                            await _send(bot, user, GOAL_REMINDERS_DISABLED)
+                            await _send(bot, user, GOAL_REMINDERS_DISABLED, reply_markup=None)
                         continue
 
                 if goal and goal.reminder_morning and user.morning_time:
