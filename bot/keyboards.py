@@ -325,10 +325,10 @@ def stats_menu_inline_kb() -> InlineKeyboardMarkup:
     from .database import get_option_bool
 
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_REPORT_DAY, callback_data="report_day")
-    builder.button(text=BTN_MY_MEALS, callback_data="my_meals")
     if get_option_bool("feat_goals"):
         builder.button(text=BTN_GOALS, callback_data="goals")
+    builder.button(text=BTN_REPORT_DAY, callback_data="report_day")
+    builder.button(text=BTN_MY_MEALS, callback_data="my_meals")
     builder.button(text=BTN_BACK, callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()
