@@ -90,6 +90,8 @@ async def test_goal_reminders_uses_user_timezone(monkeypatch):
     query.message = message
     query.answer = AsyncMock()
 
+    state = AsyncMock()
+
     fake_now = datetime(2025, 1, 1, 12, 0)
 
     class DummyDatetime:
@@ -99,11 +101,55 @@ async def test_goal_reminders_uses_user_timezone(monkeypatch):
 
     monkeypatch.setattr(goals, "datetime", DummyDatetime)
 
-    await goals.goal_reminders(query)
+    await goals.goal_reminders(query, state)
 
     message.edit_text.assert_awaited_once()
     text_arg = message.edit_text.call_args[0][0]
     assert "13:00" in text_arg
+    state.update_data.assert_not_called()
+    state.set_state.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_goal_reminders_prompts_timezone_when_missing(monkeypatch):
+    session = MagicMock()
+    monkeypatch.setattr(goals, "SessionLocal", MagicMock(return_value=session))
+
+    user = MagicMock()
+    user.goal = Goal()
+    user.timezone = None
+    monkeypatch.setattr(goals, "ensure_user", MagicMock(return_value=user))
+
+    message = MagicMock()
+    message.message_id = 7
+    message.edit_text = AsyncMock()
+
+    query = MagicMock()
+    query.from_user.id = 1
+    query.message = message
+    query.answer = AsyncMock()
+
+    state = AsyncMock()
+
+    fake_now = datetime(2025, 1, 1, 12, 0)
+
+    class DummyDatetime:
+        @classmethod
+        def utcnow(cls):
+            return fake_now
+
+    monkeypatch.setattr(goals, "datetime", DummyDatetime)
+
+    await goals.goal_reminders(query, state)
+
+    message.edit_text.assert_awaited_once()
+    text_arg = message.edit_text.call_args[0][0]
+    assert "12:00" in text_arg
+    state.update_data.assert_awaited_once_with(prompt_id=7, return_to="main")
+    state.set_state.assert_awaited_once_with(goals.GoalReminderState.waiting_timezone)
+    session.commit.assert_called_once()
+    session.close.assert_called_once()
+    query.answer.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -141,7 +187,7 @@ async def test_goal_time_prompts_timezone(monkeypatch):
     message.edit_text.assert_awaited_once()
     text_arg = message.edit_text.call_args[0][0]
     assert "12:00" in text_arg
-    state.update_data.assert_awaited_once_with(prompt_id=42)
+    state.update_data.assert_awaited_once_with(prompt_id=42, return_to="settings")
     state.set_state.assert_awaited_once_with(goals.GoalReminderState.waiting_timezone)
     query.answer.assert_awaited_once()
     session.close.assert_called_once()
@@ -167,7 +213,7 @@ async def test_goal_timezone_updates_and_returns(monkeypatch):
     message.bot.edit_message_text = AsyncMock()
 
     state = AsyncMock()
-    state.get_data.return_value = {"prompt_id": 99}
+    state.get_data.return_value = {"prompt_id": 99, "return_to": "settings"}
     state.clear = AsyncMock()
 
     fake_now = datetime(2025, 1, 1, 12, 0)
@@ -188,6 +234,52 @@ async def test_goal_timezone_updates_and_returns(monkeypatch):
     assert "13:00" in text_arg
     kwargs = message.bot.edit_message_text.call_args.kwargs
     assert kwargs.get("reply_markup") == "kb"
+    session.commit.assert_called_once()
+    session.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_goal_timezone_returns_to_main_view(monkeypatch):
+    session = MagicMock()
+    monkeypatch.setattr(goals, "SessionLocal", MagicMock(return_value=session))
+
+    goal = Goal()
+    user = MagicMock()
+    user.goal = goal
+    user.timezone = 0
+    monkeypatch.setattr(goals, "ensure_user", MagicMock(return_value=user))
+
+    monkeypatch.setattr(goals, "goal_reminders_kb", MagicMock(return_value="main_kb"))
+
+    message = MagicMock()
+    message.text = "13:00"
+    message.chat.id = 1
+    message.delete = AsyncMock()
+    message.bot = MagicMock()
+    message.bot.edit_message_text = AsyncMock()
+
+    state = AsyncMock()
+    state.get_data.return_value = {"prompt_id": 5, "return_to": "main"}
+    state.clear = AsyncMock()
+
+    fake_now = datetime(2025, 1, 1, 12, 0)
+
+    class DummyDatetime:
+        @classmethod
+        def utcnow(cls):
+            return fake_now
+
+    monkeypatch.setattr(goals, "datetime", DummyDatetime)
+
+    await goals.goal_timezone(message, state)
+
+    assert user.timezone == 60
+    message.bot.edit_message_text.assert_awaited_once()
+    text_arg = message.bot.edit_message_text.call_args[0][0]
+    assert "13:00" in text_arg
+    kwargs = message.bot.edit_message_text.call_args.kwargs
+    assert kwargs.get("reply_markup") == "main_kb"
+    state.clear.assert_awaited_once()
     session.commit.assert_called_once()
     session.close.assert_called_once()
 
