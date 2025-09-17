@@ -34,7 +34,7 @@ async def test_goal_save_enables_reminders_without_affecting_meal(monkeypatch):
     user.morning_enabled = False
     monkeypatch.setattr(goals, "ensure_user", MagicMock(return_value=user))
 
-    monkeypatch.setattr(goals, "goal_summary_text", lambda g: "summary")
+    monkeypatch.setattr(goals, "goal_summary_text", lambda g, session=None: "summary")
     monkeypatch.setattr(goals, "goals_main_kb", MagicMock(return_value="kb"))
 
     message = MagicMock()

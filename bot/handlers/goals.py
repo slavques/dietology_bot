@@ -61,6 +61,7 @@ from ..texts import (
 )
 from datetime import datetime, timedelta
 from sqlalchemy import func
+from sqlalchemy.orm import object_session
 
 
 def calculate_goal(data: dict) -> tuple[int, int, int, int]:
@@ -114,8 +115,30 @@ def calculate_goal(data: dict) -> tuple[int, int, int, int]:
     return calories, protein, fat, carbs
 
 
-def goal_summary_text(goal: Goal) -> str:
+def goal_summary_text(goal: Goal, session=None) -> str:
     eaten = p_eaten = f_eaten = c_eaten = 0
+    if goal and goal.user_id:
+        close_session = False
+        if session is None:
+            session = object_session(goal)
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        totals = session.query(
+            func.coalesce(func.sum(Meal.calories), 0),
+            func.coalesce(func.sum(Meal.protein), 0),
+            func.coalesce(func.sum(Meal.fat), 0),
+            func.coalesce(func.sum(Meal.carbs), 0),
+        ).filter(
+            Meal.user_id == goal.user_id,
+            Meal.timestamp >= start,
+            Meal.timestamp < end,
+        ).one()
+        eaten, p_eaten, f_eaten, c_eaten = [round(value, 1) for value in totals]
+        if close_session:
+            session.close()
     return GOAL_CURRENT.format(
         cal=goal.calories or 0,
         p=goal.protein or 0,
@@ -163,9 +186,10 @@ def goal_trends_report(user, days: int, session) -> str:
     """Return trend statistics for the given user over ``days`` days."""
     goal = getattr(user, "goal", None)
     if not goal:
-        return GOAL_TRENDS.format(
+        base = GOAL_TRENDS.format(
             days=days, balance=0, p=0, p_goal=0, f=0, f_goal=0, c=0, c_goal=0
         )
+        return base.rstrip("\n") + "\nПродолжай! 💪"
     start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     start -= timedelta(days=days - 1)
     end = start + timedelta(days=days)
@@ -187,7 +211,7 @@ def goal_trends_report(user, days: int, session) -> str:
     avg_f = total_f / denom
     avg_c = total_c / denom
     balance = int(round(avg_cal - (goal.calories or 0)))
-    return GOAL_TRENDS.format(
+    base = GOAL_TRENDS.format(
         days=days,
         balance=balance,
         p=int(avg_p),
@@ -197,6 +221,7 @@ def goal_trends_report(user, days: int, session) -> str:
         c=int(avg_c),
         c_goal=int(goal.carbs or 0),
     )
+    return base.rstrip("\n") + "\nПродолжай! 💪"
 
 
 async def open_goals(query: types.CallbackQuery, state: FSMContext):
@@ -248,7 +273,9 @@ async def open_goals(query: types.CallbackQuery, state: FSMContext):
             intro_text = f"{GOAL_INTRO_TEXT}\n\n{GOAL_FREE_TRIAL_NOTE}"
         await query.message.edit_text(intro_text, reply_markup=goal_start_kb())
     else:
-        await query.message.edit_text(goal_summary_text(goal), reply_markup=goals_main_kb())
+        await query.message.edit_text(
+            goal_summary_text(goal, session), reply_markup=goals_main_kb()
+        )
     session.close()
     await query.answer()
 
@@ -557,7 +584,7 @@ async def goal_confirm_save(query: types.CallbackQuery, state: FSMContext):
         goal.reminder_evening = True
     session.commit()
     session.refresh(goal)
-    summary = goal_summary_text(goal)
+    summary = goal_summary_text(goal, session)
     session.close()
     await state.clear()
     await query.message.edit_text(summary, reply_markup=goals_main_kb())
@@ -610,7 +637,9 @@ async def goal_recalc(query: types.CallbackQuery):
         cal, p, f, c = calculate_goal(data)
         goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
         session.commit()
-        await query.message.edit_text(goal_summary_text(goal), reply_markup=goals_main_kb())
+        await query.message.edit_text(
+            goal_summary_text(goal, session), reply_markup=goals_main_kb()
+        )
     else:
         await query.message.edit_text(GOAL_INTRO_TEXT, reply_markup=goal_start_kb())
     session.close()
@@ -847,7 +876,9 @@ async def goals_main(query: types.CallbackQuery):
     user = ensure_user(session, query.from_user.id)
     goal = user.goal
     if goal:
-        await query.message.edit_text(goal_summary_text(goal), reply_markup=goals_main_kb())
+        await query.message.edit_text(
+            goal_summary_text(goal, session), reply_markup=goals_main_kb()
+        )
     else:
         await query.message.edit_text(GOAL_INTRO_TEXT, reply_markup=goal_start_kb())
     session.close()
