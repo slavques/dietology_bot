@@ -627,11 +627,27 @@ async def goal_trends(query: types.CallbackQuery):
     await query.answer()
 
 
-async def goal_reminders(query: types.CallbackQuery):
+async def goal_reminders(query: types.CallbackQuery, state: FSMContext):
     session = SessionLocal()
     user = ensure_user(session, query.from_user.id)
     goal = user.goal or Goal()
     user.goal = goal
+
+    if user.timezone is None:
+        utc = datetime.utcnow().strftime("%H:%M")
+        await query.message.edit_text(
+            TZ_PROMPT.format(utc_time=utc),
+            reply_markup=back_to_goal_reminders_kb(),
+        )
+        await state.update_data(
+            prompt_id=query.message.message_id, return_to="main"
+        )
+        await state.set_state(GoalReminderState.waiting_timezone)
+        session.commit()
+        session.close()
+        await query.answer()
+        return
+
     now = datetime.utcnow() + timedelta(minutes=user.timezone or 0)
     text = GOAL_REMINDERS_TEXT.format(time=now.strftime("%H:%M"))
     await query.message.edit_text(text, reply_markup=goal_reminders_kb(goal))
@@ -667,7 +683,9 @@ async def goal_time(query: types.CallbackQuery, state: FSMContext):
         TZ_PROMPT.format(utc_time=utc),
         reply_markup=back_to_goal_reminders_settings_kb(),
     )
-    await state.update_data(prompt_id=query.message.message_id)
+    await state.update_data(
+        prompt_id=query.message.message_id, return_to="settings"
+    )
     await state.set_state(GoalReminderState.waiting_timezone)
     await query.answer()
     session.close()
@@ -693,28 +711,35 @@ async def goal_timezone(message: types.Message, state: FSMContext):
         diff -= 1440
     session = SessionLocal()
     user = ensure_user(session, message.from_user.id)
+    goal = user.goal or Goal()
+    user.goal = goal
     user.timezone = diff
     session.commit()
     data = await state.get_data()
     prompt_id = data.get("prompt_id")
+    return_to = data.get("return_to", "settings")
     await state.clear()
     try:
         await message.delete()
     except Exception:
         pass
-    local = (
-        datetime.utcnow() + timedelta(minutes=user.timezone or 0)
-    ).strftime("%H:%M")
-    text = TIME_CURRENT.format(local_time=local)
+    local_dt = datetime.utcnow() + timedelta(minutes=user.timezone or 0)
+    local = local_dt.strftime("%H:%M")
+    if return_to == "main":
+        text = GOAL_REMINDERS_TEXT.format(time=local)
+        markup = goal_reminders_kb(goal)
+    else:
+        text = TIME_CURRENT.format(local_time=local)
+        markup = goal_reminders_settings_kb(user)
     if prompt_id:
         await message.bot.edit_message_text(
             text,
             chat_id=message.chat.id,
             message_id=prompt_id,
-            reply_markup=goal_reminders_settings_kb(user),
+            reply_markup=markup,
         )
     else:
-        await message.answer(text, reply_markup=goal_reminders_settings_kb(user))
+        await message.answer(text, reply_markup=markup)
     session.close()
 
 

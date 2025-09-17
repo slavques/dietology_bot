@@ -363,9 +363,9 @@ def back_to_reminder_settings_kb() -> InlineKeyboardMarkup:
 
 
 def back_to_goal_reminders_kb() -> InlineKeyboardMarkup:
-    """Back button returning to goal reminders screen."""
+    """Back button returning to the goals menu from reminders."""
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_BACK, callback_data="goal_reminders")
+    builder.button(text=BTN_BACK, callback_data="goals_main")
     builder.adjust(1)
     return builder.as_markup()
 
