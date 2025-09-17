@@ -71,7 +71,9 @@ def reminder_watcher(check_interval: int = 60):
                 .filter(ReminderSettings.timezone != None)
                 .all()
             )
+            processed_user_ids = set()
             for user in users:
+                processed_user_ids.add(user.id)
                 offset = timedelta(minutes=user.timezone or 0)
                 local_now = now + offset
 
@@ -209,6 +211,33 @@ def reminder_watcher(check_interval: int = 60):
                     ):
                         await _send(bot, user, random.choice(REM_TEXT_EVENING))
                         user.last_evening = local_now
+
+            extra_users = (
+                session.query(User)
+                .filter(User.goal_trial_start != None)
+                .all()
+            )
+            for user in extra_users:
+                if user.id in processed_user_ids:
+                    continue
+                if user.grade != "free":
+                    if user.goal_trial_start or user.goal_trial_notified:
+                        user.goal_trial_start = None
+                        user.goal_trial_notified = False
+                    continue
+                start = getattr(user, "goal_trial_start", None)
+                if start and now >= start + timedelta(days=3):
+                    goal = getattr(user, "goal", None)
+                    if goal:
+                        session.delete(goal)
+                    if not user.goal_trial_notified:
+                        await _send(
+                            bot,
+                            user,
+                            GOAL_TRIAL_EXPIRED_NOTICE,
+                            reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                        )
+                    user.goal_trial_notified = True
             session.commit()
             session.close()
             await asyncio.sleep(check_interval)
