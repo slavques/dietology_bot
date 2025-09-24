@@ -1,6 +1,9 @@
 import asyncio
 import random
+import re
 from datetime import datetime, timedelta, time
+from html import escape
+
 from aiogram import Bot
 
 from .database import SessionLocal, User, Meal
@@ -60,9 +63,43 @@ def _format_macro(value) -> str:
     return f"{num:.1f}".rstrip("0").rstrip(".")
 
 
-async def _send(bot: Bot, user: User, text: str, reply_markup=None) -> None:
+def _highlight_numbers(text: str) -> str:
+    return re.sub(r"(\d+(?:[.,]\d+)?)", r"<b>\1</b>", text)
+
+
+def _format_gpt_message(content: str, message_type: str) -> str:
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", content.strip()) if p.strip()]
+    if not paragraphs:
+        return escape(content.strip())
+
+    prefixes = {
+        "morning": ("🌅 ", "📊 ", "💪 "),
+        "evening": ("🌙 ", "📊 ", "💡 "),
+    }
+    default_prefix = ("", "📊 ", "💡 ")
+    first_prefix, second_prefix, third_prefix = prefixes.get(message_type, default_prefix)
+
+    formatted = []
+    for idx, paragraph in enumerate(paragraphs):
+        escaped = escape(paragraph)
+        if idx == 0:
+            escaped = f"{first_prefix}<b>{escaped}</b>" if escaped else ""
+        else:
+            escaped = _highlight_numbers(escaped)
+            prefix = third_prefix if idx >= 2 else second_prefix
+            escaped = f"{prefix}{escaped}" if escaped else ""
+        formatted.append(escaped)
+    return "\n\n".join(formatted)
+
+
+async def _send(bot: Bot, user: User, text: str, reply_markup=None, parse_mode=None) -> None:
     try:
-        await bot.send_message(user.telegram_id, text, reply_markup=reply_markup)
+        await bot.send_message(
+            user.telegram_id,
+            text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
         log("notification", "sent reminder to %s: %s", user.telegram_id, text)
     except Exception:
         pass
@@ -161,7 +198,8 @@ def reminder_watcher(check_interval: int = 60):
                         ])
                         log("notification", "morning GPT response for %s: %s", user.telegram_id, content.strip())
                         await token_monitor.add(tokens_in, tokens_out)
-                        await _send(bot, user, content.strip())
+                        formatted = _format_gpt_message(content.strip(), "morning")
+                        await _send(bot, user, formatted, parse_mode="HTML")
                         user.last_morning = local_now
                 elif user.morning_enabled and user.morning_time:
                     target = _parse_time(user.morning_time)
@@ -216,7 +254,8 @@ def reminder_watcher(check_interval: int = 60):
                         ])
                         log("notification", "evening GPT response for %s: %s", user.telegram_id, content.strip())
                         await token_monitor.add(tokens_in, tokens_out)
-                        await _send(bot, user, content.strip())
+                        formatted = _format_gpt_message(content.strip(), "evening")
+                        await _send(bot, user, formatted, parse_mode="HTML")
                         user.last_evening = local_now
                 elif user.evening_enabled and user.evening_time:
                     target = _parse_time(user.evening_time)
