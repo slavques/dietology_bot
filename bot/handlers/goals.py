@@ -80,7 +80,7 @@ def _goal_body_fat_image_path() -> Optional[Path]:
     if not GOAL_BODY_FAT_IMAGE_NAME:
         return None
     image_path = STATIC_DIR / GOAL_BODY_FAT_IMAGE_NAME
-    if not image_path.exists():
+    if not image_path.is_file():
         return None
     return image_path
 
@@ -105,7 +105,7 @@ async def _show_goal_body_fat_prompt(bot, chat_id: int, state: FSMContext, msg_i
         try:
             sent = await bot.send_photo(
                 chat_id,
-                FSInputFile(image_path),
+                FSInputFile(str(image_path), filename=image_path.name),
                 caption=GOAL_CHOOSE_BODY_FAT,
                 reply_markup=markup,
             )

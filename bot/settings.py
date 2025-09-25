@@ -31,6 +31,7 @@ FAQ_LINK = "https://telegra.ph/CHaVO--AI-Dietolog-Bot-08-02"
 
 # Directory with static assets that can be sent to users
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 # Filename of the illustration that accompanies the body fat question
 GOAL_BODY_FAT_IMAGE_NAME = "goal_body_fat.png"
