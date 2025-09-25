@@ -126,22 +126,35 @@ def _load_goal_body_fat_photo() -> Optional[Tuple[BufferedInputFile, Path]]:
         logger.warning("Failed to read body fat illustration %s: %s", image_path, err)
         return None
     image_format = imghdr.what(None, payload)
-    if image_format not in {"jpeg", "png"}:
+    supported_formats = {"jpeg", "png"}
+    pil_format = ""
+    if image_format not in supported_formats:
         try:
-            with Image.open(BytesIO(payload)) as illustration:
+            with Image.open(image_path) as illustration:
                 pil_format = (illustration.format or "").lower()
-                if pil_format in {"jpeg", "png"}:
+                if pil_format in supported_formats:
                     image_format = pil_format
                 elif pil_format:
                     buffer = BytesIO()
                     illustration.convert("RGB").save(buffer, format="JPEG")
                     payload = buffer.getvalue()
                     image_format = "jpeg"
-                else:
-                    raise UnidentifiedImageError
-        except UnidentifiedImageError:
+        except (UnidentifiedImageError, OSError) as err:
+            logger.debug(
+                "Pillow could not identify body fat illustration %s: %s", image_path, err
+            )
+    if image_format not in supported_formats:
+        if not image_format:
+            extension = image_path.suffix.lower()
+            if extension in {".jpg", ".jpeg"}:
+                image_format = "jpeg"
+            elif extension == ".png":
+                image_format = "png"
+        if image_format not in supported_formats:
             logger.warning(
-                "Body fat illustration %s has unsupported format %s", image_path, image_format
+                "Body fat illustration %s has unsupported format %s",
+                image_path,
+                pil_format or image_format or "unknown",
             )
             return None
     filename = image_path.name
