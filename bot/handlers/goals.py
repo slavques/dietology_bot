@@ -100,6 +100,14 @@ async def _delete_message_safely(bot, chat_id: int, message_id: Optional[int]) -
         pass
 
 
+def _detect_body_fat_format_from_signature(payload: bytes) -> Optional[str]:
+    if payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if payload[:3] == b"\xff\xd8\xff":
+        return "jpeg"
+    return None
+
+
 def _prepare_goal_body_fat_payload(
     image_path: Path, payload: bytes
 ) -> Optional[Tuple[bytes, str]]:
@@ -108,14 +116,18 @@ def _prepare_goal_body_fat_payload(
     if detected_format in supported_formats:
         return payload, detected_format
 
+    signature_format = _detect_body_fat_format_from_signature(payload)
+    if signature_format:
+        return payload, signature_format
+
     try:
         with Image.open(image_path) as illustration:
             illustration.load()
             normalized = ImageOps.exif_transpose(illustration)
             pil_format = (illustration.format or "").lower()
     except (UnidentifiedImageError, OSError) as err:
-        logger.debug(
-            "Pillow could not normalise body fat illustration %s: %s",
+        logger.warning(
+            "Body fat illustration %s is not a valid PNG/JPEG and should be re-exported (%s)",
             image_path,
             err,
         )
@@ -153,11 +165,6 @@ def _prepare_goal_body_fat_payload(
                 return None
             return payload, target_format
 
-    extension = image_path.suffix.lower()
-    if extension in {".jpg", ".jpeg"}:
-        return payload, "jpeg"
-    if extension == ".png":
-        return payload, "png"
     return None
 
 

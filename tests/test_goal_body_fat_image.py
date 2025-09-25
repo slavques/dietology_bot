@@ -28,7 +28,7 @@ def test_load_goal_body_fat_photo_falls_back_to_pillow(monkeypatch, tmp_path):
     assert buffered_file.data
 
 
-def test_load_goal_body_fat_photo_uses_extension_when_pillow_fails(monkeypatch, tmp_path):
+def test_load_goal_body_fat_photo_detects_signature_when_pillow_fails(monkeypatch, tmp_path):
     image_path = tmp_path / "goal_body_fat.png"
     Image.new("RGB", (10, 10), color="blue").save(image_path, format="PNG")
 
@@ -48,6 +48,18 @@ def test_load_goal_body_fat_photo_uses_extension_when_pillow_fails(monkeypatch, 
     assert returned_path == image_path
     assert buffered_file.filename.endswith(".png")
     assert buffered_file.data
+
+
+def test_load_goal_body_fat_photo_rejects_corrupted_file(monkeypatch, tmp_path):
+    image_path = tmp_path / "goal_body_fat.png"
+    image_path.write_bytes(b"not a real png")
+
+    monkeypatch.setattr(goals, "STATIC_DIR", tmp_path)
+    monkeypatch.setattr(goals, "GOAL_BODY_FAT_IMAGE_NAME", image_path.name)
+
+    result = goals._load_goal_body_fat_photo()
+
+    assert result is None
 
 
 def test_load_goal_body_fat_photo_converts_unsupported_format(monkeypatch, tmp_path):
