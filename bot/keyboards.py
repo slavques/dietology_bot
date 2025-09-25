@@ -64,6 +64,11 @@ from .texts import (
     BTN_ACTIVITY_MED,
     BTN_ACTIVITY_HIGH,
     BTN_ACTIVITY_VERY_HIGH,
+    BTN_TRAINING_NONE,
+    BTN_TRAINING_FEW,
+    BTN_TRAINING_SOME,
+    BTN_TRAINING_OFTEN,
+    BTN_TRAINING_DAILY,
     BTN_TARGET_LOSS,
     BTN_TARGET_MAINTAIN,
     BTN_TARGET_GAIN,
@@ -511,12 +516,24 @@ def goal_body_fat_kb() -> InlineKeyboardMarkup:
 
 def goal_activity_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_ACTIVITY_SEDENTARY, callback_data="goal_activity:sedentary")
-    builder.button(text=BTN_ACTIVITY_LOW, callback_data="goal_activity:low")
-    builder.button(text=BTN_ACTIVITY_MED, callback_data="goal_activity:med")
-    builder.button(text=BTN_ACTIVITY_HIGH, callback_data="goal_activity:high")
-    builder.button(text=BTN_ACTIVITY_VERY_HIGH, callback_data="goal_activity:very_high")
+    builder.button(text=BTN_ACTIVITY_SEDENTARY, callback_data="goal_activity:study")
+    builder.button(text=BTN_ACTIVITY_LOW, callback_data="goal_activity:remote")
+    builder.button(text=BTN_ACTIVITY_MED, callback_data="goal_activity:office")
+    builder.button(text=BTN_ACTIVITY_HIGH, callback_data="goal_activity:physical")
+    builder.button(text=BTN_ACTIVITY_VERY_HIGH, callback_data="goal_activity:very_active")
     builder.button(text=BTN_BACK, callback_data="goal_back:body_fat")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def goal_training_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=BTN_TRAINING_NONE, callback_data="goal_training:none")
+    builder.button(text=BTN_TRAINING_FEW, callback_data="goal_training:few")
+    builder.button(text=BTN_TRAINING_SOME, callback_data="goal_training:some")
+    builder.button(text=BTN_TRAINING_OFTEN, callback_data="goal_training:often")
+    builder.button(text=BTN_TRAINING_DAILY, callback_data="goal_training:daily")
+    builder.button(text=BTN_BACK, callback_data="goal_back:activity")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -526,7 +543,7 @@ def goal_target_kb() -> InlineKeyboardMarkup:
     builder.button(text=BTN_TARGET_LOSS, callback_data="goal_target:loss")
     builder.button(text=BTN_TARGET_MAINTAIN, callback_data="goal_target:maintain")
     builder.button(text=BTN_TARGET_GAIN, callback_data="goal_target:gain")
-    builder.button(text=BTN_BACK, callback_data="goal_back:activity")
+    builder.button(text=BTN_BACK, callback_data="goal_back:training")
     builder.adjust(1)
     return builder.as_markup()
 
