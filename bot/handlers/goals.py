@@ -1,4 +1,6 @@
 from aiogram import types, Dispatcher, F
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
@@ -59,9 +61,60 @@ from ..texts import (
     GOAL_TRIAL_EXPIRED_NOTICE,
     GOAL_TRIAL_PAYWALL_TEXT,
 )
+from ..settings import STATIC_DIR, GOAL_BODY_FAT_IMAGE_NAME
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional
 from sqlalchemy import func
 from sqlalchemy.orm import object_session
+
+
+def _goal_body_fat_image_path() -> Optional[Path]:
+    if not GOAL_BODY_FAT_IMAGE_NAME:
+        return None
+    image_path = STATIC_DIR / GOAL_BODY_FAT_IMAGE_NAME
+    if not image_path.exists():
+        return None
+    return image_path
+
+
+async def _delete_message_safely(bot, chat_id: int, message_id: Optional[int]) -> None:
+    if not message_id:
+        return
+    try:
+        await bot.delete_message(chat_id, message_id)
+    except TelegramBadRequest:
+        pass
+
+
+async def _show_goal_body_fat_prompt(bot, chat_id: int, state: FSMContext, msg_id: Optional[int]):
+    image_path = _goal_body_fat_image_path()
+    markup = goal_body_fat_kb()
+    if image_path:
+        await _delete_message_safely(bot, chat_id, msg_id)
+        sent = await bot.send_photo(
+            chat_id,
+            FSInputFile(image_path),
+            caption=GOAL_CHOOSE_BODY_FAT,
+            reply_markup=markup,
+        )
+        await state.update_data(msg_id=sent.message_id)
+        return
+    if msg_id:
+        await bot.edit_message_text(
+            GOAL_CHOOSE_BODY_FAT,
+            chat_id=chat_id,
+            message_id=msg_id,
+            reply_markup=markup,
+        )
+        await state.update_data(msg_id=msg_id)
+        return
+    sent = await bot.send_message(
+        chat_id,
+        GOAL_CHOOSE_BODY_FAT,
+        reply_markup=markup,
+    )
+    await state.update_data(msg_id=sent.message_id)
 
 
 def calculate_goal(data: dict) -> tuple[int, int, int, int]:
@@ -322,7 +375,10 @@ async def process_age(message: types.Message, state: FSMContext):
             reply_markup=goal_back_kb("age"),
         )
     else:
-        await message.answer(GOAL_ENTER_HEIGHT, reply_markup=goal_back_kb("age"))
+        response = await message.answer(
+            GOAL_ENTER_HEIGHT, reply_markup=goal_back_kb("age")
+        )
+        await state.update_data(msg_id=response.message_id)
     await state.set_state(GoalState.height)
 
 
@@ -347,7 +403,10 @@ async def process_height(message: types.Message, state: FSMContext):
             reply_markup=goal_back_kb("height"),
         )
     else:
-        await message.answer(GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height"))
+        response = await message.answer(
+            GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height")
+        )
+        await state.update_data(msg_id=response.message_id)
     await state.set_state(GoalState.weight)
 
 
@@ -383,15 +442,12 @@ async def process_weight(message: types.Message, state: FSMContext):
         else:
             await message.answer(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
     else:
-        if msg_id:
-            await message.bot.edit_message_text(
-                GOAL_CHOOSE_BODY_FAT,
-                chat_id=message.chat.id,
-                message_id=msg_id,
-                reply_markup=goal_body_fat_kb(),
-            )
-        else:
-            await message.answer(GOAL_CHOOSE_BODY_FAT, reply_markup=goal_body_fat_kb())
+        await _show_goal_body_fat_prompt(
+            message.bot,
+            message.chat.id,
+            state,
+            msg_id,
+        )
         await state.set_state(GoalState.body_fat)
 
 
@@ -413,7 +469,21 @@ async def goal_set_body_fat(query: types.CallbackQuery, state: FSMContext):
         await state.clear()
         await query.message.edit_text(GOAL_EDIT_PROMPT, reply_markup=goal_edit_kb())
     else:
-        await query.message.edit_text(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
+        if query.message.photo:
+            await _delete_message_safely(
+                query.message.bot,
+                query.message.chat.id,
+                query.message.message_id,
+            )
+            sent = await query.message.answer(
+                GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb()
+            )
+            await state.update_data(msg_id=sent.message_id)
+        else:
+            await query.message.edit_text(
+                GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb()
+            )
+            await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.activity)
     await query.answer()
 
@@ -541,12 +611,29 @@ async def goal_back(query: types.CallbackQuery, state: FSMContext):
         await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.height)
     elif step == "weight":
-        await query.message.edit_text(GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height"))
-        await state.update_data(msg_id=query.message.message_id)
+        if query.message.photo:
+            await _delete_message_safely(
+                query.message.bot,
+                query.message.chat.id,
+                query.message.message_id,
+            )
+            sent = await query.message.answer(
+                GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height")
+            )
+            await state.update_data(msg_id=sent.message_id)
+        else:
+            await query.message.edit_text(
+                GOAL_ENTER_WEIGHT, reply_markup=goal_back_kb("height")
+            )
+            await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.weight)
     elif step == "body_fat":
-        await query.message.edit_text(GOAL_CHOOSE_BODY_FAT, reply_markup=goal_body_fat_kb())
-        await state.update_data(msg_id=query.message.message_id)
+        await _show_goal_body_fat_prompt(
+            query.message.bot,
+            query.message.chat.id,
+            state,
+            query.message.message_id,
+        )
         await state.set_state(GoalState.body_fat)
     elif step == "activity":
         await query.message.edit_text(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
