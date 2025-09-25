@@ -50,6 +50,7 @@ class GoalState(StatesGroup):
     weight = State()
     body_fat = State()
     activity = State()
+    training = State()
     target = State()
     plan = State()
 

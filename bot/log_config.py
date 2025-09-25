@@ -15,6 +15,8 @@ LOG_FLAGS = {
     'tokens': True,
     # Mass messaging events
     'broadcast': True,
+    # Discount offers sent to users
+    'discount': True,
     # Admin actions to extend subscriptions
     'days': True,
     # Enabling or disabling features
