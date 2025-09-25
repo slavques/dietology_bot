@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import types, Dispatcher, F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile
@@ -64,6 +66,9 @@ from ..texts import (
     GOAL_TRIAL_PAYWALL_TEXT,
 )
 from ..settings import STATIC_DIR, GOAL_BODY_FAT_IMAGE_NAME
+
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -92,25 +97,42 @@ async def _delete_message_safely(bot, chat_id: int, message_id: Optional[int]) -
 async def _show_goal_body_fat_prompt(bot, chat_id: int, state: FSMContext, msg_id: Optional[int]):
     image_path = _goal_body_fat_image_path()
     markup = goal_body_fat_kb()
+    fallback_msg_id = msg_id
     if image_path:
-        await _delete_message_safely(bot, chat_id, msg_id)
-        sent = await bot.send_photo(
-            chat_id,
-            FSInputFile(image_path),
-            caption=GOAL_CHOOSE_BODY_FAT,
-            reply_markup=markup,
-        )
-        await state.update_data(msg_id=sent.message_id)
-        return
-    if msg_id:
-        await bot.edit_message_text(
-            GOAL_CHOOSE_BODY_FAT,
-            chat_id=chat_id,
-            message_id=msg_id,
-            reply_markup=markup,
-        )
-        await state.update_data(msg_id=msg_id)
-        return
+        if msg_id:
+            await _delete_message_safely(bot, chat_id, msg_id)
+            fallback_msg_id = None
+        try:
+            sent = await bot.send_photo(
+                chat_id,
+                FSInputFile(image_path),
+                caption=GOAL_CHOOSE_BODY_FAT,
+                reply_markup=markup,
+            )
+        except TelegramBadRequest as err:
+            logger.warning(
+                "Failed to send goal body fat illustration, falling back to text prompt: %s",
+                err,
+            )
+        else:
+            await state.update_data(msg_id=sent.message_id)
+            return
+    if fallback_msg_id:
+        try:
+            await bot.edit_message_text(
+                GOAL_CHOOSE_BODY_FAT,
+                chat_id=chat_id,
+                message_id=fallback_msg_id,
+                reply_markup=markup,
+            )
+        except TelegramBadRequest as err:
+            logger.warning(
+                "Failed to edit body fat prompt message, sending a new one: %s",
+                err,
+            )
+        else:
+            await state.update_data(msg_id=fallback_msg_id)
+            return
     sent = await bot.send_message(
         chat_id,
         GOAL_CHOOSE_BODY_FAT,
