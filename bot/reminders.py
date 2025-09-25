@@ -67,10 +67,13 @@ def _highlight_numbers(text: str) -> str:
     return re.sub(r"(\d+(?:[.,]\d+)?)", r"<b>\1</b>", text)
 
 
-def _format_gpt_message(content: str, message_type: str) -> str:
+def _format_gpt_message(content: str, message_type: str) -> tuple[str, bool]:
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", content.strip()) if p.strip()]
     if not paragraphs:
-        return escape(content.strip())
+        return escape(content.strip()), False
+
+    if len(paragraphs) == 1:
+        return escape(paragraphs[0]), False
 
     prefixes = {
         "morning": ("🌅 ", "📊 ", "💪 "),
@@ -80,25 +83,32 @@ def _format_gpt_message(content: str, message_type: str) -> str:
     first_prefix, second_prefix, third_prefix = prefixes.get(message_type, default_prefix)
 
     formatted = []
+    uses_markup = False
     for idx, paragraph in enumerate(paragraphs):
         escaped = escape(paragraph)
         if idx == 0:
-            escaped = f"{first_prefix}<b>{escaped}</b>" if escaped else ""
+            if escaped:
+                escaped = f"{first_prefix}<b>{escaped}</b>"
+                uses_markup = True
         else:
             escaped = _highlight_numbers(escaped)
+            if "<b>" in escaped:
+                uses_markup = True
             prefix = third_prefix if idx >= 2 else second_prefix
             escaped = f"{prefix}{escaped}" if escaped else ""
         formatted.append(escaped)
-    return "\n\n".join(formatted)
+    return "\n\n".join(formatted), uses_markup
 
 
 async def _send(bot: Bot, user: User, text: str, reply_markup=None, parse_mode=None) -> None:
     try:
+        kwargs = {"reply_markup": reply_markup}
+        if parse_mode:
+            kwargs["parse_mode"] = parse_mode
         await bot.send_message(
             user.telegram_id,
             text,
-            reply_markup=reply_markup,
-            parse_mode=parse_mode,
+            **kwargs,
         )
         log("notification", "sent reminder to %s: %s", user.telegram_id, text)
     except Exception:
@@ -198,8 +208,13 @@ def reminder_watcher(check_interval: int = 60):
                         ])
                         log("notification", "morning GPT response for %s: %s", user.telegram_id, content.strip())
                         await token_monitor.add(tokens_in, tokens_out)
-                        formatted = _format_gpt_message(content.strip(), "morning")
-                        await _send(bot, user, formatted, parse_mode="HTML")
+                        formatted, use_html = _format_gpt_message(content.strip(), "morning")
+                        await _send(
+                            bot,
+                            user,
+                            formatted,
+                            parse_mode="HTML" if use_html else None,
+                        )
                         user.last_morning = local_now
                 elif user.morning_enabled and user.morning_time:
                     target = _parse_time(user.morning_time)
@@ -254,8 +269,13 @@ def reminder_watcher(check_interval: int = 60):
                         ])
                         log("notification", "evening GPT response for %s: %s", user.telegram_id, content.strip())
                         await token_monitor.add(tokens_in, tokens_out)
-                        formatted = _format_gpt_message(content.strip(), "evening")
-                        await _send(bot, user, formatted, parse_mode="HTML")
+                        formatted, use_html = _format_gpt_message(content.strip(), "evening")
+                        await _send(
+                            bot,
+                            user,
+                            formatted,
+                            parse_mode="HTML" if use_html else None,
+                        )
                         user.last_evening = local_now
                 elif user.evening_enabled and user.evening_time:
                     target = _parse_time(user.evening_time)
