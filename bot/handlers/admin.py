@@ -18,6 +18,8 @@ from ..database import (
 from ..states import AdminState
 from ..config import ADMIN_COMMAND, ADMIN_PASSWORD
 from ..keyboards import subscribe_button
+from ..logger import log
+from ..messaging import deliver_text, send_with_retries
 from ..texts import (
     BTN_BROADCAST,
     BTN_BROADCAST_TEXT,
@@ -425,6 +427,7 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
         date=format_date_ru(expire.date()), time=expire.strftime("%H:%M")
     )
     count = 0
+    failed: list[int] = []
     if target == "no":
         users = (
             session.query(User)
@@ -436,8 +439,8 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             .all()
         )
         for u in users:
-            eng = u.engagement or EngagementStatus()
-            if eng.discount_sent and (
+            eng = u.engagement
+            if eng and eng.discount_sent and (
                 not eng.discount_expires
                 or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
             ):
@@ -445,20 +448,23 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             paid = session.query(Payment).filter_by(user_id=u.id).first()
             if paid:
                 continue
-            if not u.engagement:
+            if not eng:
+                eng = EngagementStatus()
                 u.engagement = eng
-            try:
-                await query.bot.send_message(
-                    u.telegram_id,
-                    text,
-                    parse_mode="HTML",
-                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
-                )
-            except Exception:
-                pass
-            eng.discount_sent = True
-            eng.discount_expires = expire
-            count += 1
+            success = await send_with_retries(
+                query.bot,
+                u.telegram_id,
+                text=text,
+                category="discount",
+                parse_mode="HTML",
+                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+            )
+            if success:
+                eng.discount_sent = True
+                eng.discount_expires = expire
+                count += 1
+            else:
+                failed.append(u.telegram_id)
     elif target == "with":
         users = (
             session.query(User)
@@ -470,8 +476,8 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             .all()
         )
         for u in users:
-            eng = u.engagement or EngagementStatus()
-            if eng.discount_sent and (
+            eng = u.engagement
+            if eng and eng.discount_sent and (
                 not eng.discount_expires
                 or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
             ):
@@ -479,20 +485,23 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             paid = session.query(Payment).filter_by(user_id=u.id).first()
             if paid:
                 continue
-            if not u.engagement:
+            if not eng:
+                eng = EngagementStatus()
                 u.engagement = eng
-            try:
-                await query.bot.send_message(
-                    u.telegram_id,
-                    text,
-                    parse_mode="HTML",
-                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
-                )
-            except Exception:
-                pass
-            eng.discount_sent = True
-            eng.discount_expires = expire
-            count += 1
+            success = await send_with_retries(
+                query.bot,
+                u.telegram_id,
+                text=text,
+                category="discount",
+                parse_mode="HTML",
+                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+            )
+            if success:
+                eng.discount_sent = True
+                eng.discount_expires = expire
+                count += 1
+            else:
+                failed.append(u.telegram_id)
     elif target == "paid":
         users = (
             session.query(User)
@@ -515,48 +524,67 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
                 u.subscription.period_end > datetime.utcnow() - timedelta(days=3)
             ):
                 continue
-            eng = u.engagement or EngagementStatus()
-            if eng.discount_sent and (
+            eng = u.engagement
+            if eng and eng.discount_sent and (
                 not eng.discount_expires
                 or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
             ):
                 continue
-            if not u.engagement:
+            if not eng:
+                eng = EngagementStatus()
                 u.engagement = eng
-            try:
-                await query.bot.send_message(
-                    u.telegram_id,
-                    text,
-                    parse_mode="HTML",
-                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
-                )
-            except Exception:
-                pass
-            eng.discount_sent = True
-            eng.discount_expires = expire
-            count += 1
+            success = await send_with_retries(
+                query.bot,
+                u.telegram_id,
+                text=text,
+                category="discount",
+                parse_mode="HTML",
+                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+            )
+            if success:
+                eng.discount_sent = True
+                eng.discount_expires = expire
+                count += 1
+            else:
+                failed.append(u.telegram_id)
     elif target == "one" and tg_id:
         user = session.query(User).filter_by(telegram_id=int(tg_id)).first()
         if user:
-            eng = user.engagement or EngagementStatus()
-            if not user.engagement:
+            eng = user.engagement
+            if not eng:
+                eng = EngagementStatus()
                 user.engagement = eng
-            try:
-                await query.bot.send_message(
-                    user.telegram_id,
-                    text,
-                    parse_mode="HTML",
-                    reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
-                )
-            except Exception:
-                pass
-            eng.discount_sent = True
-            eng.discount_expires = expire
-            count += 1
+            success = await send_with_retries(
+                query.bot,
+                user.telegram_id,
+                text=text,
+                category="discount",
+                parse_mode="HTML",
+                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+            )
+            if success:
+                eng.discount_sent = True
+                eng.discount_expires = expire
+                count += 1
+            else:
+                failed.append(user.telegram_id)
     session.commit()
     session.close()
+    log(
+        "discount",
+        "discount target %s: delivered %s, failed %s",
+        target,
+        count,
+        len(failed),
+    )
     await state.clear()
-    await query.message.edit_text(ADMIN_DISCOUNT_DONE, reply_markup=admin_menu_kb())
+    result_text = ADMIN_DISCOUNT_DONE
+    if failed:
+        preview = ", ".join(map(str, failed[:10]))
+        result_text += f"\nНе доставлено {len(failed)} пользователям."
+        if preview:
+            result_text += f"\nIDs: {preview}"
+    await query.message.edit_text(result_text, reply_markup=admin_menu_kb())
     await query.answer()
 
 
@@ -758,19 +786,29 @@ async def process_broadcast(message: types.Message, state: FSMContext):
     text = message.text
     session = SessionLocal()
     users = session.query(User).all()
-    error = False
-    for u in users:
-        try:
-            await message.bot.send_message(u.telegram_id, text)
-        except Exception:
-            error = True
+    user_ids = [u.telegram_id for u in users]
     session.close()
-    from ..logger import log
-    log("broadcast", "sent broadcast from %s to %s users", message.from_user.id, len(users))
-    await message.answer(
-        BROADCAST_ERROR if error else BROADCAST_DONE,
-        reply_markup=admin_menu_kb(),
+    report = await deliver_text(
+        message.bot,
+        user_ids,
+        text=text,
+        category="broadcast",
     )
+    log(
+        "broadcast",
+        "sent broadcast from %s to %s users (failed=%s)",
+        message.from_user.id,
+        report.delivered,
+        len(report.failed),
+    )
+    response = BROADCAST_DONE
+    if report.failed:
+        failed_preview = ", ".join(map(str, report.failed[:10]))
+        extra = f"\nНе доставлено {len(report.failed)} пользователям."
+        if failed_preview:
+            extra += f"\nIDs: {failed_preview}"
+        response = BROADCAST_ERROR + extra
+    await message.answer(response, reply_markup=admin_menu_kb())
     await state.clear()
 
 
@@ -780,25 +818,36 @@ async def process_broadcast_support(message: types.Message, state: FSMContext):
     text = message.text
     session = SessionLocal()
     users = session.query(User).all()
+    user_ids = [u.telegram_id for u in users]
+    session.close()
     from ..settings import SUPPORT_HANDLE
     url = f"https://t.me/{SUPPORT_HANDLE.lstrip('@')}"
     builder = InlineKeyboardBuilder()
     builder.button(text=BTN_SUPPORT, url=url)
     builder.adjust(1)
     kb = builder.as_markup()
-    error = False
-    for u in users:
-        try:
-            await message.bot.send_message(u.telegram_id, text, reply_markup=kb)
-        except Exception:
-            error = True
-    session.close()
-    from ..logger import log
-    log("broadcast", "sent broadcast from %s to %s users", message.from_user.id, len(users))
-    await message.answer(
-        BROADCAST_ERROR if error else BROADCAST_DONE,
-        reply_markup=admin_menu_kb(),
+    report = await deliver_text(
+        message.bot,
+        user_ids,
+        text=text,
+        category="broadcast",
+        reply_markup=kb,
     )
+    log(
+        "broadcast",
+        "sent support broadcast from %s to %s users (failed=%s)",
+        message.from_user.id,
+        report.delivered,
+        len(report.failed),
+    )
+    response = BROADCAST_DONE
+    if report.failed:
+        failed_preview = ", ".join(map(str, report.failed[:10]))
+        extra = f"\nНе доставлено {len(report.failed)} пользователям."
+        if failed_preview:
+            extra += f"\nIDs: {failed_preview}"
+        response = BROADCAST_ERROR + extra
+    await message.answer(response, reply_markup=admin_menu_kb())
     await state.clear()
 
 
@@ -825,9 +874,19 @@ async def process_days(message: types.Message, state: FSMContext):
     if user and user.grade in {"light", "pro"} and not user.trial:
         from ..subscriptions import add_subscription_days
 
-        add_subscription_days(session, user, days)
-        from ..logger import log
-        log("days", "added %s days to %s", days, user.telegram_id)
+        try:
+            add_subscription_days(session, user, days)
+            log("days", "added %s days to %s", days, user.telegram_id)
+        except Exception as exc:
+            session.rollback()
+            log("days", "failed to add %s days to %s: %s", days, user.telegram_id, exc)
+            session.close()
+            await message.answer(
+                f"Не удалось начислить дни пользователю {target}",
+                reply_markup=admin_menu_kb(),
+            )
+            await state.clear()
+            return
     session.close()
     await message.answer(ADMIN_DAYS_DONE, reply_markup=admin_menu_kb())
     await state.clear()
@@ -852,12 +911,31 @@ async def process_days_all(message: types.Message, state: FSMContext):
         .filter(Subscription.grade.in_(["light", "pro"]))
         .all()
     )
+    failed: list[int] = []
+    success = 0
     for u in users:
-        add_subscription_days(session, u, days)
-    from ..logger import log
-    log("days", "added %s days to all %s users", days, len(users))
+        try:
+            add_subscription_days(session, u, days)
+            success += 1
+        except Exception as exc:
+            session.rollback()
+            failed.append(u.telegram_id)
+            log("days", "failed to add %s days to %s: %s", days, u.telegram_id, exc)
+    log(
+        "days",
+        "added %s days to %s users (failed=%s)",
+        days,
+        success,
+        len(failed),
+    )
     session.close()
-    await message.answer(ADMIN_DAYS_DONE, reply_markup=admin_menu_kb())
+    text = ADMIN_DAYS_DONE
+    if failed:
+        preview = ", ".join(map(str, failed[:10]))
+        text += f"\nНе удалось начислить {len(failed)} пользователям."
+        if preview:
+            text += f"\nIDs: {preview}"
+    await message.answer(text, reply_markup=admin_menu_kb())
     await state.clear()
 
 
@@ -938,12 +1016,38 @@ async def process_trial_days(message: types.Message, state: FSMContext):
         session = SessionLocal()
         users = session.query(User).all()
         from ..subscriptions import start_trial
+        failed: list[int] = []
         for u in users:
-            start_trial(session, u, days, grade)
-        from ..logger import log
-        log("trial", "started %s-day %s trial for all %s users", days, grade, len(users))
+            try:
+                start_trial(session, u, days, grade)
+            except Exception as exc:
+                session.rollback()
+                failed.append(u.telegram_id)
+                log(
+                    "trial",
+                    "failed to start %s-day %s trial for %s: %s",
+                    days,
+                    grade,
+                    u.telegram_id,
+                    exc,
+                )
+        delivered = len(users) - len(failed)
+        log(
+            "trial",
+            "started %s-day %s trial for all users: success=%s, failed=%s",
+            days,
+            grade,
+            delivered,
+            len(failed),
+        )
         session.close()
-        await message.answer(ADMIN_TRIAL_DONE, reply_markup=admin_menu_kb())
+        text = ADMIN_TRIAL_DONE
+        if failed:
+            preview = ", ".join(map(str, failed[:10]))
+            text += f"\nНе удалось подключить {len(failed)} пользователям."
+            if preview:
+                text += f"\nIDs: {preview}"
+        await message.answer(text, reply_markup=admin_menu_kb())
         await state.clear()
     else:
         await state.update_data(trial_days=days)
@@ -966,9 +1070,26 @@ async def process_trial_user_id(message: types.Message, state: FSMContext):
     user = session.query(User).filter_by(telegram_id=telegram_id).first()
     if user:
         from ..subscriptions import start_trial
-        start_trial(session, user, days, grade)
-        from ..logger import log
-        log("trial", "started %s-day %s trial for %s", days, grade, telegram_id)
+        try:
+            start_trial(session, user, days, grade)
+            log("trial", "started %s-day %s trial for %s", days, grade, telegram_id)
+        except Exception as exc:
+            session.rollback()
+            log(
+                "trial",
+                "failed to start %s-day %s trial for %s: %s",
+                days,
+                grade,
+                telegram_id,
+                exc,
+            )
+            await message.answer(
+                f"Не удалось подключить пробный период для {telegram_id}",
+                reply_markup=admin_menu_kb(),
+            )
+            session.close()
+            await state.clear()
+            return
     session.close()
     await message.answer(ADMIN_TRIAL_DONE, reply_markup=admin_menu_kb())
     await state.clear()
