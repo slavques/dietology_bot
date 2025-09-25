@@ -1,11 +1,13 @@
 import logging
 import imghdr
+from io import BytesIO
 
 from aiogram import types, Dispatcher, F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
+from PIL import Image, UnidentifiedImageError
 
 from ..database import SessionLocal, Goal, Meal, get_option_bool
 from ..subscriptions import ensure_user, update_limits
@@ -125,14 +127,31 @@ def _load_goal_body_fat_photo() -> Optional[Tuple[BufferedInputFile, Path]]:
         return None
     image_format = imghdr.what(None, payload)
     if image_format not in {"jpeg", "png"}:
-        logger.warning(
-            "Body fat illustration %s has unsupported format %s", image_path, image_format
-        )
-        return None
+        try:
+            with Image.open(BytesIO(payload)) as illustration:
+                pil_format = (illustration.format or "").lower()
+                if pil_format in {"jpeg", "png"}:
+                    image_format = pil_format
+                elif pil_format:
+                    buffer = BytesIO()
+                    illustration.convert("RGB").save(buffer, format="JPEG")
+                    payload = buffer.getvalue()
+                    image_format = "jpeg"
+                else:
+                    raise UnidentifiedImageError
+        except UnidentifiedImageError:
+            logger.warning(
+                "Body fat illustration %s has unsupported format %s", image_path, image_format
+            )
+            return None
     filename = image_path.name
     if "." not in filename:
         extension = "jpg" if image_format == "jpeg" else "png"
         filename = f"{filename}.{extension}"
+    elif image_format == "jpeg" and not filename.lower().endswith((".jpg", ".jpeg")):
+        filename = f"{image_path.stem}.jpg"
+    elif image_format == "png" and not filename.lower().endswith(".png"):
+        filename = f"{image_path.stem}.png"
     return BufferedInputFile(payload, filename=filename), image_path
 
 
