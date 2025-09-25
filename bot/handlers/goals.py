@@ -12,6 +12,7 @@ from ..keyboards import (
     goal_back_kb,
     goal_body_fat_kb,
     goal_activity_kb,
+    goal_training_kb,
     goal_target_kb,
     goal_plan_kb,
     goal_confirm_kb,
@@ -37,6 +38,7 @@ from ..texts import (
     GOAL_ENTER_WEIGHT,
     GOAL_CHOOSE_BODY_FAT,
     GOAL_CHOOSE_ACTIVITY,
+    GOAL_CHOOSE_TRAINING,
     GOAL_CHOOSE_TARGET,
     GOAL_CHOOSE_LOSS_PLAN,
     GOAL_CHOOSE_GAIN_PLAN,
@@ -121,9 +123,11 @@ def calculate_goal(data: dict) -> tuple[int, int, int, int]:
     gender = data.get("gender", "male")
     age = int(data.get("age", 0))
     height = int(data.get("height", 0))
-    weight = float(data.get("weight", 0))
+    weight = max(float(data.get("weight", 0)), 1)
     body_fat = data.get("body_fat")
-    activity = data.get("activity", "sedentary")
+    activity = data.get("activity")
+    work_intensity = data.get("work_intensity")
+    training_level = data.get("training_level")
     target = data.get("target", "maintain")
     plan = data.get("plan")
 
@@ -131,40 +135,130 @@ def calculate_goal(data: dict) -> tuple[int, int, int, int]:
         lbm = weight * (1 - float(body_fat) / 100)
         bmr = 370 + 21.6 * lbm
     else:
+        lbm = None
         if gender == "male":
             bmr = 10 * weight + 6.25 * height - 5 * age + 5
         else:
             bmr = 10 * weight + 6.25 * height - 5 * age - 161
-    factors = {
-        "sedentary": 1.2,
-        "low": 1.375,
-        "med": 1.55,
-        "high": 1.725,
-        "very_high": 1.9,
+
+    if (not work_intensity or not training_level) and isinstance(activity, str):
+        if "|" in activity:
+            work_part, train_part = activity.split("|", 1)
+            work_intensity = work_intensity or work_part
+            training_level = training_level or train_part
+        else:
+            legacy_map = {
+                "sedentary": ("study", "none"),
+                "low": ("remote", "few"),
+                "med": ("office", "some"),
+                "high": ("physical", "often"),
+                "very_high": ("very_active", "daily"),
+            }
+            legacy_work, legacy_train = legacy_map.get(activity, ("study", "none"))
+            work_intensity = work_intensity or legacy_work
+            training_level = training_level or legacy_train
+
+    work_intensity = work_intensity or "study"
+    training_level = training_level or "none"
+
+    work_factors = {
+        "study": 1.2,
+        "remote": 1.28,
+        "office": 1.38,
+        "physical": 1.55,
+        "very_active": 1.75,
     }
-    maintenance = bmr * factors.get(activity, 1.2)
-    calories = maintenance
-    ratios = (0.3, 0.3, 0.4)
+    training_bonus = {
+        "none": 0.0,
+        "few": 0.07,
+        "some": 0.14,
+        "often": 0.22,
+        "daily": 0.30,
+    }
+    activity_multiplier = work_factors.get(work_intensity, 1.3)
+    activity_multiplier *= 1 + training_bonus.get(training_level, 0.0)
+    activity_multiplier = min(max(activity_multiplier, 1.1), 2.2)
+    maintenance = bmr * activity_multiplier
+
     if target == "loss":
         if plan == "fast":
-            calories = maintenance * 0.8
+            delta = -0.25
         elif plan == "protein":
-            calories = maintenance * 0.85
-            ratios = (0.4, 0.3, 0.3)
+            delta = -0.17
         else:
-            calories = maintenance * 0.85
+            delta = -0.20
     elif target == "gain":
         if plan == "fast":
-            calories = maintenance * 1.2
+            delta = 0.18
         elif plan == "protein_carb":
-            calories = maintenance * 1.15
-            ratios = (0.3, 0.2, 0.5)
+            delta = 0.14
         else:
-            calories = maintenance * 1.15
-    calories = int(calories)
-    protein = int(calories * ratios[0] / 4)
-    fat = int(calories * ratios[1] / 9)
-    carbs = int(calories * ratios[2] / 4)
+            delta = 0.12
+    else:
+        delta = 0.0
+
+    calories = maintenance * (1 + delta)
+    min_floor = max(1200 if gender == "female" else 1400, bmr * 1.1)
+    max_cap = min(maintenance + 800, 4500)
+    if target == "gain":
+        min_floor = max(min_floor, maintenance * 0.95)
+    calories = max(min_floor, calories)
+    calories = min(max_cap, calories)
+
+    if body_fat is not None:
+        base_mass = max(lbm, 1)
+        if target == "loss":
+            protein_per_kg = 2.0
+        elif target == "gain":
+            protein_per_kg = 1.9 if plan == "protein_carb" else 1.7
+        else:
+            protein_per_kg = 1.8
+    else:
+        base_mass = weight
+        if target == "loss":
+            protein_per_kg = 1.8
+        elif target == "gain":
+            protein_per_kg = 1.7
+        else:
+            protein_per_kg = 1.6
+    if target == "loss" and plan == "protein":
+        protein_per_kg += 0.1
+    protein_g = max(base_mass * protein_per_kg, 60)
+    max_protein = max(weight * 2.4, protein_g)
+    protein_g = min(protein_g, max_protein)
+
+    if target == "loss":
+        fat_per_kg = 0.8 if plan != "fast" else 0.7
+    elif target == "gain":
+        fat_per_kg = 1.0 if plan != "protein_carb" else 0.9
+    else:
+        fat_per_kg = 0.9
+    fat_g = max(fat_per_kg * weight, 40)
+    min_fat = max(0.6 * weight, 35)
+
+    protein_cal = protein_g * 4
+    fat_cal = fat_g * 9
+    remaining_cal = calories - (protein_cal + fat_cal)
+
+    if remaining_cal < 0 and fat_g > min_fat:
+        fat_g = min_fat
+        fat_cal = fat_g * 9
+        remaining_cal = calories - (protein_cal + fat_cal)
+
+    min_protein = max((1.6 if body_fat is not None else 1.4) * base_mass, 55)
+    if remaining_cal < 0 and protein_g > min_protein:
+        protein_g = min_protein
+        protein_cal = protein_g * 4
+        remaining_cal = calories - (protein_cal + fat_cal)
+
+    carbs_g = max(remaining_cal / 4, 0)
+    if remaining_cal >= 160 and carbs_g < 40:
+        carbs_g = 40
+
+    calories = int(round(calories))
+    protein = int(round(protein_g))
+    fat = int(round(fat_g))
+    carbs = int(round(carbs_g))
     return calories, protein, fat, carbs
 
 
@@ -490,14 +584,42 @@ async def goal_set_body_fat(query: types.CallbackQuery, state: FSMContext):
 
 async def goal_set_activity(query: types.CallbackQuery, state: FSMContext):
     value = query.data.split(":")[1]
-    await state.update_data(activity=value)
+    await state.update_data(
+        work_intensity=value,
+        training_level=None,
+        msg_id=query.message.message_id,
+    )
+    await query.message.edit_text(GOAL_CHOOSE_TRAINING, reply_markup=goal_training_kb())
+    await state.set_state(GoalState.training)
+    await query.answer()
+
+
+async def goal_set_training(query: types.CallbackQuery, state: FSMContext):
+    value = query.data.split(":")[1]
     data = await state.get_data()
+    work = data.get("work_intensity") or "study"
+    activity_value = f"{work}|{value}"
+    await state.update_data(training_level=value, activity=activity_value)
     if data.get("editing"):
         session = SessionLocal()
         user = ensure_user(session, query.from_user.id)
-        if not user.goal:
-            user.goal = Goal()
-        user.goal.activity = value
+        goal = user.goal or Goal()
+        user.goal = goal
+        goal.activity = activity_value
+        calc = {
+            "gender": goal.gender,
+            "age": goal.age,
+            "height": goal.height,
+            "weight": goal.weight,
+            "body_fat": goal.body_fat,
+            "activity": activity_value,
+            "work_intensity": work,
+            "training_level": value,
+            "target": goal.target,
+            "plan": goal.plan,
+        }
+        cal, p, f, c = calculate_goal(calc)
+        goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
         session.commit()
         session.close()
         await state.clear()
@@ -520,6 +642,9 @@ async def goal_set_target(query: types.CallbackQuery, state: FSMContext):
             user.goal = goal
             goal.target = value
             goal.plan = None
+            work_level = training_level = None
+            if isinstance(goal.activity, str) and "|" in goal.activity:
+                work_level, training_level = goal.activity.split("|", 1)
             calc = {
                 "gender": goal.gender,
                 "age": goal.age,
@@ -527,6 +652,8 @@ async def goal_set_target(query: types.CallbackQuery, state: FSMContext):
                 "weight": goal.weight,
                 "body_fat": goal.body_fat,
                 "activity": goal.activity,
+                "work_intensity": work_level,
+                "training_level": training_level,
                 "target": goal.target,
                 "plan": goal.plan,
             }
@@ -571,6 +698,9 @@ async def goal_set_plan(query: types.CallbackQuery, state: FSMContext):
         goal = user.goal or Goal()
         user.goal = goal
         goal.plan = value
+        work_level = training_level = None
+        if isinstance(goal.activity, str) and "|" in goal.activity:
+            work_level, training_level = goal.activity.split("|", 1)
         calc = {
             "gender": goal.gender,
             "age": goal.age,
@@ -578,6 +708,8 @@ async def goal_set_plan(query: types.CallbackQuery, state: FSMContext):
             "weight": goal.weight,
             "body_fat": goal.body_fat,
             "activity": goal.activity,
+            "work_intensity": work_level,
+            "training_level": training_level,
             "target": goal.target,
             "plan": goal.plan,
         }
@@ -639,6 +771,10 @@ async def goal_back(query: types.CallbackQuery, state: FSMContext):
         await query.message.edit_text(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
         await state.update_data(msg_id=query.message.message_id)
         await state.set_state(GoalState.activity)
+    elif step == "training":
+        await query.message.edit_text(GOAL_CHOOSE_TRAINING, reply_markup=goal_training_kb())
+        await state.update_data(msg_id=query.message.message_id)
+        await state.set_state(GoalState.training)
     elif step == "target":
         await query.message.edit_text(GOAL_CHOOSE_TARGET, reply_markup=goal_target_kb())
         await state.update_data(msg_id=query.message.message_id)
@@ -662,7 +798,13 @@ async def goal_confirm_save(query: types.CallbackQuery, state: FSMContext):
     goal.height = data.get("height")
     goal.weight = data.get("weight")
     goal.body_fat = data.get("body_fat")
-    goal.activity = data.get("activity")
+    activity_value = data.get("activity")
+    if not activity_value:
+        work = data.get("work_intensity")
+        training = data.get("training_level")
+        if work or training:
+            activity_value = f"{work or 'study'}|{training or 'none'}"
+    goal.activity = activity_value
     goal.target = data.get("target")
     goal.plan = data.get("plan")
     goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
@@ -698,6 +840,7 @@ async def goal_edit_param(query: types.CallbackQuery, state: FSMContext):
         await query.message.edit_text(GOAL_ENTER_AGE, reply_markup=goal_back_kb("edit"))
         await state.set_state(GoalState.age)
     elif param == "activity":
+        await state.update_data(work_intensity=None, training_level=None)
         await query.message.edit_text(GOAL_CHOOSE_ACTIVITY, reply_markup=goal_activity_kb())
         await state.set_state(GoalState.activity)
     elif param == "target":
@@ -982,6 +1125,7 @@ def register(dp: Dispatcher):
     dp.message.register(process_weight, StateFilter(GoalState.weight))
     dp.callback_query.register(goal_set_body_fat, F.data.startswith("goal_bodyfat:"))
     dp.callback_query.register(goal_set_activity, F.data.startswith("goal_activity:"))
+    dp.callback_query.register(goal_set_training, F.data.startswith("goal_training:"))
     dp.callback_query.register(goal_set_target, F.data.startswith("goal_target:"))
     dp.callback_query.register(goal_set_plan, F.data.startswith("goal_plan:"))
     dp.callback_query.register(goal_back, F.data.startswith("goal_back:"))
