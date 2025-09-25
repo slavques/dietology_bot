@@ -1,11 +1,13 @@
 import logging
 import imghdr
+from io import BytesIO
 
 from aiogram import types, Dispatcher, F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from ..database import SessionLocal, Goal, Meal, get_option_bool
 from ..subscriptions import ensure_user, update_limits
@@ -98,6 +100,67 @@ async def _delete_message_safely(bot, chat_id: int, message_id: Optional[int]) -
         pass
 
 
+def _prepare_goal_body_fat_payload(
+    image_path: Path, payload: bytes
+) -> Optional[Tuple[bytes, str]]:
+    supported_formats = {"jpeg", "png"}
+    detected_format = imghdr.what(None, payload)
+    if detected_format in supported_formats:
+        return payload, detected_format
+
+    try:
+        with Image.open(image_path) as illustration:
+            illustration.load()
+            normalized = ImageOps.exif_transpose(illustration)
+            pil_format = (illustration.format or "").lower()
+    except (UnidentifiedImageError, OSError) as err:
+        logger.debug(
+            "Pillow could not normalise body fat illustration %s: %s",
+            image_path,
+            err,
+        )
+    else:
+        target_format = "png" if pil_format == "png" or image_path.suffix.lower() == ".png" else "jpeg"
+        buffer = BytesIO()
+        try:
+            if target_format == "png":
+                if "A" in normalized.getbands():
+                    converted = normalized.convert("RGBA")
+                elif normalized.mode in {"L", "RGB"}:
+                    converted = normalized.copy()
+                else:
+                    converted = normalized.convert("RGB")
+                converted.save(buffer, format="PNG", optimize=True)
+            else:
+                converted = normalized.convert("RGB")
+                converted.save(buffer, format="JPEG", quality=90, optimize=True)
+        except OSError as err:
+            logger.debug(
+                "Failed to re-encode body fat illustration %s as %s: %s",
+                image_path,
+                target_format,
+                err,
+            )
+        else:
+            payload = buffer.getvalue()
+            buffer.close()
+            if len(payload) > BODY_FAT_IMAGE_MAX_BYTES:
+                logger.warning(
+                    "Body fat illustration %s exceeds Telegram limit after normalisation (%s bytes)",
+                    image_path,
+                    len(payload),
+                )
+                return None
+            return payload, target_format
+
+    extension = image_path.suffix.lower()
+    if extension in {".jpg", ".jpeg"}:
+        return payload, "jpeg"
+    if extension == ".png":
+        return payload, "png"
+    return None
+
+
 def _load_goal_body_fat_photo() -> Optional[Tuple[BufferedInputFile, Path]]:
     image_path = _goal_body_fat_image_path()
     if not image_path:
@@ -123,16 +186,21 @@ def _load_goal_body_fat_photo() -> Optional[Tuple[BufferedInputFile, Path]]:
     except OSError as err:
         logger.warning("Failed to read body fat illustration %s: %s", image_path, err)
         return None
-    image_format = imghdr.what(None, payload)
-    if image_format not in {"jpeg", "png"}:
+    prepared = _prepare_goal_body_fat_payload(image_path, payload)
+    if not prepared:
         logger.warning(
-            "Body fat illustration %s has unsupported format %s", image_path, image_format
+            "Body fat illustration %s has unsupported format after normalisation", image_path
         )
         return None
+    payload, image_format = prepared
     filename = image_path.name
     if "." not in filename:
         extension = "jpg" if image_format == "jpeg" else "png"
         filename = f"{filename}.{extension}"
+    elif image_format == "jpeg" and not filename.lower().endswith((".jpg", ".jpeg")):
+        filename = f"{image_path.stem}.jpg"
+    elif image_format == "png" and not filename.lower().endswith(".png"):
+        filename = f"{image_path.stem}.png"
     return BufferedInputFile(payload, filename=filename), image_path
 
 
