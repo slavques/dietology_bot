@@ -1,8 +1,9 @@
 import logging
+import imghdr
 
 from aiogram import types, Dispatcher, F
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import FSInputFile
+from aiogram.types import BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
@@ -71,9 +72,12 @@ from ..settings import STATIC_DIR, GOAL_BODY_FAT_IMAGE_NAME
 logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from sqlalchemy import func
 from sqlalchemy.orm import object_session
+
+
+BODY_FAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
 
 def _goal_body_fat_image_path() -> Optional[Path]:
@@ -94,18 +98,56 @@ async def _delete_message_safely(bot, chat_id: int, message_id: Optional[int]) -
         pass
 
 
-async def _show_goal_body_fat_prompt(bot, chat_id: int, state: FSMContext, msg_id: Optional[int]):
+def _load_goal_body_fat_photo() -> Optional[Tuple[BufferedInputFile, Path]]:
     image_path = _goal_body_fat_image_path()
+    if not image_path:
+        logger.debug("Goal body fat illustration is not configured")
+        return None
+    try:
+        file_size = image_path.stat().st_size
+    except OSError as err:
+        logger.warning("Failed to stat body fat illustration %s: %s", image_path, err)
+        return None
+    if file_size <= 0:
+        logger.warning("Body fat illustration %s is empty", image_path)
+        return None
+    if file_size > BODY_FAT_IMAGE_MAX_BYTES:
+        logger.warning(
+            "Body fat illustration %s is too large for Telegram (%s bytes)",
+            image_path,
+            file_size,
+        )
+        return None
+    try:
+        payload = image_path.read_bytes()
+    except OSError as err:
+        logger.warning("Failed to read body fat illustration %s: %s", image_path, err)
+        return None
+    image_format = imghdr.what(None, payload)
+    if image_format not in {"jpeg", "png"}:
+        logger.warning(
+            "Body fat illustration %s has unsupported format %s", image_path, image_format
+        )
+        return None
+    filename = image_path.name
+    if "." not in filename:
+        extension = "jpg" if image_format == "jpeg" else "png"
+        filename = f"{filename}.{extension}"
+    return BufferedInputFile(payload, filename=filename), image_path
+
+
+async def _show_goal_body_fat_prompt(bot, chat_id: int, state: FSMContext, msg_id: Optional[int]):
+    body_fat_photo = _load_goal_body_fat_photo()
     markup = goal_body_fat_kb()
     fallback_msg_id = msg_id
-    if image_path:
+    if body_fat_photo:
         if msg_id:
             await _delete_message_safely(bot, chat_id, msg_id)
             fallback_msg_id = None
         try:
             sent = await bot.send_photo(
                 chat_id,
-                FSInputFile(str(image_path), filename=image_path.name),
+                body_fat_photo[0],
                 caption=GOAL_CHOOSE_BODY_FAT,
                 reply_markup=markup,
             )
@@ -114,6 +156,7 @@ async def _show_goal_body_fat_prompt(bot, chat_id: int, state: FSMContext, msg_i
                 "Failed to send goal body fat illustration, falling back to text prompt: %s",
                 err,
             )
+            logger.debug("Illustration attempted from %s", body_fat_photo[1])
         else:
             await state.update_data(msg_id=sent.message_id)
             return
