@@ -20,7 +20,7 @@ from ..subscriptions import consume_request, ensure_user, has_request_quota, not
 from ..database import SessionLocal
 from .referral import reward_first_analysis
 from ..states import EditMeal, LookupMeal
-from ..storage import pending_meals
+from ..storage import pending_meals, should_send_document_prompt
 from ..texts import (
     LIMIT_REACHED_TEXT,
     format_date_ru,
@@ -265,7 +265,8 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
 
 async def handle_document(message: types.Message):
-    await message.answer(DOCUMENT_PHOTO_ERROR)
+    if should_send_document_prompt(message.from_user.id):
+        await message.answer(DOCUMENT_PHOTO_ERROR)
 
 
 def register(dp: Dispatcher):
