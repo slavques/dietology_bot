@@ -27,6 +27,7 @@ from ..texts import (
     REQUEST_PHOTO,
     PHOTO_ANALYZING,
     MULTI_PHOTO_ERROR,
+    DOCUMENT_PHOTO_ERROR,
     RECOGNITION_ERROR,
     NO_FOOD_ERROR,
     CLARIFY_PROMPT,
@@ -264,7 +265,7 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
 
 async def handle_document(message: types.Message):
-    await message.answer(MULTI_PHOTO_ERROR)
+    await message.answer(DOCUMENT_PHOTO_ERROR)
 
 
 def register(dp: Dispatcher):
