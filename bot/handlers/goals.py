@@ -1,4 +1,5 @@
 import logging
+import inspect
 import imghdr
 from io import BytesIO
 
@@ -95,7 +96,9 @@ async def _delete_message_safely(bot, chat_id: int, message_id: Optional[int]) -
     if not message_id:
         return
     try:
-        await bot.delete_message(chat_id, message_id)
+        result = bot.delete_message(chat_id, message_id)
+        if inspect.isawaitable(result):
+            await result
     except TelegramBadRequest:
         pass
 
