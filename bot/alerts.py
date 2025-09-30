@@ -17,6 +17,7 @@ from .database import (
     get_option_int,
     set_option,
 )
+from .utils import sleep_until_next_utc_midnight
 
 
 alert_bot = Bot(token=ALERT_BOT_TOKEN) if ALERT_BOT_TOKEN else None
@@ -166,28 +167,22 @@ async def monthly_limit(telegram_id: int) -> None:
 
 async def token_watcher() -> None:
     """Send daily token report at midnight UTC and reset counters."""
+
     while True:
-        now = datetime.utcnow()
-        tomorrow = now.date() + timedelta(days=1)
-        midnight = datetime.combine(tomorrow, time())
-        await asyncio.sleep((midnight - now).total_seconds())
+        await sleep_until_next_utc_midnight()
         await token_monitor.report_and_reset()
 
 
 async def user_stats_watcher() -> None:
     """Send daily user statistics to the alert chat at midnight UTC."""
     while True:
-        now = datetime.utcnow()
-        tomorrow = now.date() + timedelta(days=1)
-        midnight = datetime.combine(tomorrow, time())
-        await asyncio.sleep((midnight - now).total_seconds())
+        await sleep_until_next_utc_midnight()
 
-        session = SessionLocal()
-        try:
-            today = datetime.utcnow().date()
-            start = datetime.combine(today - timedelta(days=1), time())
-            end = datetime.combine(today, time())
+        today = datetime.utcnow().date()
+        start = datetime.combine(today - timedelta(days=1), time())
+        end = datetime.combine(today, time())
 
+        with SessionLocal() as session:
             total_users = session.query(User).count()
             ended = (
                 session.query(Subscription)
@@ -235,8 +230,6 @@ async def user_stats_watcher() -> None:
                 }
             )
             session.commit()
-        finally:
-            session.close()
 
 
 async def _log_chat_id(message: types.Message) -> None:
