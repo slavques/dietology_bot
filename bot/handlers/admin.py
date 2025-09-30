@@ -425,20 +425,26 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
                 last_sent_at = engagement.discount_expires - timedelta(days=1)
             if last_sent_at and last_sent_at > decision_time - timedelta(days=30):
                 return None
-        last_payment = (
+        payments = (
             session.query(Payment)
             .filter_by(user_id=user.id)
-            .order_by(Payment.timestamp.desc())
-            .first()
+            .order_by(Payment.timestamp.asc())
+            .all()
         )
-        if last_payment is None:
+        if not payments:
             if user.created_at and user.created_at <= decision_time - timedelta(days=3):
                 return "new"
             return None
-        if last_payment.timestamp > decision_time - timedelta(days=3):
-            return None
-        period_end = subscription.period_end
-        if not period_end or period_end > decision_time - timedelta(days=3):
+        paid_until: Optional[datetime] = None
+        for payment in payments:
+            months = payment.months or 1
+            if months <= 0:
+                months = 1
+            start = payment.timestamp
+            if paid_until and paid_until > start:
+                start = paid_until
+            paid_until = start + timedelta(days=30 * months)
+        if not paid_until or paid_until > decision_time - timedelta(days=3):
             return None
         return "return"
 
