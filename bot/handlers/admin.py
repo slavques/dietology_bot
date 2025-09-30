@@ -84,6 +84,7 @@ from ..texts import (
     ADMIN_TRIAL_DONE,
     ADMIN_DISCOUNT_PROMPT,
     ADMIN_DISCOUNT_DONE,
+    ADMIN_DISCOUNT_COOLDOWN,
     ADMIN_STATS,
     ADMIN_REFERRAL_TITLE,
     ADMIN_REFERRAL_EMPTY,
@@ -418,11 +419,12 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
         if skip_inactive and (user.blocked or user.left_bot):
             return None
         engagement = user.engagement
-        if respect_cooldown and engagement and engagement.discount_sent and (
-            not engagement.discount_expires
-            or engagement.discount_expires + timedelta(days=29) > now
-        ):
-            return None
+        if respect_cooldown and engagement and engagement.discount_sent:
+            last_sent_at = engagement.discount_last_sent
+            if not last_sent_at and engagement.discount_expires:
+                last_sent_at = engagement.discount_expires - timedelta(days=1)
+            if last_sent_at and last_sent_at > now - timedelta(days=30):
+                return None
         last_payment = (
             session.query(Payment)
             .filter_by(user_id=user.id)
@@ -467,6 +469,7 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             if success:
                 engagement.discount_sent = True
                 engagement.discount_expires = expire
+                engagement.discount_last_sent = now
                 count += 1
                 sent_stats[discount_type] += 1
             else:
@@ -478,6 +481,19 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             if not eng:
                 eng = EngagementStatus()
                 user.engagement = eng
+            last_manual_sent = eng.discount_last_sent or (
+                eng.discount_expires - timedelta(days=1)
+                if eng.discount_sent and eng.discount_expires
+                else None
+            )
+            if last_manual_sent and last_manual_sent > now - timedelta(days=30):
+                session.close()
+                await state.clear()
+                await query.message.edit_text(
+                    ADMIN_DISCOUNT_COOLDOWN, reply_markup=admin_menu_kb()
+                )
+                await query.answer()
+                return
             discount_type = determine_discount_type(
                 user, respect_cooldown=False, skip_inactive=False
             )
@@ -496,6 +512,7 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             if success:
                 eng.discount_sent = True
                 eng.discount_expires = expire
+                eng.discount_last_sent = now
                 count += 1
                 if discount_type in sent_stats:
                     sent_stats[discount_type] += 1
