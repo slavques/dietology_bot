@@ -30,6 +30,7 @@ from .database import (
 )
 
 from .logger import log
+from .messaging import send_with_retries
 from .alerts import (
     anomalous_activity,
     user_blocked_daily,
@@ -38,6 +39,35 @@ from .alerts import (
 
 FREE_LIMIT = 20
 PAID_LIMIT = 800
+
+
+async def _send_notification(
+    bot: Bot,
+    chat_id: int,
+    text: str,
+    *,
+    event: str,
+    reply_markup=None,
+    **kwargs,
+) -> bool:
+    """Send subscription-related notifications with retries and logging."""
+
+    send_kwargs = {}
+    if reply_markup is not None:
+        send_kwargs["reply_markup"] = reply_markup
+    send_kwargs.update(kwargs)
+    delivered = await send_with_retries(
+        bot,
+        chat_id,
+        text=text,
+        category="notification",
+        **send_kwargs,
+    )
+    if delivered:
+        log("notification", "delivered %s to %s", event, chat_id)
+    else:
+        log("notification", "failed to deliver %s to %s", event, chat_id)
+    return delivered
 
 
 def update_monthly(user: User) -> None:
@@ -316,16 +346,14 @@ async def notify_trial_end(bot: Bot, session: SessionLocal, user: User) -> None:
         text = TRIAL_ENDED
         if user.resume_grade == "light" and user.grade.startswith("pro"):
             text = TRIAL_PRO_ENDED_START
-        try:
-            kb = None if text == TRIAL_PRO_ENDED_START else subscribe_button(BTN_REMOVE_LIMIT)
-            await bot.send_message(
-                user.telegram_id,
-                text,
-                reply_markup=kb,
-            )
-            log("notification", "trial ended notice to %s", user.telegram_id)
-        except Exception:
-            pass
+        kb = None if text == TRIAL_PRO_ENDED_START else subscribe_button(BTN_REMOVE_LIMIT)
+        await _send_notification(
+            bot,
+            user.telegram_id,
+            text,
+            event="trial ended notice",
+            reply_markup=kb,
+        )
         if user.resume_grade:
             user.grade = user.resume_grade
             user.period_end = user.resume_period_end
@@ -380,15 +408,12 @@ async def _daily_check(bot: Bot):
                     old=grade_name(user.grade),
                     new=grade_name(user.resume_grade),
                 )
-                try:
-                    await bot.send_message(user.telegram_id, text)
-                    log(
-                        "notification",
-                        "sent plan switch notice to %s",
-                        user.telegram_id,
-                    )
-                except Exception:
-                    pass
+                await _send_notification(
+                    bot,
+                    user.telegram_id,
+                    text,
+                    event="plan switch resume notice",
+                )
             user.grade = user.resume_grade
             user.period_end = user.resume_period_end
             user.resume_grade = None
@@ -410,51 +435,53 @@ async def _daily_check(bot: Bot):
                     old=grade_name(user.resume_grade),
                     new=grade_name(user.grade),
                 )
-                try:
-                    await bot.send_message(user.telegram_id, text)
-                    log(
-                        "notification",
-                        "sent plan switch notice to %s",
-                        user.telegram_id,
-                    )
-                except Exception:
-                    pass
-                user.notified_0d = True
+                delivered = await _send_notification(
+                    bot,
+                    user.telegram_id,
+                    text,
+                    event="plan switch current notice",
+                )
+                if delivered:
+                    user.notified_0d = True
         if user.grade in {"light", "pro"} and user.period_end and not user.trial:
             delta = user.period_end - now
             text = None
             price = PLAN_PRICES["1m"] if user.grade == "light" else PRO_PLAN_PRICES["1m"]
+            flag = None
             if delta <= timedelta(0) and not user.notified_0d:
                 text = SUB_PAUSED.format(price=price)
-                user.notified_0d = True
+                flag = "notified_0d"
             elif delta <= timedelta(days=1) and not user.notified_1d:
                 text = SUB_END_1D.format(price=price)
-                user.notified_1d = True
+                flag = "notified_1d"
             elif delta <= timedelta(days=3) and not user.notified_3d:
                 text = SUB_END_3D.format(price=price)
-                user.notified_3d = True
+                flag = "notified_3d"
             elif delta <= timedelta(days=7) and not user.notified_7d:
                 text = SUB_END_7D.format(price=price)
-                user.notified_7d = True
+                flag = "notified_7d"
             if text:
                 kb = subscribe_button(BTN_RENEW_SUB)
-                try:
-                    await bot.send_message(user.telegram_id, text, reply_markup=kb)
-                    log("notification", "sent subscription notice to %s", user.telegram_id)
-                except Exception:
-                    pass
+                delivered = await _send_notification(
+                    bot,
+                    user.telegram_id,
+                    text,
+                    event="subscription expiry notice",
+                    reply_markup=kb,
+                )
+                if delivered and flag:
+                    setattr(user, flag, True)
         update_limits(user)
         if user.grade == "free" and not user.notified_free:
-            try:
-                await bot.send_message(
-                    user.telegram_id,
-                    FREE_DAY_TEXT,
-                    reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
-                )
+            delivered = await _send_notification(
+                bot,
+                user.telegram_id,
+                FREE_DAY_TEXT,
+                event="free quota notice",
+                reply_markup=subscribe_button(BTN_REMOVE_LIMIT),
+            )
+            if delivered:
                 user.notified_free = True
-                log("notification", "sent free quota notice to %s", user.telegram_id)
-            except Exception:
-                pass
     session.commit()
     session.close()
 

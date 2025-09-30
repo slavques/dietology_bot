@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
@@ -38,7 +38,7 @@ async def _send_with_retries(
 
     attempt = 0
     delay = base_delay
-    last_error: Exception | None = None
+    last_error: Optional[Exception] = None
     while attempt < retries:
         attempt += 1
         try:
