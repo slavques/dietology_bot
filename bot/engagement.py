@@ -277,6 +277,7 @@ def engagement_watcher(check_interval: int = 60):
                     ):
                         meal["reminded"] = True
 
+
             await asyncio.sleep(check_interval)
 
     def _start(bot: Bot):
