@@ -80,6 +80,10 @@ def _ensure_columns():
             )
         if "discount_expires" not in existing:
             conn.execute(text("ALTER TABLE engagement_status ADD COLUMN discount_expires TIMESTAMP"))
+        if "discount_last_sent" not in existing:
+            conn.execute(
+                text("ALTER TABLE engagement_status ADD COLUMN discount_last_sent TIMESTAMP")
+            )
 
     existing = _column_names("goals")
     with engine.begin() as conn:
@@ -268,6 +272,7 @@ class EngagementStatus(Base):
     inactivity_30d_sent = Column(Boolean, default=False)
     discount_sent = Column(Boolean, default=False)
     discount_expires = Column(DateTime, nullable=True)
+    discount_last_sent = Column(DateTime, nullable=True)
 
     user = relationship('User', back_populates='engagement')
 
