@@ -395,8 +395,8 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     target, tg_id = data.get("discount_target", (None, None))
     session = SessionLocal()
-    now = datetime.utcnow()
-    expire = now + timedelta(hours=24)
+    decision_time = datetime.utcnow()
+    expire = decision_time + timedelta(hours=24)
     text_new = DISCOUNT_MESSAGE.format(
         date=format_date_ru(expire.date()), time=expire.strftime("%H:%M")
     )
@@ -423,7 +423,7 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             last_sent_at = engagement.discount_last_sent
             if not last_sent_at and engagement.discount_expires:
                 last_sent_at = engagement.discount_expires - timedelta(days=1)
-            if last_sent_at and last_sent_at > now - timedelta(days=30):
+            if last_sent_at and last_sent_at > decision_time - timedelta(days=30):
                 return None
         last_payment = (
             session.query(Payment)
@@ -432,13 +432,13 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             .first()
         )
         if last_payment is None:
-            if user.created_at and user.created_at <= now - timedelta(days=3):
+            if user.created_at and user.created_at <= decision_time - timedelta(days=3):
                 return "new"
             return None
-        if last_payment.timestamp > now - timedelta(days=3):
+        if last_payment.timestamp > decision_time - timedelta(days=3):
             return None
         period_end = subscription.period_end
-        if not period_end or period_end > now - timedelta(days=3):
+        if not period_end or period_end > decision_time - timedelta(days=3):
             return None
         return "return"
 
@@ -467,9 +467,11 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
                 reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
             )
             if success:
+                sent_at = datetime.utcnow()
                 engagement.discount_sent = True
                 engagement.discount_expires = expire
-                engagement.discount_last_sent = now
+                engagement.discount_last_sent = sent_at
+                session.add(engagement)
                 count += 1
                 sent_stats[discount_type] += 1
             else:
@@ -486,7 +488,7 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
                 if eng.discount_sent and eng.discount_expires
                 else None
             )
-            if last_manual_sent and last_manual_sent > now - timedelta(days=30):
+            if last_manual_sent and last_manual_sent > decision_time - timedelta(days=30):
                 session.close()
                 await state.clear()
                 await query.message.edit_text(
@@ -510,9 +512,11 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
                 reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
             )
             if success:
+                sent_at = datetime.utcnow()
                 eng.discount_sent = True
                 eng.discount_expires = expire
-                eng.discount_last_sent = now
+                eng.discount_last_sent = sent_at
+                session.add(eng)
                 count += 1
                 if discount_type in sent_stats:
                     sent_stats[discount_type] += 1
