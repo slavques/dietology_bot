@@ -1,7 +1,8 @@
 from typing import Dict, Any, Optional
+import asyncio
 import re
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from sqlalchemy import func
 
 from .texts import MEAL_TEMPLATE
@@ -28,36 +29,49 @@ def format_meal_message(
     )
 
     if user_id is not None:
-        session = SessionLocal()
-        user = session.query(User).filter_by(telegram_id=user_id).first()
-        if user and user.goal and user.goal.calories:
-            start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            end = start + timedelta(days=1)
-            totals = session.query(
-                func.coalesce(func.sum(Meal.calories), 0),
-                func.coalesce(func.sum(Meal.protein), 0),
-                func.coalesce(func.sum(Meal.fat), 0),
-                func.coalesce(func.sum(Meal.carbs), 0),
-            ).filter(
-                Meal.user_id == user.id,
-                Meal.timestamp >= start,
-                Meal.timestamp < end,
-            ).one()
-            cal_forecast = totals[0] + macros["calories"]
-            p_forecast = totals[1] + macros["protein"]
-            f_forecast = totals[2] + macros["fat"]
-            c_forecast = totals[3] + macros["carbs"]
-            cal_ex = max(0, round(cal_forecast - (user.goal.calories or 0), 1))
-            p_ex = max(0, round(p_forecast - (user.goal.protein or 0), 1))
-            f_ex = max(0, round(f_forecast - (user.goal.fat or 0), 1))
-            c_ex = max(0, round(c_forecast - (user.goal.carbs or 0), 1))
-            if cal_ex or p_ex or f_ex or c_ex:
-                message += (
-                    "\n\n"
-                    f"⚠️ Добавив это блюдо, ты превысишь дневную цель на "
-                    f"{int(cal_ex)} ккал и {int(p_ex)} б, {int(f_ex)} ж, {int(c_ex)} у"
+        with SessionLocal() as session:
+            user = session.query(User).filter_by(telegram_id=user_id).first()
+            if user and user.goal and user.goal.calories:
+                start = datetime.utcnow().replace(
+                    hour=0, minute=0, second=0, microsecond=0
                 )
-        session.close()
+                end = start + timedelta(days=1)
+                totals = session.query(
+                    func.coalesce(func.sum(Meal.calories), 0),
+                    func.coalesce(func.sum(Meal.protein), 0),
+                    func.coalesce(func.sum(Meal.fat), 0),
+                    func.coalesce(func.sum(Meal.carbs), 0),
+                ).filter(
+                    Meal.user_id == user.id,
+                    Meal.timestamp >= start,
+                    Meal.timestamp < end,
+                ).one()
+                aggregated = dict(
+                    zip(
+                        ("calories", "protein", "fat", "carbs"),
+                        totals,
+                    )
+                )
+                overflow = {
+                    key: max(
+                        0,
+                        round(
+                            aggregated[key]
+                            + macros[key]
+                            - (getattr(user.goal, key, 0) or 0),
+                            1,
+                        ),
+                    )
+                    for key in ("calories", "protein", "fat", "carbs")
+                }
+                if any(overflow.values()):
+                    message += (
+                        "\n\n"
+                        "⚠️ Добавив это блюдо, ты превысишь дневную цель на "
+                        f"{int(overflow['calories'])} ккал и "
+                        f"{int(overflow['protein'])} б, "
+                        f"{int(overflow['fat'])} ж, {int(overflow['carbs'])} у"
+                    )
     log("utils", f"Formatted meal message: {message}")
     return message
 
@@ -114,3 +128,18 @@ def plural_ru_day(days: int) -> str:
             word = "дней"
     log("utils", f"Plural result: {word}")
     return word
+
+
+def seconds_until_next_utc_midnight(now: Optional[datetime] = None) -> float:
+    """Return seconds remaining until the next UTC midnight."""
+
+    current = now or datetime.utcnow()
+    tomorrow = current.date() + timedelta(days=1)
+    midnight = datetime.combine(tomorrow, time())
+    return max((midnight - current).total_seconds(), 0.0)
+
+
+async def sleep_until_next_utc_midnight(now: Optional[datetime] = None) -> None:
+    """Sleep asynchronously until the next UTC midnight."""
+
+    await asyncio.sleep(seconds_until_next_utc_midnight(now))

@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -9,6 +10,7 @@ from bot.utils import (  # noqa: E402
     parse_serving,
     make_bar_chart,
     plural_ru_day,
+    seconds_until_next_utc_midnight,
 )
 
 
@@ -41,3 +43,10 @@ def test_plural_ru_day():
     assert plural_ru_day(2) == 'дня'
     assert plural_ru_day(5) == 'дней'
     assert plural_ru_day(11) == 'дней'
+
+
+def test_seconds_until_next_utc_midnight():
+    morning = datetime(2024, 1, 1, 8, 0, 0)
+    evening = datetime(2024, 1, 1, 23, 30, 0)
+    assert seconds_until_next_utc_midnight(morning) == 16 * 3600
+    assert seconds_until_next_utc_midnight(evening) == 30 * 60
