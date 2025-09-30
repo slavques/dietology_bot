@@ -9,6 +9,7 @@ from aiogram import Bot
 from .database import SessionLocal, User, Meal
 from .keyboards import subscribe_button
 from .logger import log
+from .messaging import send_with_retries
 from .texts import (
     REM_TEXT_MORNING,
     REM_TEXT_DAY,
@@ -100,19 +101,35 @@ def _format_gpt_message(content: str, message_type: str) -> tuple[str, bool]:
     return "\n\n".join(formatted), uses_markup
 
 
-async def _send(bot: Bot, user: User, text: str, reply_markup=None, parse_mode=None) -> None:
-    try:
-        kwargs = {"reply_markup": reply_markup}
-        if parse_mode:
-            kwargs["parse_mode"] = parse_mode
-        await bot.send_message(
-            user.telegram_id,
-            text,
-            **kwargs,
-        )
-        log("notification", "sent reminder to %s: %s", user.telegram_id, text)
-    except Exception:
-        pass
+async def _send(
+    bot: Bot,
+    user: User,
+    text: str,
+    *,
+    reply_markup=None,
+    parse_mode=None,
+    event: str | None = None,
+) -> bool:
+    """Deliver a reminder with retry logic and structured logging."""
+
+    send_kwargs = {}
+    if reply_markup is not None:
+        send_kwargs["reply_markup"] = reply_markup
+    if parse_mode:
+        send_kwargs["parse_mode"] = parse_mode
+    delivered = await send_with_retries(
+        bot,
+        user.telegram_id,
+        text=text,
+        category="notification",
+        **send_kwargs,
+    )
+    label = event or text
+    if delivered:
+        log("notification", "sent reminder to %s: %s", user.telegram_id, label)
+    else:
+        log("notification", "failed to send reminder to %s: %s", user.telegram_id, label)
+    return delivered
 
 
 def reminder_watcher(check_interval: int = 60):
@@ -214,6 +231,7 @@ def reminder_watcher(check_interval: int = 60):
                             user,
                             formatted,
                             parse_mode="HTML" if use_html else None,
+                            event="goal morning reminder",
                         )
                         user.last_morning = local_now
                 elif user.morning_enabled and user.morning_time:
@@ -223,7 +241,12 @@ def reminder_watcher(check_interval: int = 60):
                         and local_now.time().hour == target.hour
                         and local_now.time().minute == target.minute
                     ):
-                        await _send(bot, user, random.choice(REM_TEXT_MORNING))
+                        await _send(
+                            bot,
+                            user,
+                            random.choice(REM_TEXT_MORNING),
+                            event="morning reminder",
+                        )
                         user.last_morning = local_now
 
                 if user.day_enabled and user.day_time:
@@ -233,7 +256,12 @@ def reminder_watcher(check_interval: int = 60):
                         and local_now.time().hour == target.hour
                         and local_now.time().minute == target.minute
                     ):
-                        await _send(bot, user, random.choice(REM_TEXT_DAY))
+                        await _send(
+                            bot,
+                            user,
+                            random.choice(REM_TEXT_DAY),
+                            event="day reminder",
+                        )
                         user.last_day = local_now
 
                 if goal and goal.reminder_evening and user.evening_time:
@@ -275,6 +303,7 @@ def reminder_watcher(check_interval: int = 60):
                             user,
                             formatted,
                             parse_mode="HTML" if use_html else None,
+                            event="goal evening reminder",
                         )
                         user.last_evening = local_now
                 elif user.evening_enabled and user.evening_time:
@@ -284,7 +313,12 @@ def reminder_watcher(check_interval: int = 60):
                         and local_now.time().hour == target.hour
                         and local_now.time().minute == target.minute
                     ):
-                        await _send(bot, user, random.choice(REM_TEXT_EVENING))
+                        await _send(
+                            bot,
+                            user,
+                            random.choice(REM_TEXT_EVENING),
+                            event="evening reminder",
+                        )
                         user.last_evening = local_now
 
             extra_users = (
@@ -311,6 +345,7 @@ def reminder_watcher(check_interval: int = 60):
                             user,
                             GOAL_TRIAL_EXPIRED_NOTICE,
                             reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
+                            event="goal trial expired notice",
                         )
                     user.goal_trial_notified = True
             session.commit()
