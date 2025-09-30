@@ -30,9 +30,6 @@ from ..texts import (
     BTN_ONE,
     BTN_ALL,
     BTN_DISCOUNT,
-    BTN_FREE_NO_REQ,
-    BTN_FREE_WITH_REQ,
-    BTN_PAID_NO_SUB,
     BTN_BLOCK,
     BTN_BLOCKED_USERS,
     BTN_FEATURES,
@@ -237,9 +234,7 @@ def days_menu_kb() -> types.InlineKeyboardMarkup:
 
 def discount_menu_kb() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=BTN_FREE_NO_REQ, callback_data="admin:discount_no")
-    builder.button(text=BTN_FREE_WITH_REQ, callback_data="admin:discount_with")
-    builder.button(text=BTN_PAID_NO_SUB, callback_data="admin:discount_paid")
+    builder.button(text=BTN_ALL, callback_data="admin:discount_all")
     builder.button(text=BTN_ONE, callback_data="admin:discount_one")
     builder.button(text=BTN_BACK, callback_data="admin:menu")
     builder.adjust(1)
@@ -360,31 +355,11 @@ async def admin_discount_menu(query: types.CallbackQuery):
     await query.answer()
 
 
-async def admin_discount_free_no(query: types.CallbackQuery, state: FSMContext):
+async def admin_discount_all(query: types.CallbackQuery, state: FSMContext):
     if query.from_user.id not in admins:
         await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
         return
-    await state.update_data(discount_target=("no", None))
-    await state.set_state(AdminState.waiting_discount_confirm)
-    await query.message.edit_text(ADMIN_DISCOUNT_PROMPT, reply_markup=discount_confirm_kb())
-    await query.answer()
-
-
-async def admin_discount_free_with(query: types.CallbackQuery, state: FSMContext):
-    if query.from_user.id not in admins:
-        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
-        return
-    await state.update_data(discount_target=("with", None))
-    await state.set_state(AdminState.waiting_discount_confirm)
-    await query.message.edit_text(ADMIN_DISCOUNT_PROMPT, reply_markup=discount_confirm_kb())
-    await query.answer()
-
-
-async def admin_discount_paid(query: types.CallbackQuery, state: FSMContext):
-    if query.from_user.id not in admins:
-        await query.answer(ADMIN_UNAVAILABLE, show_alert=True)
-        return
-    await state.update_data(discount_target=("paid", None))
+    await state.update_data(discount_target=("all", None))
     await state.set_state(AdminState.waiting_discount_confirm)
     await query.message.edit_text(ADMIN_DISCOUNT_PROMPT, reply_markup=discount_confirm_kb())
     await query.answer()
@@ -419,134 +394,83 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     target, tg_id = data.get("discount_target", (None, None))
     session = SessionLocal()
-    expire = datetime.utcnow() + timedelta(hours=24)
-    template = (
-        RETURN_DISCOUNT_MESSAGE if target == "paid" else DISCOUNT_MESSAGE
+    now = datetime.utcnow()
+    expire = now + timedelta(hours=24)
+    text_new = DISCOUNT_MESSAGE.format(
+        date=format_date_ru(expire.date()), time=expire.strftime("%H:%M")
     )
-    text = template.format(
+    text_return = RETURN_DISCOUNT_MESSAGE.format(
         date=format_date_ru(expire.date()), time=expire.strftime("%H:%M")
     )
     count = 0
     failed: list[int] = []
-    if target == "no":
-        users = (
-            session.query(User)
-            .join(Subscription)
-            .filter(
-                Subscription.grade == "free",
-                Subscription.requests_total == 0,
-            )
-            .all()
+    sent_stats = {"new": 0, "return": 0}
+
+    def determine_discount_type(
+        user: User,
+        *,
+        respect_cooldown: bool = True,
+        skip_inactive: bool = True,
+    ) -> Optional[str]:
+        subscription = user.subscription
+        if not subscription or subscription.grade != "free":
+            return None
+        if skip_inactive and (user.blocked or user.left_bot):
+            return None
+        engagement = user.engagement
+        if respect_cooldown and engagement and engagement.discount_sent and (
+            not engagement.discount_expires
+            or engagement.discount_expires + timedelta(days=29) > now
+        ):
+            return None
+        last_payment = (
+            session.query(Payment)
+            .filter_by(user_id=user.id)
+            .order_by(Payment.timestamp.desc())
+            .first()
         )
-        for u in users:
-            eng = u.engagement
-            if eng and eng.discount_sent and (
-                not eng.discount_expires
-                or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
-            ):
-                continue
-            paid = session.query(Payment).filter_by(user_id=u.id).first()
-            if paid:
-                continue
-            if not eng:
-                eng = EngagementStatus()
-                u.engagement = eng
-            success = await send_with_retries(
-                query.bot,
-                u.telegram_id,
-                text=text,
-                category="discount",
-                parse_mode="HTML",
-                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
-            )
-            if success:
-                eng.discount_sent = True
-                eng.discount_expires = expire
-                count += 1
-            else:
-                failed.append(u.telegram_id)
-    elif target == "with":
-        users = (
-            session.query(User)
-            .join(Subscription)
-            .filter(
-                Subscription.grade == "free",
-                Subscription.requests_total > 0,
-            )
-            .all()
-        )
-        for u in users:
-            eng = u.engagement
-            if eng and eng.discount_sent and (
-                not eng.discount_expires
-                or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
-            ):
-                continue
-            paid = session.query(Payment).filter_by(user_id=u.id).first()
-            if paid:
-                continue
-            if not eng:
-                eng = EngagementStatus()
-                u.engagement = eng
-            success = await send_with_retries(
-                query.bot,
-                u.telegram_id,
-                text=text,
-                category="discount",
-                parse_mode="HTML",
-                reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
-            )
-            if success:
-                eng.discount_sent = True
-                eng.discount_expires = expire
-                count += 1
-            else:
-                failed.append(u.telegram_id)
-    elif target == "paid":
+        if last_payment is None:
+            if user.created_at and user.created_at <= now - timedelta(days=3):
+                return "new"
+            return None
+        if last_payment.timestamp > now - timedelta(days=3):
+            return None
+        period_end = subscription.period_end
+        if not period_end or period_end > now - timedelta(days=3):
+            return None
+        return "return"
+
+    if target == "all":
         users = (
             session.query(User)
             .join(Subscription)
             .filter(Subscription.grade == "free")
             .all()
         )
-        for u in users:
-            last_payment = (
-                session.query(Payment)
-                .filter_by(user_id=u.id)
-                .order_by(Payment.timestamp.desc())
-                .first()
-            )
-            if not last_payment:
+        for user in users:
+            discount_type = determine_discount_type(user)
+            if not discount_type:
                 continue
-            if last_payment.timestamp > datetime.utcnow() - timedelta(days=3):
-                continue
-            if not u.subscription.period_end or (
-                u.subscription.period_end > datetime.utcnow() - timedelta(days=3)
-            ):
-                continue
-            eng = u.engagement
-            if eng and eng.discount_sent and (
-                not eng.discount_expires
-                or eng.discount_expires + timedelta(days=29) > datetime.utcnow()
-            ):
-                continue
-            if not eng:
-                eng = EngagementStatus()
-                u.engagement = eng
+            engagement = user.engagement
+            if not engagement:
+                engagement = EngagementStatus()
+                user.engagement = engagement
+            text = text_new if discount_type == "new" else text_return
             success = await send_with_retries(
                 query.bot,
-                u.telegram_id,
+                user.telegram_id,
                 text=text,
                 category="discount",
                 parse_mode="HTML",
                 reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
             )
             if success:
-                eng.discount_sent = True
-                eng.discount_expires = expire
+                engagement.discount_sent = True
+                engagement.discount_expires = expire
                 count += 1
+                sent_stats[discount_type] += 1
             else:
-                failed.append(u.telegram_id)
+                failed.append(user.telegram_id)
     elif target == "one" and tg_id:
         user = session.query(User).filter_by(telegram_id=int(tg_id)).first()
         if user:
@@ -554,6 +478,13 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             if not eng:
                 eng = EngagementStatus()
                 user.engagement = eng
+            discount_type = determine_discount_type(
+                user, respect_cooldown=False, skip_inactive=False
+            )
+            if discount_type == "return":
+                text = text_return
+            else:
+                text = text_new
             success = await send_with_retries(
                 query.bot,
                 user.telegram_id,
@@ -566,19 +497,28 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
                 eng.discount_sent = True
                 eng.discount_expires = expire
                 count += 1
+                if discount_type in sent_stats:
+                    sent_stats[discount_type] += 1
             else:
                 failed.append(user.telegram_id)
     session.commit()
     session.close()
     log(
         "discount",
-        "discount target %s: delivered %s, failed %s",
+        "discount target %s: delivered %s (new %s, return %s), failed %s",
         target,
         count,
+        sent_stats["new"],
+        sent_stats["return"],
         len(failed),
     )
     await state.clear()
     result_text = ADMIN_DISCOUNT_DONE
+    if target == "all":
+        result_text += (
+            f"\nНовые пользователи: {sent_stats['new']}"
+            f"\nВозврат: {sent_stats['return']}"
+        )
     if failed:
         preview = ", ".join(map(str, failed[:10]))
         result_text += f"\nНе доставлено {len(failed)} пользователям."
@@ -1462,9 +1402,7 @@ def register(dp: Dispatcher):
         admin_broadcast_support_prompt, F.data == "admin:broadcast:support"
     )
     dp.callback_query.register(admin_discount_menu, F.data == "admin:discount")
-    dp.callback_query.register(admin_discount_free_no, F.data == "admin:discount_no")
-    dp.callback_query.register(admin_discount_free_with, F.data == "admin:discount_with")
-    dp.callback_query.register(admin_discount_paid, F.data == "admin:discount_paid")
+    dp.callback_query.register(admin_discount_all, F.data == "admin:discount_all")
     dp.callback_query.register(admin_discount_one, F.data == "admin:discount_one")
     dp.callback_query.register(admin_discount_confirm, F.data == "admin:discount_confirm")
     dp.callback_query.register(admin_days_menu, F.data == "admin:days")
