@@ -10,6 +10,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from bot.handlers import goals  # noqa: E402
 from bot.handlers.goals import process_age, process_weight, GoalState  # noqa: E402
 from bot.keyboards import goal_back_kb, goal_body_fat_kb  # noqa: E402
 from bot.texts import GOAL_ENTER_HEIGHT, GOAL_CHOOSE_BODY_FAT  # noqa: E402
@@ -43,7 +44,7 @@ async def test_process_age_edits_prompt_and_deletes_input():
 
 
 @pytest.mark.asyncio
-async def test_process_weight_moves_to_activity_and_deletes_input():
+async def test_process_weight_moves_to_activity_and_deletes_input(monkeypatch):
     message = MagicMock()
     message.text = "70"
     message.chat.id = 1
@@ -55,6 +56,8 @@ async def test_process_weight_moves_to_activity_and_deletes_input():
 
     state = AsyncMock()
     state.get_data.return_value = {"msg_id": 99}
+
+    monkeypatch.setattr(goals, "GOAL_BODY_FAT_IMAGE_NAME", "")
 
     await process_weight(message, state)
 
