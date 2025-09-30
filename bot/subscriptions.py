@@ -435,38 +435,42 @@ async def _daily_check(bot: Bot):
                     old=grade_name(user.resume_grade),
                     new=grade_name(user.grade),
                 )
-                await _send_notification(
+                delivered = await _send_notification(
                     bot,
                     user.telegram_id,
                     text,
                     event="plan switch current notice",
                 )
-                user.notified_0d = True
+                if delivered:
+                    user.notified_0d = True
         if user.grade in {"light", "pro"} and user.period_end and not user.trial:
             delta = user.period_end - now
             text = None
             price = PLAN_PRICES["1m"] if user.grade == "light" else PRO_PLAN_PRICES["1m"]
+            flag = None
             if delta <= timedelta(0) and not user.notified_0d:
                 text = SUB_PAUSED.format(price=price)
-                user.notified_0d = True
+                flag = "notified_0d"
             elif delta <= timedelta(days=1) and not user.notified_1d:
                 text = SUB_END_1D.format(price=price)
-                user.notified_1d = True
+                flag = "notified_1d"
             elif delta <= timedelta(days=3) and not user.notified_3d:
                 text = SUB_END_3D.format(price=price)
-                user.notified_3d = True
+                flag = "notified_3d"
             elif delta <= timedelta(days=7) and not user.notified_7d:
                 text = SUB_END_7D.format(price=price)
-                user.notified_7d = True
+                flag = "notified_7d"
             if text:
                 kb = subscribe_button(BTN_RENEW_SUB)
-                await _send_notification(
+                delivered = await _send_notification(
                     bot,
                     user.telegram_id,
                     text,
                     event="subscription expiry notice",
                     reply_markup=kb,
                 )
+                if delivered and flag:
+                    setattr(user, flag, True)
         update_limits(user)
         if user.grade == "free" and not user.notified_free:
             delivered = await _send_notification(

@@ -3,6 +3,7 @@ import random
 import re
 from datetime import datetime, timedelta, time
 from html import escape
+from typing import Optional
 
 from aiogram import Bot
 
@@ -108,7 +109,7 @@ async def _send(
     *,
     reply_markup=None,
     parse_mode=None,
-    event: str | None = None,
+    event: Optional[str] = None,
 ) -> bool:
     """Deliver a reminder with retry logic and structured logging."""
 
@@ -168,13 +169,14 @@ def reminder_watcher(check_interval: int = 60):
                         if goal:
                             session.delete(goal)
                         if not user.goal_trial_notified:
-                            await _send(
+                            delivered = await _send(
                                 bot,
                                 user,
                                 GOAL_TRIAL_EXPIRED_NOTICE,
                                 reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
                             )
-                        user.goal_trial_notified = True
+                            if delivered:
+                                user.goal_trial_notified = True
                         continue
                 if goal:
                     last_meal = (
@@ -191,7 +193,12 @@ def reminder_watcher(check_interval: int = 60):
                             user.telegram_id,
                         )
                         if user.grade != "free":
-                            await _send(bot, user, GOAL_REMINDERS_DISABLED, reply_markup=None)
+                            await _send(
+                                bot,
+                                user,
+                                GOAL_REMINDERS_DISABLED,
+                                reply_markup=None,
+                            )
                         continue
 
                 if goal and goal.reminder_morning and user.morning_time:
@@ -226,14 +233,14 @@ def reminder_watcher(check_interval: int = 60):
                         log("notification", "morning GPT response for %s: %s", user.telegram_id, content.strip())
                         await token_monitor.add(tokens_in, tokens_out)
                         formatted, use_html = _format_gpt_message(content.strip(), "morning")
-                        await _send(
+                        if await _send(
                             bot,
                             user,
                             formatted,
                             parse_mode="HTML" if use_html else None,
                             event="goal morning reminder",
-                        )
-                        user.last_morning = local_now
+                        ):
+                            user.last_morning = local_now
                 elif user.morning_enabled and user.morning_time:
                     target = _parse_time(user.morning_time)
                     if (
@@ -241,13 +248,13 @@ def reminder_watcher(check_interval: int = 60):
                         and local_now.time().hour == target.hour
                         and local_now.time().minute == target.minute
                     ):
-                        await _send(
+                        if await _send(
                             bot,
                             user,
                             random.choice(REM_TEXT_MORNING),
                             event="morning reminder",
-                        )
-                        user.last_morning = local_now
+                        ):
+                            user.last_morning = local_now
 
                 if user.day_enabled and user.day_time:
                     target = _parse_time(user.day_time)
@@ -256,13 +263,13 @@ def reminder_watcher(check_interval: int = 60):
                         and local_now.time().hour == target.hour
                         and local_now.time().minute == target.minute
                     ):
-                        await _send(
+                        if await _send(
                             bot,
                             user,
                             random.choice(REM_TEXT_DAY),
                             event="day reminder",
-                        )
-                        user.last_day = local_now
+                        ):
+                            user.last_day = local_now
 
                 if goal and goal.reminder_evening and user.evening_time:
                     target = _parse_time(user.evening_time)
@@ -298,14 +305,14 @@ def reminder_watcher(check_interval: int = 60):
                         log("notification", "evening GPT response for %s: %s", user.telegram_id, content.strip())
                         await token_monitor.add(tokens_in, tokens_out)
                         formatted, use_html = _format_gpt_message(content.strip(), "evening")
-                        await _send(
+                        if await _send(
                             bot,
                             user,
                             formatted,
                             parse_mode="HTML" if use_html else None,
                             event="goal evening reminder",
-                        )
-                        user.last_evening = local_now
+                        ):
+                            user.last_evening = local_now
                 elif user.evening_enabled and user.evening_time:
                     target = _parse_time(user.evening_time)
                     if (
@@ -313,13 +320,13 @@ def reminder_watcher(check_interval: int = 60):
                         and local_now.time().hour == target.hour
                         and local_now.time().minute == target.minute
                     ):
-                        await _send(
+                        if await _send(
                             bot,
                             user,
                             random.choice(REM_TEXT_EVENING),
                             event="evening reminder",
-                        )
-                        user.last_evening = local_now
+                        ):
+                            user.last_evening = local_now
 
             extra_users = (
                 session.query(User)
@@ -340,14 +347,15 @@ def reminder_watcher(check_interval: int = 60):
                     if goal:
                         session.delete(goal)
                     if not user.goal_trial_notified:
-                        await _send(
+                        delivered = await _send(
                             bot,
                             user,
                             GOAL_TRIAL_EXPIRED_NOTICE,
                             reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
                             event="goal trial expired notice",
                         )
-                    user.goal_trial_notified = True
+                        if delivered:
+                            user.goal_trial_notified = True
             session.commit()
             session.close()
             await asyncio.sleep(check_interval)

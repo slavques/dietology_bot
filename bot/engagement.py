@@ -1,6 +1,8 @@
 import asyncio
 import time
 from datetime import datetime, timedelta
+from typing import Optional
+
 from aiogram import Bot
 
 from .database import SessionLocal, User, Meal, EngagementStatus
@@ -33,7 +35,7 @@ async def _send(
     chat_id: int,
     text: str,
     *,
-    event: str | None = None,
+    event: Optional[str] = None,
     reply_markup=None,
     **kwargs,
 ) -> bool:
@@ -73,31 +75,31 @@ async def process_request_events(bot: Bot, telegram_id: int) -> None:
     prev_ts = user.last_request
 
     if not eng.first_request_sent and user.requests_total >= 1:
-        await _send(
+        if await _send(
             bot,
             user.telegram_id,
             FIRST_REQUEST_DONE,
             event="first request milestone",
-        )
-        eng.first_request_sent = True
+        ):
+            eng.first_request_sent = True
 
     if not eng.three_requests_sent and user.requests_total >= 3:
-        await _send(
+        if await _send(
             bot,
             user.telegram_id,
             THREE_REQUESTS_DONE,
             event="three requests milestone",
-        )
-        eng.three_requests_sent = True
+        ):
+            eng.three_requests_sent = True
 
     if not eng.seven_requests_sent and user.requests_total >= 7:
-        await _send(
+        if await _send(
             bot,
             user.telegram_id,
             SEVEN_REQUESTS_DONE,
             event="seven requests milestone",
-        )
-        eng.seven_requests_sent = True
+        ):
+            eng.seven_requests_sent = True
 
     if (
         not eng.five_no_meal_sent
@@ -113,17 +115,22 @@ async def process_request_events(bot: Bot, telegram_id: int) -> None:
         if meals:
             latest = max(meals, key=lambda m: m.get("timestamp", 0))
             msg_id = latest.get("message_id")
-        await _send(
+        if await _send(
             bot,
             user.telegram_id,
             NO_MEAL_AFTER_REQUESTS,
             event="no meal reminder",
             reply_to_message_id=msg_id,
-        )
-        eng.five_no_meal_sent = True
+        ):
+            eng.five_no_meal_sent = True
 
     if prev_ts and now - prev_ts >= timedelta(days=7):
-        await _send(bot, user.telegram_id, WELCOME_BACK, event="welcome back reminder")
+        await _send(
+            bot,
+            user.telegram_id,
+            WELCOME_BACK,
+            event="welcome back reminder",
+        )
     eng.inactivity_7d_sent = False
     eng.inactivity_14d_sent = False
     eng.inactivity_30d_sent = False
@@ -152,35 +159,35 @@ def engagement_watcher(check_interval: int = 60):
                         not eng.no_request_15m
                         and delta >= timedelta(minutes=15)
                     ):
-                        await _send(
+                        if await _send(
                             bot,
                             user.telegram_id,
                             WELCOME_REMINDER_15M,
                             event="welcome reminder 15m",
-                        )
-                        eng.no_request_15m = True
+                        ):
+                            eng.no_request_15m = True
                     if (
                         not eng.no_request_24h
                         and delta >= timedelta(hours=24)
                     ):
-                        await _send(
+                        if await _send(
                             bot,
                             user.telegram_id,
                             WELCOME_REMINDER_24H,
                             event="welcome reminder 24h",
-                        )
-                        eng.no_request_24h = True
+                        ):
+                            eng.no_request_24h = True
                     if (
                         not eng.no_request_3d
                         and delta >= timedelta(days=3)
                     ):
-                        await _send(
+                        if await _send(
                             bot,
                             user.telegram_id,
                             WELCOME_REMINDER_3D,
                             event="welcome reminder 3d",
-                        )
-                        eng.no_request_3d = True
+                        ):
+                            eng.no_request_3d = True
 
                 # 10-day feedback
                 if (
@@ -188,14 +195,14 @@ def engagement_watcher(check_interval: int = 60):
                     and now - (user.created_at or now) >= timedelta(days=10)
                 ):
                     url = f"https://t.me/{SUPPORT_HANDLE.lstrip('@')}"
-                    await _send(
+                    if await _send(
                         bot,
                         user.telegram_id,
                         FEEDBACK_10D,
                         event="feedback reminder 10d",
                         reply_markup=feedback_button(url),
-                    )
-                    eng.feedback_10d_sent = True
+                    ):
+                        eng.feedback_10d_sent = True
 
                 # free limit reminder
                 if user.grade == "free":
@@ -210,14 +217,14 @@ def engagement_watcher(check_interval: int = 60):
                         and not eng.limit_reminder_sent
                         and now - eng.limit_reached_at >= timedelta(days=3)
                     ):
-                        await _send(
+                        if await _send(
                             bot,
                             user.telegram_id,
                             FREE_LIMIT_PAY_REMINDER,
                             event="free limit reminder",
                             reply_markup=subscribe_button(BTN_REMOVE_LIMITS),
-                        )
-                        eng.limit_reminder_sent = True
+                        ):
+                            eng.limit_reminder_sent = True
                 else:
                     eng.limit_reached_at = None
                     eng.limit_reminder_sent = False
@@ -227,29 +234,29 @@ def engagement_watcher(check_interval: int = 60):
                 if last_ts:
                     days = (now - last_ts).days
                     if days >= 30 and not eng.inactivity_30d_sent:
-                        await _send(
+                        if await _send(
                             bot,
                             user.telegram_id,
                             INACTIVE_30D,
                             event="inactive 30d",
-                        )
-                        eng.inactivity_30d_sent = True
+                        ):
+                            eng.inactivity_30d_sent = True
                     elif days >= 14 and not eng.inactivity_14d_sent:
-                        await _send(
+                        if await _send(
                             bot,
                             user.telegram_id,
                             INACTIVE_14D,
                             event="inactive 14d",
-                        )
-                        eng.inactivity_14d_sent = True
+                        ):
+                            eng.inactivity_14d_sent = True
                     elif days >= 7 and not eng.inactivity_7d_sent:
-                        await _send(
+                        if await _send(
                             bot,
                             user.telegram_id,
                             INACTIVE_7D,
                             event="inactive 7d",
-                        )
-                        eng.inactivity_7d_sent = True
+                        ):
+                            eng.inactivity_7d_sent = True
 
             session.commit()
             session.close()
@@ -261,14 +268,15 @@ def engagement_watcher(check_interval: int = 60):
                 if ts and now_ts - ts > 1800 and not meal.get("reminded"):
                     chat_id = meal.get("chat_id")
                     msg_id = meal.get("message_id")
-                    await _send(
+                    if await _send(
                         bot,
                         chat_id,
                         ADD_MEAL_REMINDER,
                         event="pending meal reminder",
                         reply_to_message_id=msg_id,
-                    )
-                    meal["reminded"] = True
+                    ):
+                        meal["reminded"] = True
+
 
             await asyncio.sleep(check_interval)
 
