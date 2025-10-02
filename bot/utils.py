@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional
 import asyncio
+import html
 import re
 
 from datetime import datetime, timedelta, time
@@ -143,3 +144,48 @@ async def sleep_until_next_utc_midnight(now: Optional[datetime] = None) -> None:
     """Sleep asynchronously until the next UTC midnight."""
 
     await asyncio.sleep(seconds_until_next_utc_midnight(now))
+
+
+_CODE_BLOCK_PATTERN = re.compile(r"(```|''')([\s\S]+?)\1")
+_INLINE_CODE_PATTERN = re.compile(r"(?<!\w)(`|')([^`'\n]+?)\1(?!\w)")
+_BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*", re.S)
+_ITALIC_PATTERN = re.compile(r"__([^_]+?)__", re.S)
+_STRIKE_PATTERN = re.compile(r"~~(.+?)~~", re.S)
+
+
+def telegram_markdown_to_html(text: str) -> str:
+    """Convert a subset of Telegram Markdown to HTML-safe markup."""
+
+    if not text:
+        return text or ""
+
+    placeholders: Dict[str, str] = {}
+    placeholder_index = 0
+
+    def _store_placeholder(rendered: str) -> str:
+        nonlocal placeholder_index
+        key = f"[[MD:{placeholder_index}]]"
+        placeholder_index += 1
+        placeholders[key] = rendered
+        return key
+
+    def _replace_code_blocks(match: re.Match) -> str:
+        content = match.group(2)
+        return _store_placeholder(f"<pre>{html.escape(content)}</pre>")
+
+    def _replace_inline_code(match: re.Match) -> str:
+        content = match.group(2)
+        return _store_placeholder(f"<code>{html.escape(content)}</code>")
+
+    transformed = _CODE_BLOCK_PATTERN.sub(_replace_code_blocks, text)
+    transformed = _INLINE_CODE_PATTERN.sub(_replace_inline_code, transformed)
+    transformed = html.escape(transformed)
+
+    transformed = _BOLD_PATTERN.sub(lambda m: f"<b>{m.group(1)}</b>", transformed)
+    transformed = _ITALIC_PATTERN.sub(lambda m: f"<i>{m.group(1)}</i>", transformed)
+    transformed = _STRIKE_PATTERN.sub(lambda m: f"<s>{m.group(1)}</s>", transformed)
+
+    for key, value in placeholders.items():
+        transformed = transformed.replace(key, value)
+
+    return transformed

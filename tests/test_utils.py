@@ -11,6 +11,7 @@ from bot.utils import (  # noqa: E402
     make_bar_chart,
     plural_ru_day,
     seconds_until_next_utc_midnight,
+    telegram_markdown_to_html,
 )
 
 
@@ -50,3 +51,14 @@ def test_seconds_until_next_utc_midnight():
     evening = datetime(2024, 1, 1, 23, 30, 0)
     assert seconds_until_next_utc_midnight(morning) == 16 * 3600
     assert seconds_until_next_utc_midnight(evening) == 30 * 60
+
+
+def test_telegram_markdown_to_html():
+    text = "**жирный** __курсив__ ~~зачерк~~ `код`\n```\nмногострочный\nкод\n```"
+    rendered = telegram_markdown_to_html(text)
+    assert "<b>жирный</b>" in rendered
+    assert "<i>курсив</i>" in rendered
+    assert "<s>зачерк</s>" in rendered
+    assert "<code>код</code>" in rendered
+    assert "<pre>\nмногострочный\nкод\n</pre>" in rendered
+    assert "<script>" not in rendered
