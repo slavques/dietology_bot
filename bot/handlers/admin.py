@@ -93,6 +93,7 @@ from ..texts import (
     format_date_ru,
 )
 from ..subscriptions import PAID_LIMIT
+from ..utils import telegram_markdown_to_html
 
 admins = set()
 
@@ -747,10 +748,18 @@ async def process_comment_text(message: types.Message, state: FSMContext):
     await state.clear()
 
 
+def _render_broadcast_text(message: types.Message) -> str:
+    if message.html_text and (not message.text or message.html_text != message.text):
+        return message.html_text
+    if not message.text:
+        return ""
+    return telegram_markdown_to_html(message.text)
+
+
 async def process_broadcast(message: types.Message, state: FSMContext):
     if message.from_user.id not in admins:
         return
-    text = message.text
+    text = _render_broadcast_text(message)
     session = SessionLocal()
     users = session.query(User).all()
     user_ids = [u.telegram_id for u in users]
@@ -760,6 +769,7 @@ async def process_broadcast(message: types.Message, state: FSMContext):
         user_ids,
         text=text,
         category="broadcast",
+        parse_mode="HTML",
     )
     log(
         "broadcast",
@@ -782,7 +792,7 @@ async def process_broadcast(message: types.Message, state: FSMContext):
 async def process_broadcast_support(message: types.Message, state: FSMContext):
     if message.from_user.id not in admins:
         return
-    text = message.text
+    text = _render_broadcast_text(message)
     session = SessionLocal()
     users = session.query(User).all()
     user_ids = [u.telegram_id for u in users]
@@ -798,6 +808,7 @@ async def process_broadcast_support(message: types.Message, state: FSMContext):
         user_ids,
         text=text,
         category="broadcast",
+        parse_mode="HTML",
         reply_markup=kb,
     )
     log(
