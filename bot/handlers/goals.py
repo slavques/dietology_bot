@@ -2,6 +2,7 @@ import logging
 import inspect
 import imghdr
 from io import BytesIO
+from datetime import datetime
 
 from aiogram import types, Dispatcher, F
 from aiogram.exceptions import TelegramBadRequest
@@ -952,6 +953,7 @@ async def goal_confirm_save(query: types.CallbackQuery, state: FSMContext):
     goal.plan = data.get("plan")
     goal.calories, goal.protein, goal.fat, goal.carbs = cal, p, f, c
     if is_new:
+        goal.reactivated_at = datetime.utcnow()
         goal.reminder_morning = True
         goal.reminder_evening = True
     session.commit()

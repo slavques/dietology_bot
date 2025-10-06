@@ -697,6 +697,7 @@ async def test_goal_auto_stop_after_inactivity(monkeypatch):
         reminder_morning=True,
         reminder_evening=True,
     )
+    goal.reactivated_at = datetime(2024, 12, 31)
     user.goal = goal
     user.id = 1
     user.telegram_id = 123
@@ -766,6 +767,7 @@ async def test_goal_auto_stop_after_inactivity_free_no_notice(monkeypatch):
         reminder_morning=True,
         reminder_evening=True,
     )
+    goal.reactivated_at = datetime(2024, 12, 31)
     user.goal = goal
     user.id = 1
     user.telegram_id = 123
@@ -820,4 +822,73 @@ async def test_goal_auto_stop_after_inactivity_free_no_notice(monkeypatch):
         await reminders.reminder_watcher(check_interval=0)(bot)
 
     session.delete.assert_called_once_with(goal)
+    send_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_goal_not_stopped_immediately_after_reactivation(monkeypatch):
+    user = MagicMock()
+    goal = Goal(
+        target="maintain",
+        calories=2000,
+        protein=100,
+        fat=50,
+        carbs=250,
+        reminder_morning=True,
+        reminder_evening=True,
+    )
+    fake_now = datetime(2025, 1, 4, 8, 0)
+    goal.reactivated_at = fake_now - timedelta(hours=1)
+    user.goal = goal
+    user.id = 1
+    user.telegram_id = 123
+    user.timezone = 0
+    user.morning_time = "08:00"
+    user.evening_time = "20:00"
+    user.morning_enabled = False
+    user.day_enabled = False
+    user.evening_enabled = False
+    user.grade = "light"
+
+    query_users = MagicMock()
+    query_users.join.return_value.filter.return_value.all.return_value = [user]
+
+    last_meal_query = MagicMock()
+    last_meal_query.filter.return_value.order_by.return_value.first.return_value = MagicMock(
+        timestamp=fake_now - timedelta(days=4)
+    )
+
+    session = MagicMock()
+
+    def query_side_effect(model):
+        if model.__name__ == "User":
+            return query_users
+        return last_meal_query
+
+    session.query.side_effect = query_side_effect
+    monkeypatch.setattr(reminders, "SessionLocal", MagicMock(return_value=session))
+
+    monkeypatch.setattr(
+        reminders,
+        "datetime",
+        SimpleNamespace(utcnow=lambda: fake_now, combine=datetime.combine),
+    )
+
+    send_mock = AsyncMock()
+    monkeypatch.setattr(reminders, "_send", send_mock)
+    monkeypatch.setattr(reminders, "_chat_completion", AsyncMock())
+    tm = SimpleNamespace(add=AsyncMock())
+    monkeypatch.setattr(reminders, "token_monitor", tm)
+
+    async def fake_sleep(_):
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(reminders, "asyncio", SimpleNamespace(sleep=fake_sleep))
+
+    bot = MagicMock()
+
+    with pytest.raises(asyncio.CancelledError):
+        await reminders.reminder_watcher(check_interval=0)(bot)
+
+    session.delete.assert_not_called()
     send_mock.assert_not_awaited()
