@@ -13,7 +13,6 @@ from ..database import (
     Comment,
     EngagementStatus,
     Subscription,
-    Payment,
 )
 from ..states import AdminState
 from ..config import ADMIN_COMMAND, ADMIN_PASSWORD
@@ -92,6 +91,7 @@ from ..texts import (
     RETURN_DISCOUNT_MESSAGE,
     format_date_ru,
 )
+from ..discounts import determine_discount_type
 from ..subscriptions import PAID_LIMIT
 from ..utils import telegram_markdown_to_html
 
@@ -408,47 +408,6 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
     failed: list[int] = []
     sent_stats = {"new": 0, "return": 0}
 
-    def determine_discount_type(
-        user: User,
-        *,
-        respect_cooldown: bool = True,
-        skip_inactive: bool = True,
-    ) -> Optional[str]:
-        subscription = user.subscription
-        if not subscription or subscription.grade != "free":
-            return None
-        if skip_inactive and (user.blocked or user.left_bot):
-            return None
-        engagement = user.engagement
-        if respect_cooldown and engagement and engagement.discount_sent:
-            last_sent_at = engagement.discount_last_sent
-            if not last_sent_at and engagement.discount_expires:
-                last_sent_at = engagement.discount_expires - timedelta(days=1)
-            if last_sent_at and last_sent_at > decision_time - timedelta(days=30):
-                return None
-        payments = (
-            session.query(Payment)
-            .filter_by(user_id=user.id)
-            .order_by(Payment.timestamp.asc())
-            .all()
-        )
-        if not payments:
-            if user.created_at and user.created_at <= decision_time - timedelta(days=3):
-                return "new"
-            return None
-        paid_until: Optional[datetime] = None
-        for payment in payments:
-            months = payment.months or 1
-            if months <= 0:
-                months = 1
-            start = payment.timestamp
-            if paid_until and paid_until > start:
-                start = paid_until
-            paid_until = start + timedelta(days=30 * months)
-        if not paid_until or paid_until > decision_time - timedelta(days=3):
-            return None
-        return "return"
-
     if target == "all":
         users = (
             session.query(User)
@@ -457,7 +416,9 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             .all()
         )
         for user in users:
-            discount_type = determine_discount_type(user)
+            discount_type = determine_discount_type(
+                session, user, decision_time
+            )
             if not discount_type:
                 continue
             engagement = user.engagement
@@ -504,7 +465,11 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
                 await query.answer()
                 return
             discount_type = determine_discount_type(
-                user, respect_cooldown=False, skip_inactive=False
+                session,
+                user,
+                decision_time,
+                respect_cooldown=False,
+                skip_inactive=False,
             )
             if discount_type == "return":
                 text = text_return

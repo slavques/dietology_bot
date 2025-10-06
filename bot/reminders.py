@@ -113,9 +113,7 @@ async def _send(
 ) -> bool:
     """Deliver a reminder with retry logic and structured logging."""
 
-    send_kwargs = {}
-    if reply_markup is not None:
-        send_kwargs["reply_markup"] = reply_markup
+    send_kwargs = {"reply_markup": reply_markup}
     if parse_mode:
         send_kwargs["parse_mode"] = parse_mode
     delivered = await send_with_retries(
