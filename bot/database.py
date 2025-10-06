@@ -91,6 +91,8 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE goals ADD COLUMN body_fat FLOAT"))
         if "plan" not in existing:
             conn.execute(text("ALTER TABLE goals ADD COLUMN plan TEXT"))
+        if "reactivated_at" not in existing:
+            conn.execute(text("ALTER TABLE goals ADD COLUMN reactivated_at TIMESTAMP"))
 
 
 def _drop_request_logs():
@@ -313,6 +315,7 @@ class Goal(Base):
     carbs = Column(Integer, nullable=True)
     reminder_morning = Column(Boolean, default=False)
     reminder_evening = Column(Boolean, default=False)
+    reactivated_at = Column(DateTime, nullable=True, default=datetime.utcnow)
 
     user = relationship('User', back_populates='goal')
 
