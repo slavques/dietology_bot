@@ -313,6 +313,7 @@ class Goal(Base):
     carbs = Column(Integer, nullable=True)
     reminder_morning = Column(Boolean, default=False)
     reminder_evening = Column(Boolean, default=False)
+    reactivated_at = Column(DateTime, nullable=True, default=datetime.utcnow)
 
     user = relationship('User', back_populates='goal')
 

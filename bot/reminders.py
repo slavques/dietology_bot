@@ -203,7 +203,17 @@ def reminder_watcher(check_interval: int = 60):
                         .order_by(Meal.timestamp.desc())
                         .first()
                     )
-                    if last_meal and last_meal.timestamp < now - timedelta(days=3):
+                    last_activity = last_meal.timestamp if last_meal else None
+                    if getattr(goal, "reactivated_at", None):
+                        if last_activity is None:
+                            last_activity = goal.reactivated_at
+                        else:
+                            last_activity = max(last_activity, goal.reactivated_at)
+
+                    if (
+                        last_activity
+                        and last_activity < now - timedelta(days=3)
+                    ):
                         session.delete(goal)
                         log(
                             "notification",
