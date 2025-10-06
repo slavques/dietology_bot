@@ -167,6 +167,8 @@ def reminder_watcher(check_interval: int = 60):
             processed_user_ids = set()
             for user in users:
                 processed_user_ids.add(user.id)
+                if user.blocked or user.left_bot:
+                    continue
                 offset = timedelta(minutes=user.timezone or 0)
                 local_now = now + offset
 
@@ -363,6 +365,8 @@ def reminder_watcher(check_interval: int = 60):
             )
             for user in extra_users:
                 if user.id in processed_user_ids:
+                    continue
+                if user.blocked or user.left_bot:
                     continue
                 if user.grade != "free":
                     if user.goal_trial_start or user.goal_trial_notified:

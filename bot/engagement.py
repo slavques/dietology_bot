@@ -147,7 +147,11 @@ def engagement_watcher(check_interval: int = 60):
             now = datetime.utcnow()
             session = SessionLocal()
             users = session.query(User).all()
+            skip_chat_ids = set()
             for user in users:
+                if user.blocked or user.left_bot:
+                    skip_chat_ids.add(user.telegram_id)
+                    continue
                 eng = user.engagement or EngagementStatus()
                 if not user.engagement:
                     user.engagement = eng
@@ -267,6 +271,8 @@ def engagement_watcher(check_interval: int = 60):
                 ts = meal.get("timestamp")
                 if ts and now_ts - ts > 1800 and not meal.get("reminded"):
                     chat_id = meal.get("chat_id")
+                    if chat_id in skip_chat_ids:
+                        continue
                     msg_id = meal.get("message_id")
                     if await _send(
                         bot,
