@@ -91,6 +91,8 @@ def _ensure_columns():
             conn.execute(text("ALTER TABLE goals ADD COLUMN body_fat FLOAT"))
         if "plan" not in existing:
             conn.execute(text("ALTER TABLE goals ADD COLUMN plan TEXT"))
+        if "reactivated_at" not in existing:
+            conn.execute(text("ALTER TABLE goals ADD COLUMN reactivated_at TIMESTAMP"))
 
 
 def _drop_request_logs():
