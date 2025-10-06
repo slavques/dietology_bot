@@ -102,6 +102,26 @@ def _format_gpt_message(content: str, message_type: str) -> tuple[str, bool]:
     return "\n\n".join(formatted), uses_markup
 
 
+def _goal_meal_window(
+    start_local: Optional[datetime],
+    local_now: datetime,
+    offset: timedelta,
+    fallback_days: int,
+) -> tuple[datetime, datetime]:
+    """Return UTC bounds for goal reminders respecting custom notification cycles."""
+
+    end_utc = local_now - offset
+    if start_local:
+        start_utc = start_local - offset
+    else:
+        start_utc, _ = _day_bounds(local_now, offset, days=fallback_days)
+
+    if start_utc >= end_utc:
+        start_utc = end_utc - timedelta(days=1)
+
+    return start_utc, end_utc
+
+
 async def _send(
     bot: Bot,
     user: User,
@@ -208,7 +228,12 @@ def reminder_watcher(check_interval: int = 60):
                         and local_now.time().hour == target.hour
                         and local_now.time().minute == target.minute
                     ):
-                        start, end = _day_bounds(local_now, offset, days=-1)
+                        start, end = _goal_meal_window(
+                            user.last_morning,
+                            local_now,
+                            offset,
+                            fallback_days=-1,
+                        )
                         meals = (
                             session.query(Meal)
                             .filter(Meal.user_id == user.id, Meal.timestamp >= start, Meal.timestamp < end)
@@ -278,7 +303,12 @@ def reminder_watcher(check_interval: int = 60):
                         and local_now.time().hour == target.hour
                         and local_now.time().minute == target.minute
                     ):
-                        start, end = _day_bounds(local_now, offset, days=0)
+                        start, end = _goal_meal_window(
+                            user.last_morning,
+                            local_now,
+                            offset,
+                            fallback_days=0,
+                        )
                         meals = (
                             session.query(Meal)
                             .filter(Meal.user_id == user.id, Meal.timestamp >= start, Meal.timestamp < end)
