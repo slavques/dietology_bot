@@ -114,6 +114,37 @@ def ensure_user(session: SessionLocal, telegram_id: int) -> User:
     return user
 
 
+def _downgrade_to_free(user: User, *, now: Optional[datetime] = None, reason: Optional[str] = None) -> None:
+    """Reset a paid subscription back to the free tier."""
+
+    now = now or datetime.utcnow()
+    user.grade = "free"
+    user.request_limit = FREE_LIMIT
+    user.requests_used = 0
+    user.period_start = now
+    user.period_end = now + timedelta(days=30)
+    user.notified_7d = False
+    user.notified_3d = False
+    user.notified_1d = False
+    user.notified_0d = False
+    user.notified_free = True
+    user.goal_trial_start = now
+    user.goal_trial_notified = False
+    if reason:
+        log(
+            "notification",
+            "subscription expired for %s (%s)",
+            user.telegram_id,
+            reason,
+        )
+    else:
+        log(
+            "notification",
+            "subscription expired for %s",
+            user.telegram_id,
+        )
+
+
 def update_limits(user: User) -> None:
     update_monthly(user)
     now = datetime.utcnow()
@@ -150,23 +181,7 @@ def update_limits(user: User) -> None:
                     user.resume_grade = None
                     user.resume_period_end = None
             elif user.notified_0d:
-                user.grade = "free"
-                user.request_limit = FREE_LIMIT
-                user.requests_used = 0
-                user.period_start = now
-                user.period_end = now + timedelta(days=30)
-                user.notified_7d = False
-                user.notified_3d = False
-                user.notified_1d = False
-                user.notified_0d = False
-                user.notified_free = True
-                user.goal_trial_start = now
-                user.goal_trial_notified = False
-                log(
-                    "notification",
-                    "subscription expired for %s",
-                    user.telegram_id,
-                )
+                _downgrade_to_free(user, now=now)
     else:
         if user.period_end is None:
             user.period_end = user.period_start + timedelta(days=30)
@@ -471,6 +486,14 @@ async def _daily_check(bot: Bot):
                 )
                 if delivered and flag:
                     setattr(user, flag, True)
+                elif flag == "notified_0d" and not delivered:
+                    _downgrade_to_free(
+                        user,
+                        now=now,
+                        reason="delivery failed",
+                    )
+                    session.commit()
+                    continue
         update_limits(user)
         if user.grade == "free" and not user.notified_free:
             delivered = await _send_notification(
