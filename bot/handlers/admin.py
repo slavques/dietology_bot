@@ -418,6 +418,9 @@ async def admin_discount_confirm(query: types.CallbackQuery, state: FSMContext):
             return None
         if skip_inactive and (user.blocked or user.left_bot):
             return None
+        period_end = subscription.period_end
+        if period_end and period_end > decision_time - timedelta(days=3):
+            return None
         engagement = user.engagement
         if respect_cooldown and engagement and engagement.discount_sent:
             last_sent_at = engagement.discount_last_sent
