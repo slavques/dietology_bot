@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 import os
 import time
 
@@ -9,12 +9,12 @@ import time
 pending_meals: Dict[str, Dict] = {}
 
 # track reminder states for invalid photo uploads
-_document_photo_reminders: Dict[int, Dict[str, float | bool]] = {}
-_multi_photo_reminders: Dict[int, Dict[str, float | bool]] = {}
+_document_photo_reminders: Dict[int, Dict[str, Union[float, bool]]] = {}
+_multi_photo_reminders: Dict[int, Dict[str, Union[float, bool]]] = {}
 
 
 def _should_send_prompt(
-    store: Dict[int, Dict[str, float | bool]], user_id: int, cooldown: int
+    store: Dict[int, Dict[str, Union[float, bool]]], user_id: int, cooldown: int
 ) -> bool:
     """Return True if a prompt should be shown, locking it until reset."""
 
@@ -30,7 +30,9 @@ def _should_send_prompt(
     return True
 
 
-def _reset_prompt(store: Dict[int, Dict[str, float | bool]], user_id: int) -> None:
+def _reset_prompt(
+    store: Dict[int, Dict[str, Union[float, bool]]], user_id: int
+) -> None:
     state = store.get(user_id)
     if state:
         state["locked"] = False
