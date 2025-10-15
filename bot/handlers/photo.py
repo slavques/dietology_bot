@@ -265,7 +265,8 @@ async def handle_photo(message: types.Message, state: FSMContext):
 
 
 async def handle_document(message: types.Message):
-    if should_send_document_prompt(message.from_user.id):
+    throttle_key = message.from_user.id if message.from_user else message.chat.id
+    if throttle_key is None or should_send_document_prompt(throttle_key):
         await message.answer(DOCUMENT_PHOTO_ERROR)
 
 
