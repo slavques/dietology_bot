@@ -2,11 +2,19 @@ import asyncio
 import logging
 import traceback
 from datetime import datetime, timedelta, time
-from aiogram import Bot, Dispatcher, types
+from pathlib import Path
+from typing import Any, Iterable
+
+from aiogram import Bot, Dispatcher, F, types
+from aiogram.types import FSInputFile
 
 from sqlalchemy import func
 
-from .config import ALERT_BOT_TOKEN, ALERT_CHAT_IDS as ALERT_CHAT_IDS_CONFIG
+from .config import (
+    ALERT_BOT_TOKEN,
+    ALERT_CHAT_IDS as ALERT_CHAT_IDS_CONFIG,
+    LOG_DIR,
+)
 from .database import (
     SessionLocal,
     User,
@@ -238,11 +246,67 @@ async def _log_chat_id(message: types.Message) -> None:
     await message.answer(f"Chat ID: {chat_id}")
 
 
+def _collect_log_files() -> list[Path]:
+    """Return available log files sorted by modification time."""
+
+    log_dir = Path(LOG_DIR)
+    if not log_dir.exists():
+        return []
+
+    patterns: Iterable[str] = ("*.log", "*.log.*")
+    files: dict[Path, Path] = {}
+    for pattern in patterns:
+        for path in log_dir.glob(pattern):
+            if path.is_file():
+                files[path.resolve()] = path
+
+    return sorted(files.values(), key=lambda item: item.stat().st_mtime)
+
+
+async def send_log_files(message: types.Message) -> None:
+    """Send all available log files to the requesting alert chat."""
+
+    if ALERT_CHAT_IDS and message.chat.id not in ALERT_CHAT_IDS:
+        await message.answer("Команда недоступна в этом чате.")
+        return
+
+    log_files = _collect_log_files()
+    if not log_files:
+        await message.answer("Лог-файлы не найдены.")
+        return
+
+    await message.answer(f"Найдено {len(log_files)} лог-файлов, отправляю…")
+
+    for path in log_files:
+        try:
+            await message.answer_document(
+                FSInputFile(path), caption=path.name
+            )
+        except Exception:
+            logging.exception("Failed to send log file %s", path)
+            await message.answer(f"Не удалось отправить {path.name}.")
+            break
+
+
+def _logs_command_filter() -> Any:
+    """Return a filter that matches /logs commands in text or caption."""
+
+    pattern = r"^/logs(?:@\w+)?(?:\s|$)"
+    return F.text.regexp(pattern) | F.caption.regexp(pattern)
+
+
 async def run_alert_bot() -> None:
     if not alert_bot:
         raise RuntimeError("ALERT_BOT_TOKEN is not set")
     dp = Dispatcher()
+
+    logs_filter = _logs_command_filter()
+
+    dp.message.register(send_log_files, logs_filter)
     dp.message.register(_log_chat_id)
+
+    dp.channel_post.register(send_log_files, logs_filter)
+    dp.channel_post.register(_log_chat_id)
     await dp.start_polling(alert_bot)
 
 
