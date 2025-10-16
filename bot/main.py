@@ -1,6 +1,7 @@
 import logging
 import logging.handlers
 import os
+import re
 import asyncio
 from datetime import datetime, time, timedelta, timezone
 from aiogram import Bot, Dispatcher
@@ -82,7 +83,26 @@ if __name__ == '__main__':
         when='midnight',
         backupCount=3,
         atTime=rotate_time,
+        encoding="utf-8",
     )
+    file_handler.suffix = "%Y-%m-%d.log"
+
+    base_name, base_ext = os.path.splitext(os.path.basename(log_file))
+
+    # Ensure rotated logs follow the botYYYY-MM-DD.log convention expected by the alert bot.
+
+    def _log_namer(default_name: str) -> str:
+        directory, filename = os.path.split(default_name)
+        prefix = f"{base_name}{base_ext}."
+        if filename.startswith(prefix):
+            timestamp_suffix = filename[len(prefix) :]
+        else:
+            # Fall back to removing the first dot-separated segment.
+            _, _, timestamp_suffix = filename.partition(".")
+        return os.path.join(directory, f"{base_name}{timestamp_suffix}")
+
+    file_handler.namer = _log_namer
+    file_handler.extMatch = re.compile(rf"^{re.escape(base_name)}\\d{{4}}-\\d{{2}}-\\d{{2}}\\.log$")
 
     formatter = logging.Formatter(
         fmt="%(asctime)s %(levelname)s - %(message)s",
