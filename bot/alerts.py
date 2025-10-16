@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, time
 from pathlib import Path
 from typing import Iterable
 
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+from aiogram import Bot, Dispatcher, F, types
+from aiogram.filters.magic_filter import MagicFilter
 from aiogram.types import FSInputFile
 
 from sqlalchemy import func
@@ -289,16 +289,24 @@ async def send_log_files(message: types.Message) -> None:
             break
 
 
+def _logs_command_filter() -> MagicFilter:
+    """Return a filter that matches /logs commands in text or caption."""
+
+    pattern = r"^/logs(?:@\w+)?(?:\s|$)"
+    return F.text.regexp(pattern) | F.caption.regexp(pattern)
+
+
 async def run_alert_bot() -> None:
     if not alert_bot:
         raise RuntimeError("ALERT_BOT_TOKEN is not set")
     dp = Dispatcher()
-    command_filter = Command(commands={"logs"}, ignore_mention=True)
 
-    dp.message.register(send_log_files, command_filter)
+    logs_filter = _logs_command_filter()
+
+    dp.message.register(send_log_files, logs_filter)
     dp.message.register(_log_chat_id)
 
-    dp.channel_post.register(send_log_files, command_filter)
+    dp.channel_post.register(send_log_files, logs_filter)
     dp.channel_post.register(_log_chat_id)
     await dp.start_polling(alert_bot)
 
