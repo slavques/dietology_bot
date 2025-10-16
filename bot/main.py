@@ -1,6 +1,7 @@
 import logging
 import logging.handlers
 import os
+import re
 import asyncio
 from datetime import datetime, time, timedelta, timezone
 from aiogram import Bot, Dispatcher
@@ -96,7 +97,10 @@ if __name__ == '__main__':
         when='midnight',
         backupCount=3,
         atTime=rotate_time,
+        encoding="utf-8",
     )
+    file_handler.suffix = "%Y-%m-%d.log"
+    file_handler.extMatch = re.compile(r"^\\d{4}-\\d{2}-\\d{2}\\.log$")
 
     formatter = logging.Formatter(
         fmt="%(asctime)s %(levelname)s - %(message)s",
