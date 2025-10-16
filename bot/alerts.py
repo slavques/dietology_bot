@@ -293,8 +293,13 @@ async def run_alert_bot() -> None:
     if not alert_bot:
         raise RuntimeError("ALERT_BOT_TOKEN is not set")
     dp = Dispatcher()
-    dp.message.register(send_log_files, Command(commands={"logs"}))
+    command_filter = Command(commands={"logs"}, ignore_mention=True)
+
+    dp.message.register(send_log_files, command_filter)
     dp.message.register(_log_chat_id)
+
+    dp.channel_post.register(send_log_files, command_filter)
+    dp.channel_post.register(_log_chat_id)
     await dp.start_polling(alert_bot)
 
 
