@@ -5,7 +5,8 @@ from datetime import datetime, timedelta, time
 from pathlib import Path
 from typing import Iterable
 
-from aiogram import Bot, Dispatcher, F, types
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 from aiogram.types import FSInputFile
 
 from sqlalchemy import func
@@ -275,6 +276,8 @@ async def send_log_files(message: types.Message) -> None:
         await message.answer("Лог-файлы не найдены.")
         return
 
+    await message.answer(f"Найдено {len(log_files)} лог-файлов, отправляю…")
+
     for path in log_files:
         try:
             await message.answer_document(
@@ -290,7 +293,7 @@ async def run_alert_bot() -> None:
     if not alert_bot:
         raise RuntimeError("ALERT_BOT_TOKEN is not set")
     dp = Dispatcher()
-    dp.message.register(send_log_files, F.text == "/logs")
+    dp.message.register(send_log_files, Command(commands={"logs"}))
     dp.message.register(_log_chat_id)
     await dp.start_polling(alert_bot)
 
