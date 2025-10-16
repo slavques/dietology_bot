@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env if it exists
@@ -18,4 +20,16 @@ ALERT_CHAT_IDS = [int(x) for x in os.getenv("ALERT_CHAT_IDS", "").split(",") if 
 # Interval in seconds for checking subscription status.
 # Defaults to 10 minutes if the environment variable is missing.
 SUBSCRIPTION_CHECK_INTERVAL = int(os.getenv("SUBSCRIPTION_CHECK_INTERVAL", "1800"))
-LOG_DIR = os.getenv("LOG_DIR", "logs")
+
+def _resolve_path(path: str) -> str:
+    """Return an absolute path for directories configured via environment."""
+
+    resolved = Path(path).expanduser()
+    if resolved.is_absolute():
+        return str(resolved)
+
+    project_root = Path(__file__).resolve().parent.parent
+    return str(project_root / resolved)
+
+
+LOG_DIR = _resolve_path(os.getenv("LOG_DIR", "logs"))
