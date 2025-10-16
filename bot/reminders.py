@@ -113,6 +113,9 @@ def _goal_meal_window(
     end_utc = local_now - offset
     if start_local:
         start_utc = start_local - offset
+        min_start = end_utc - timedelta(days=1)
+        if start_utc < min_start:
+            start_utc = min_start
     else:
         start_utc, _ = _day_bounds(local_now, offset, days=fallback_days)
 
