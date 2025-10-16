@@ -26,7 +26,13 @@ from .subscriptions import subscription_watcher
 from .cleanup import cleanup_watcher
 from .reminders import reminder_watcher
 from .engagement import engagement_watcher
-from .alerts import token_watcher, user_stats_watcher, setup_error_alerts
+from .alerts import (
+    token_watcher,
+    user_stats_watcher,
+    setup_error_alerts,
+    setup_asyncio_error_alerts,
+    create_monitored_task,
+)
 from .error_handler import handle_error
 
 bot = Bot(token=API_TOKEN)
@@ -49,6 +55,9 @@ goals.register(dp)
 dp.errors.register(handle_error)
 
 async def main() -> None:
+    loop = asyncio.get_running_loop()
+    setup_asyncio_error_alerts(loop)
+
     watcher = subscription_watcher(bot, check_interval=SUBSCRIPTION_CHECK_INTERVAL)()
     cleanup = cleanup_watcher()()
     reminder = reminder_watcher()(bot)
@@ -56,16 +65,21 @@ async def main() -> None:
     tokens = token_watcher()
     stats = user_stats_watcher()
     tasks = [
-        asyncio.create_task(watcher),
-        asyncio.create_task(cleanup),
-        asyncio.create_task(reminder),
-        asyncio.create_task(engage),
-        asyncio.create_task(tokens),
-        asyncio.create_task(stats),
+        create_monitored_task(watcher, name="subscription_watcher"),
+        create_monitored_task(cleanup, name="cleanup_watcher"),
+        create_monitored_task(reminder, name="reminder_watcher"),
+        create_monitored_task(engage, name="engagement_watcher"),
+        create_monitored_task(tokens, name="token_watcher"),
+        create_monitored_task(stats, name="user_stats_watcher"),
     ]
-    await dp.start_polling(bot)
-    for t in tasks:
-        t.cancel()
+    try:
+        await dp.start_polling(bot)
+    except Exception:
+        logging.exception("Polling stopped due to unexpected error")
+        raise
+    finally:
+        for t in tasks:
+            t.cancel()
 
 
 if __name__ == '__main__':

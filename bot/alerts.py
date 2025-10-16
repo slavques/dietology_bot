@@ -1,9 +1,10 @@
 import asyncio
 import logging
 import traceback
+from collections.abc import Awaitable
 from datetime import datetime, timedelta, time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.types import FSInputFile
@@ -44,8 +45,29 @@ async def send_alert(*texts: str) -> None:
             pass
 
 
+def _format_exception(exc: BaseException) -> str:
+    return "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+
+
+def _schedule_alert(message: str) -> None:
+    if not alert_bot or not ALERT_CHAT_IDS:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            asyncio.run(send_alert(message))
+        except Exception:
+            pass
+    else:
+        loop.create_task(send_alert(message))
+
+
 class ErrorAlertHandler(logging.Handler):
     """Log handler that forwards error stack traces to alert chats."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.ERROR)
 
     def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - logging side effect
         if record.levelno < logging.ERROR:
@@ -55,20 +77,64 @@ class ErrorAlertHandler(logging.Handler):
         else:
             trace = record.getMessage()
         message = f"Ошибка - {trace}"
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(send_alert(message))
-        except RuntimeError:
-            try:
-                asyncio.run(send_alert(message))
-            except Exception:
-                pass
+        _schedule_alert(message)
 
 
 def setup_error_alerts() -> None:
     """Attach ErrorAlertHandler to root logger if alerting is enabled."""
     if alert_bot and ALERT_CHAT_IDS:
         logging.getLogger().addHandler(ErrorAlertHandler())
+
+
+def _notify_unexpected_error(source: str, exc: Optional[BaseException]) -> None:
+    parts = [f"Необработанная ошибка: {source}"]
+    if exc is not None:
+        parts.append(_format_exception(exc))
+    _schedule_alert("\n".join(parts))
+
+
+def setup_asyncio_error_alerts(loop: asyncio.AbstractEventLoop) -> None:
+    """Forward unexpected asyncio exceptions to alert chats."""
+
+    if not alert_bot or not ALERT_CHAT_IDS:
+        return
+
+    def _handler(_: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        exception = context.get("exception")
+        if exception is None:
+            future = context.get("future")
+            if future is not None and not future.cancelled():
+                try:
+                    exception = future.exception()
+                except Exception:
+                    exception = None
+        message = context.get("message", "asyncio loop exception")
+        _notify_unexpected_error(message, exception)
+
+    loop.set_exception_handler(_handler)
+
+
+def create_monitored_task(
+    coro: Awaitable[Any], *, name: Optional[str] = None
+) -> asyncio.Task[Any]:
+    """Create a task that reports unexpected exceptions via alert bot."""
+
+    task = asyncio.create_task(coro, name=name)
+
+    def _done_callback(done: asyncio.Task[Any]) -> None:
+        try:
+            exception = done.exception()
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            _notify_unexpected_error(name or done.get_name() or "task", exc)
+            return
+        if exception is None:
+            return
+        _notify_unexpected_error(name or done.get_name() or "task", exception)
+
+    task.add_done_callback(_done_callback)
+    return task
 
 
 class TokenMonitor:
