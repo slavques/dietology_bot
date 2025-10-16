@@ -3,10 +3,9 @@ import logging
 import traceback
 from datetime import datetime, timedelta, time
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from aiogram import Bot, Dispatcher, F, types
-from aiogram.filters.magic_filter import MagicFilter
 from aiogram.types import FSInputFile
 
 from sqlalchemy import func
@@ -289,7 +288,7 @@ async def send_log_files(message: types.Message) -> None:
             break
 
 
-def _logs_command_filter() -> MagicFilter:
+def _logs_command_filter() -> Any:
     """Return a filter that matches /logs commands in text or caption."""
 
     pattern = r"^/logs(?:@\w+)?(?:\s|$)"
